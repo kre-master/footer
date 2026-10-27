@@ -6659,7 +6659,7 @@ function shareTeamsOnWhatsApp() {
 
 function getShareAppUrl() {
   if (location.protocol === "file:" || location.hostname === "127.0.0.1" || location.hostname === "localhost") {
-    return "https://kre-master.github.io/equilibrador-5v5/";
+    return "https://kre-master.github.io/footer/";
   }
   return location.href.split("#")[0];
 }
@@ -10872,7 +10872,7 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `equilibrador-5v5-${formatDateForFile(new Date().toISOString())}.json`;
+  link.download = `footer-${formatDateForFile(new Date().toISOString())}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }

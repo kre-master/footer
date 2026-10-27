@@ -37,5 +37,5 @@ createServer(async (req, res) => {
     res.end("Not found");
   }
 }).listen(port, "127.0.0.1", () => {
-  console.log(`Equilibrador 5v5: http://127.0.0.1:${port}`);
+  console.log(`Footer: http://127.0.0.1:${port}`);
 });

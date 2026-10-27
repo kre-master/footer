@@ -1,4 +1,4 @@
-package com.kremaster.equilibrador5v5;
+package com.kremaster.footer;
 
 import com.getcapacitor.BridgeActivity;
 
