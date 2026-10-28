@@ -167,6 +167,9 @@ let currentInviteCode = null;
 // Grupos novos (fase 3.3): pedidos da propria conta e, para o dono da app, todos os pendentes.
 let isPlatformAdmin = false;
 let groupRequests = [];
+// Quarentena de grupos: os que esta conta pode recuperar e, para o dono da app, todos os grupos.
+let deletedGroups = [];
+let allGroups = [];
 let newGroupFormOpen = false;
 const PUBLIC_GAME_ERRORS = {
   traits_required: "Preenche primeiro as tuas caracteristicas na Conta.",
@@ -1555,14 +1558,14 @@ function renderNewGroupPanel() {
         <textarea data-new-group="notes" maxlength="300" rows="2" placeholder="Notas (opcional)"></textarea>
       </div>
       <div class="actions">
-        <button class="primary-btn" data-submit-new-group>Pedir grupo</button>
+        <button class="primary-btn" data-submit-new-group>Criar grupo</button>
         <button class="ghost-btn" data-close-new-group>Cancelar</button>
       </div>`;
   } else {
     body = `
       ${lastDecided?.status === "approved" ? `<p class="hint good">O grupo ${escapeHtml(lastDecided.name)} foi aprovado.</p>` : ""}
       ${lastDecided?.status === "rejected" ? `<p class="hint warn">O pedido do grupo ${escapeHtml(lastDecided.name)} nao foi aprovado.</p>` : ""}
-      <p>Tens um grupo de amigos que joga com regularidade? Pede um grupo proprio, com convocatorias e perfis privados.</p>
+      <p>Tens um grupo de amigos que joga com regularidade? Cria um grupo proprio, com convocatorias e perfis privados. Ficas logo como dono e convidas os teus amigos.</p>
       <div class="actions"><button class="ghost-btn" data-open-new-group>Criar um grupo novo</button></div>`;
   }
   panel.innerHTML = `<div class="account-card"><h3>Criar um grupo</h3>${body}</div>`;
@@ -1574,7 +1577,7 @@ function renderNewGroupPanel() {
     newGroupFormOpen = false;
     renderNewGroupPanel();
   });
-  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", submitNewGroupRequest);
+  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", submitNewGroup);
   panel.querySelector("[data-cancel-group-request]")?.addEventListener("click", async (event) => {
     if (!confirm("Cancelar o pedido do grupo?")) return;
     await supabaseClient.rpc("cancel_group_request", { p_request_id: event.currentTarget.dataset.cancelGroupRequest });
@@ -1584,29 +1587,34 @@ function renderNewGroupPanel() {
   });
 }
 
-async function submitNewGroupRequest() {
+// Cria o grupo na hora (sem aprovacao); quem cria fica dono e passa logo para o grupo novo.
+async function submitNewGroup() {
   const panel = document.querySelector("#new-group-panel");
   const value = (field) => panel?.querySelector(`[data-new-group="${field}"]`)?.value.trim() || "";
   if (value("name").length < 2) {
     alert("Escreve o nome do grupo.");
     return;
   }
-  const { error } = await supabaseClient.rpc("request_group", {
+  const { data: groupId, error } = await supabaseClient.rpc("create_group", {
     p_name: value("name"),
     p_location: value("location"),
     p_schedule: value("schedule"),
     p_notes: value("notes"),
   });
   if (error) {
-    alert(String(error.message || "").includes("request_pending")
-      ? "Ja tens um pedido de grupo pendente."
-      : `Nao consegui enviar o pedido: ${error.message}`);
+    alert(String(error.message || "").includes("group_limit_reached")
+      ? "Ja es dono de 2 grupos. Nao da para criar mais."
+      : `Nao consegui criar o grupo: ${error.message}`);
     return;
   }
   newGroupFormOpen = false;
+  writeActiveGroupId(groupId);
+  await loadAccountState();
+  await loadRemoteState();
   await loadGroupRequests();
-  renderNewGroupPanel();
-  renderGroupRequestsList();
+  updateAccessUi();
+  showView("events");
+  render();
 }
 
 // Dono da app: aprovar ou recusar grupos novos.
@@ -1913,23 +1921,49 @@ function markPublicGamesSeen() {
     // Sem armazenamento local: a bolinha volta na proxima visita.
   }
   renderGamesTabBadge();
+  renderAdminBadges();
 }
 
 // Bolinha vermelha em Jogos: pedidos por decidir (admin), convites recebidos e jogos publicos novos.
-function getGamesAttentionCount() {
+// Pedidos para jogar nos jogos do grupo (admins) ficam em "Os meus jogos"; convites e jogos novos de outros grupos em "Jogos publicos".
+function getGamesAttention() {
   const pendingRequests = isAdmin ? joinRequests.filter((row) => row.status === "pending").length : 0;
   const invites = publicEvents.filter((row) => row.my_status === "invited").length;
   const seen = readPublicSeen();
   const newGames = publicEvents.filter((row) => !row.my_status && !seen.has(row.event_id)).length;
-  return pendingRequests + invites + newGames;
+  return { mine: pendingRequests, public: invites + newGames };
+}
+
+function getGamesAttentionCount() {
+  const attention = getGamesAttention();
+  return attention.mine + attention.public;
+}
+
+// Numero vermelho em Admin e em Pedidos: perfis por aprovar e (dono da app) grupos pedidos.
+function getAdminPendingCount() {
+  const claims = isAdmin ? playerClaims.filter((claim) => claim.status === "pending").length : 0;
+  const groups = isPlatformAdmin ? groupRequests.filter((row) => row.status === "pending").length : 0;
+  return claims + groups;
+}
+
+function renderAdminBadges() {
+  const count = getAdminPendingCount();
+  setBadgeCount("#admin-tab-badge", count);
+  setBadgeCount("#claims-subtab-badge", count);
+}
+
+function setBadgeCount(selector, count) {
+  const badge = document.querySelector(selector);
+  if (!badge) return;
+  badge.classList.toggle("hidden", !count);
+  badge.textContent = count > 9 ? "9+" : String(count || "");
 }
 
 function renderGamesTabBadge() {
-  const badge = document.querySelector("#games-tab-badge");
-  if (!badge) return;
-  const count = getGamesAttentionCount();
-  badge.classList.toggle("hidden", !count);
-  badge.textContent = count > 9 ? "9+" : String(count || "");
+  const attention = getGamesAttention();
+  setBadgeCount("#games-tab-badge", attention.mine + attention.public);
+  setBadgeCount("#mygames-subtab-badge", attention.mine);
+  setBadgeCount("#public-subtab-badge", attention.public);
 }
 
 async function loadMyTraits() {
@@ -2526,6 +2560,8 @@ function showView(viewName, options = {}) {
   if (viewName === "public-games") markPublicGamesSeen();
   if (viewName === "my-games") loadMyGames();
   if (viewName === "club") renderClubPanel();
+  if (viewName === "account") loadDeletedGroups();
+  if (viewName === "claims") loadAllGroups();
   if (viewName === "today") {
     // Vindo de "abrir jogo" ou de importar confirmados: leva o utilizador ate as equipas.
     requestAnimationFrame(() => document.querySelector("#generate-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -3090,6 +3126,7 @@ function render() {
   renderPublicGames();
   renderAvailabilityPanel();
   renderGamesTabBadge();
+  renderAdminBadges();
   renderTraitsPanel();
   renderGroupBanner();
   renderInvitePanel();
@@ -3205,7 +3242,7 @@ function renderAccountPanel() {
       ${activeGroupId ? `
         <div class="create-own-player">
           <strong>Nao estas na lista?</strong>
-          <p class="hint">Cria o teu perfil. Fica com uma nota provisoria ate o admin aprovar e a acertar.</p>
+          <p class="hint">Cria o teu perfil e ficas logo ligado, com uma nota provisoria que o admin acerta depois.</p>
           <div class="add-guest-row">
             <input data-own-player-name maxlength="40" placeholder="O teu nome" value="${escapeHtml(currentProfile?.display_name || "")}">
             <button class="ghost-btn" data-create-own-player>Criar o meu perfil</button>
@@ -3222,7 +3259,7 @@ function renderAccountPanel() {
   bindAccountPanelActions();
 }
 
-// Membro novo que nao esta na lista: cria a ficha e fica como pedido pendente para o admin.
+// Membro novo que nao esta na lista: cria a ficha e fica logo ligado (o admin acerta a nota depois).
 async function createOwnPlayer() {
   if (!supabaseClient || !currentSession?.user || !activeGroupId) return;
   const name = els.accountPanel?.querySelector("[data-own-player-name]")?.value.trim() || "";
@@ -3242,6 +3279,7 @@ async function createOwnPlayer() {
   }
   await loadAccountState();
   await loadRemoteState();
+  showView(getLinkedPlayer() ? "player-profile" : "account");
   render();
 }
 
@@ -6118,7 +6156,12 @@ function renderEventPublicSection(eventData) {
         </div>
         <button class="${missing || pending.length ? "primary-btn" : "ghost-btn"}" data-recruit-toggle="${eventData.id}">${open ? "Fechar" : "Procurar jogadores"}</button>
       </div>
-      ${open ? renderRecruitBody(eventData, pending, accepted) : ""}
+      ${open ? renderRecruitBody(eventData, pending, accepted) : pending.length ? `
+        <div class="join-requests">
+          <strong>Pedidos recebidos (${pending.length})</strong>
+          ${pending.map((row) => renderJoinRequestRow(row, eventData)).join("")}
+        </div>
+      ` : ""}
     </div>
   `;
 }
@@ -6307,8 +6350,9 @@ function renderPublicGames() {
   const panel = document.querySelector("#public-games-panel");
   const list = document.querySelector("#public-games-list");
   if (!panel || !list) return;
-  const subtab = document.querySelector("#public-games-subtab");
-  if (subtab) subtab.textContent = publicEvents.length ? `Jogos publicos (${publicEvents.length})` : "Jogos publicos";
+  // So o texto: o numero vermelho fica no mesmo botao.
+  const subtabLabel = document.querySelector("#public-games-subtab [data-subtab-label]");
+  if (subtabLabel) subtabLabel.textContent = publicEvents.length ? `Jogos publicos (${publicEvents.length})` : "Jogos publicos";
   if (!publicEvents.length) {
     list.innerHTML = `<div class="empty-state">${currentSession?.user
       ? "Sem jogos publicos de momento. Quando um grupo abrir um jogo a quem nao e do grupo, aparece aqui."
@@ -6374,6 +6418,7 @@ async function respondToInvite(eventId, accept) {
   await loadPublicEvents();
   renderPublicGames();
   renderGamesTabBadge();
+  renderAdminBadges();
 }
 
 async function changePublicRequest(eventId, request) {
@@ -6453,6 +6498,7 @@ function renderEventCard(eventData) {
   const confirmedGame = eventGame && !isFinishedGame(eventGame) ? eventGame : null;
   const detailsAttrs = (key) => `data-event-details="${eventData.id}:${key}" ${openEventDetails.has(`${eventData.id}:${key}`) ? "open" : ""}`;
   const isCancelled = eventData.status === "cancelled";
+  const pendingJoins = isAdmin ? joinRequests.filter((row) => row.event_id === eventData.id && row.status === "pending").length : 0;
   return `
     <article class="event-card ${isSelected ? "selected" : ""}">
       <div class="event-top">
@@ -6483,8 +6529,8 @@ function renderEventCard(eventData) {
         ` : `<button class="primary-btn" data-event-generate="${eventData.id}" ${going.length < eventData.minPlayers || going.length > Math.min(eventData.maxPlayers, 12) ? "disabled" : ""}>Fazer equipas</button>`}
         <button class="ghost-btn" data-event-share="${eventData.id}">WhatsApp</button>
       </div>
-      <details class="event-more admin-actions" ${detailsAttrs("manage")}>
-        <summary>Gerir convocatoria</summary>
+      <details class="event-more admin-actions" ${detailsAttrs("manage")} ${pendingJoins ? "open" : ""}>
+        <summary>Gerir convocatoria${pendingJoins ? ` <span class="subtab-badge">${pendingJoins}</span> ${pendingJoins === 1 ? "pedido para jogar" : "pedidos para jogar"}` : ""}</summary>
         <div class="event-date-edit">
           <label class="game-date-control">
             <span>Data/hora</span>
@@ -8905,7 +8951,13 @@ function renderClubPanel() {
       </div>
     </section>
     ${canEdit ? '<section class="club-block" id="club-join-requests"></section>' : ""}
-    ${renderClubSearchSection()}`;
+    ${renderClubSearchSection()}
+    ${group.role === "owner" && remoteEnabled ? `
+      <section class="club-block club-danger">
+        <h4>Apagar grupo</h4>
+        <p class="hint">O grupo desaparece logo para todos os membros. Podes recupera-lo durante 30 dias em "A minha conta"; depois e apagado de vez, com jogadores, jogos e estatisticas.</p>
+        <button type="button" class="danger-btn" data-club-delete="${escapeHtml(group.id)}">Apagar ${escapeHtml(group.name)}</button>
+      </section>` : ""}`;
   bindClubSearch(panel);
   if (canEdit) loadClubJoinRequests(group);
 
@@ -8919,6 +8971,7 @@ function renderClubPanel() {
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
   panel.querySelectorAll("[data-club-leave]").forEach((button) => button.addEventListener("click", () => leaveClub(button.dataset.clubLeave)));
+  panel.querySelector("[data-club-delete]")?.addEventListener("click", () => deleteGroup(group.id, group.name));
 
   const editor = panel.querySelector("[data-club-editor]");
   if (!editor) return;
@@ -9083,6 +9136,98 @@ async function leaveClub(groupId) {
     return;
   }
   window.location.reload();
+}
+
+// ---- Apagar grupos com quarentena de 30 dias (dono do grupo ou dono da app) ----
+async function deleteGroup(groupId, name) {
+  const typed = prompt(`Para apagar, escreve o nome do grupo: ${name}\n\nO grupo desaparece logo para todos. Podes recupera-lo durante 30 dias.`);
+  if (typed == null) return;
+  if (typed.trim().toLowerCase() !== String(name).trim().toLowerCase()) {
+    alert("O nome nao coincide. O grupo nao foi apagado.");
+    return;
+  }
+  const { data: purgeAt, error } = await supabaseClient.rpc("delete_group", { p_group_id: groupId });
+  if (error) {
+    const message = String(error.message || "");
+    alert(message.includes("legacy_group_protected")
+      ? "Este grupo e o original da app e esta protegido."
+      : message.includes("group_owner_required")
+        ? "So o dono do grupo pode apaga-lo."
+        : `Nao consegui apagar o grupo: ${message}`);
+    return;
+  }
+  alert(`${name} foi apagado. Podes recupera-lo ate ${formatDate(purgeAt)} em "A minha conta".`);
+  window.location.reload();
+}
+
+async function restoreGroup(groupId) {
+  const { error } = await supabaseClient.rpc("restore_group", { p_group_id: groupId });
+  if (error) {
+    alert(String(error.message || "").includes("restore_window_over")
+      ? "Ja passaram os 30 dias. O grupo nao pode ser recuperado."
+      : `Nao consegui recuperar o grupo: ${error.message}`);
+    return;
+  }
+  window.location.reload();
+}
+
+async function loadDeletedGroups() {
+  if (!remoteEnabled || !supabaseClient || !currentSession?.user) return;
+  const { data, error } = await supabaseClient.rpc("list_deleted_groups");
+  // Sem a migracao group-quarantine-migration.sql a funcao nao existe: o painel fica vazio.
+  deletedGroups = error ? [] : data || [];
+  renderDeletedGroupsPanel();
+}
+
+function renderDeletedGroupsPanel() {
+  const panel = document.querySelector("#deleted-groups-panel");
+  if (!panel) return;
+  if (!deletedGroups.length) {
+    panel.innerHTML = "";
+    return;
+  }
+  panel.innerHTML = `
+    <div class="account-card">
+      <h3>Grupos apagados</h3>
+      <p class="hint">Estao em quarentena. Recupera-os antes da data indicada; depois sao apagados de vez.</p>
+      <div class="club-list">
+        ${deletedGroups.map((item) => `
+          <div class="club-row">
+            <div class="club-row-text"><strong>${escapeHtml(item.name)}</strong><small>Apagado de vez a ${escapeHtml(formatDate(item.purge_at))}</small></div>
+            <button type="button" class="primary-btn" data-restore-group="${escapeHtml(item.id)}">Recuperar</button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  panel.querySelectorAll("[data-restore-group]").forEach((button) => button.addEventListener("click", () => restoreGroup(button.dataset.restoreGroup)));
+}
+
+async function loadAllGroups() {
+  if (!isPlatformAdmin || !supabaseClient) {
+    renderAllGroupsList();
+    return;
+  }
+  const { data, error } = await supabaseClient.rpc("list_all_groups");
+  allGroups = error ? [] : data || [];
+  renderAllGroupsList();
+}
+
+function renderAllGroupsList() {
+  const section = document.querySelector("#all-groups-section");
+  const list = document.querySelector("#all-groups-list");
+  if (!section || !list) return;
+  section.classList.toggle("hidden", !isPlatformAdmin || !allGroups.length);
+  list.innerHTML = allGroups.map((item) => `
+    <div class="club-row">
+      <div class="club-row-text">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.owner_name || "Sem dono")} · ${item.member_count} ${item.member_count === 1 ? "membro" : "membros"}${item.deleted_at ? ` · apagado, de vez a ${escapeHtml(formatDate(item.purge_at))}` : ""}</small>
+      </div>
+      ${item.deleted_at
+        ? `<button type="button" class="primary-btn" data-restore-group="${escapeHtml(item.id)}">Recuperar</button>`
+        : item.protected ? `<span class="metric">Protegido</span>` : `<button type="button" class="ghost-btn danger" data-delete-group="${escapeHtml(item.id)}" data-group-name="${escapeHtml(item.name)}">Apagar</button>`}
+    </div>`).join("");
+  list.querySelectorAll("[data-restore-group]").forEach((button) => button.addEventListener("click", () => restoreGroup(button.dataset.restoreGroup)));
+  list.querySelectorAll("[data-delete-group]").forEach((button) => button.addEventListener("click", () => deleteGroup(button.dataset.deleteGroup, button.dataset.groupName)));
 }
 
 // Historico do jogador: jogos de todos os grupos a que pertence (o RLS ja limita aos seus grupos).

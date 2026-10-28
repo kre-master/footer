@@ -8,6 +8,26 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.12.0",
+      date: "2026-10-28",
+      title: "Avisos de admin e apagar grupos",
+      items: [
+        "Os admins veem um número vermelho em Admin e em Pedidos quando há pedidos por aprovar.",
+        "Em Jogos, o número vermelho aparece também em Os meus jogos (pedidos para jogar) ou em Jogos públicos (convites e jogos novos). Os pedidos para jogar ficam logo visíveis na convocatória.",
+        "O dono de um grupo pode apagá-lo no Clube. O grupo fica 30 dias em quarentena e pode ser recuperado em A minha conta; depois é apagado de vez.",
+      ],
+    },
+    {
+      version: "1.11.0",
+      date: "2026-10-28",
+      title: "Criar grupos sem esperar",
+      items: [
+        "Quem cria um grupo fica logo como dono, sem aprovação. Cada conta pode ser dona de até 2 grupos.",
+        "Se não estás na lista do teu grupo, crias o teu perfil e ficas logo ligado; o admin acerta a nota depois.",
+        "Escolher um perfil que já existe continua a precisar da aprovação do admin.",
+      ],
+    },
+    {
       version: "1.10.2",
       date: "2026-10-28",
       title: "Primeiros passos do grupo",

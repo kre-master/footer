@@ -72,3 +72,4 @@ Depois de alterar:
 - Retomar fase 3.1 (jogos publicos).
 - Hall of Fame fase 2: categorias de video (ver [[03 - Decisoes e regras]], seccao Hall of Fame). Validar primeiro o novo desenho no telemovel.
 - Rever a Revisao do mes no telemovel com um mes real fechado (outubro fecha depois do ultimo jogo + 24 h de MVP e do dia 1 de novembro).
+- Opcional: "Transferir dono" de um grupo para outro admin.

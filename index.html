@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261028-hof2">
+    <link rel="stylesheet" href="styles.css?v=20261028-quarantine3">
   </head>
   <body>
     <div class="app-shell">
@@ -69,11 +69,12 @@
           <button class="tab admin-only" type="button" data-view="payments">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>
             <span>Admin</span>
+            <span class="tab-badge hidden" id="admin-tab-badge" aria-hidden="true"></span>
           </button>
         </nav>
         <nav class="subtabs hidden" data-group="game" aria-label="Jogos">
-          <button class="subtab" type="button" data-view="events">Os meus jogos</button>
-          <button class="subtab" type="button" data-view="public-games" id="public-games-subtab">Jogos publicos</button>
+          <button class="subtab" type="button" data-view="events">Os meus jogos <span class="subtab-badge hidden" id="mygames-subtab-badge" aria-hidden="true"></span></button>
+          <button class="subtab" type="button" data-view="public-games" id="public-games-subtab"><span data-subtab-label>Jogos publicos</span> <span class="subtab-badge hidden" id="public-subtab-badge" aria-hidden="true"></span></button>
           <button class="subtab admin-only" type="button" data-view="new-game">Nova convocatoria</button>
         </nav>
         <nav class="subtabs hidden" data-group="history" aria-label="Historico">
@@ -88,7 +89,7 @@
         </nav>
         <nav class="subtabs hidden" data-group="admin" aria-label="Admin">
           <button class="subtab" type="button" data-view="payments">Pagamentos</button>
-          <button class="subtab" type="button" data-view="claims">Pedidos</button>
+          <button class="subtab" type="button" data-view="claims">Pedidos <span class="subtab-badge hidden" id="claims-subtab-badge" aria-hidden="true"></span></button>
         </nav>
       </header>
 
@@ -259,6 +260,7 @@
             <div id="account-panel" class="account-panel"></div>
             <div id="traits-panel" class="traits-panel"></div>
             <div id="new-group-panel" class="traits-panel"></div>
+            <div id="deleted-groups-panel" class="traits-panel"></div>
           </section>
         </section>
 
@@ -341,6 +343,16 @@
               </div>
             </div>
             <div id="group-requests-list" class="group-requests-list"></div>
+          </section>
+          <section class="panel wide-panel hidden" id="all-groups-section">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Dono da app</p>
+                <h2>Todos os grupos</h2>
+              </div>
+            </div>
+            <p class="hint">Um grupo apagado desaparece logo para todos e pode ser recuperado durante 30 dias. Depois é apagado de vez.</p>
+            <div id="all-groups-list" class="club-list"></div>
           </section>
           <section class="panel wide-panel">
             <div class="panel-head">
@@ -547,7 +559,7 @@
     <script src="player-insights.js?v=20261028-review1"></script>
     <script src="month-review.js?v=20261028-review1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
-    <script src="notifications.js?v=20261028-onb1"></script>
-    <script src="app.js?v=20261028-onb1"></script>
+    <script src="notifications.js?v=20261028-quarantine3"></script>
+    <script src="app.js?v=20261028-quarantine3"></script>
   </body>
 </html>

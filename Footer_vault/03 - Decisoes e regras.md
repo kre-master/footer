@@ -228,3 +228,16 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - O papel `anon` deixou de ter permissoes de escrita nas tabelas; `TRUNCATE`, `TRIGGER` e `REFERENCES` sairam de `anon` e `authenticated`.
 - Decisao do utilizador: manter a password minima em 6 caracteres.
 - Riscos conhecidos e aceites por agora: `email_for_login` revela o email de quem souber o username; um admin de grupo pode editar email/username/nome dos membros do seu grupo; protecao contra passwords vazadas desligada.
+
+## Grupos e perfis sem aprovacao (2026-10-28)
+
+- Criar grupo e automatico (`create_group`): quem cria fica dono; maximo 2 grupos como dono por conta. Fica um registo "approved" em `group_requests`. O antigo `request_group`/aprovacao do dono da app deixa de ser usado pela app (pedidos pendentes antigos continuam a aparecer em Admin > Pedidos).
+- Criar o proprio perfil novo ("Nao estas na lista?") liga logo a conta, com nota provisoria. Escolher um perfil existente continua a precisar do admin do grupo (evita alguem ficar com o historico de outro).
+- Ainda nao ha forma, na app, de o dono da app apagar ou suspender grupos; so pelo painel do Supabase.
+
+## Avisos de admin e apagar grupos (2026-10-28)
+
+- Numero vermelho em Admin e em Admin > Pedidos: perfis por aprovar (admins) + pedidos de grupos novos pendentes (dono da app). Pagamentos nao tem numero.
+- Apagar grupo: o dono do grupo (no Clube, escrevendo o nome para confirmar) ou o dono da app (Admin > Pedidos > Todos os grupos). O grupo desaparece logo para todos (as funcoes `is_group_member`/`is_group_admin` ignoram grupos apagados), os convites sao anulados e fica 30 dias em quarentena. Recuperar: dono do grupo em "A minha conta > Grupos apagados" ou dono da app em "Todos os grupos". Ao fim de 30 dias, `private.purge_deleted_groups()` (pg_cron diario as 03:17 UTC) apaga tudo de vez.
+- O grupo original (legacy, Futeboleiros) esta protegido e nao pode ser apagado.
+- Numeros vermelhos em Jogos: "Os meus jogos" conta pedidos para jogar nos jogos do grupo (admins); "Jogos publicos" conta convites e jogos novos de outros grupos. Com pedidos pendentes, "Gerir convocatoria" abre sozinho e os pedidos aparecem logo com Aceitar/Recusar.
