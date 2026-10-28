@@ -5018,7 +5018,6 @@ function renderPaymentsPanel() {
 
 // Hall of Fame: periodo escolhido no seletor e listas abertas sobrevivem aos re-renders.
 let statsPeriod = "all";
-const openStatsLists = new Set();
 const STATS_PERIODS = [["month", "Este mes"], ["season", "Epoca"], ["all", "Sempre"]];
 const HOF_ICONS = {
   trophy: "M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6M10 17h4",
@@ -5087,7 +5086,7 @@ function renderStatsVideoSection(range, partial) {
     <h3 class="hof-section-title">Em campo <span class="hof-beta">Beta</span>${partial ? ` <span class="hof-partial">Parcial</span>` : ""}</h3>
     <p class="hof-note">Números do tracking de vídeo · ${analysed} de ${finished.length} jogos analisados. Só entram jogadores com 10 min ou mais observados e fora da baliza.</p>`;
   if (!rows.length) {
-    return `<section class="hof-section">${head}<article class="hof-card"><p class="hof-empty">Ainda não há jogos analisados por vídeo neste período.</p></article></section>`;
+    return `<section class="hof-section">${head}<div class="hof-rail"><article class="hof-card hof-tone-slate"><p class="hof-empty">Ainda não há jogos analisados por vídeo neste período.</p></article></div></section>`;
   }
   const tagOf = (list) => {
     const status = FooterInsights.weakestOf(list);
@@ -5108,10 +5107,11 @@ function renderStatsVideoSection(range, partial) {
   const passer = top((s) => s.passes.total, (s) => s.passes.status);
   const pairs = getHallPassPairs(range);
   const card = (icon, title, list, valueOf, extraOf, emptyMessage) =>
-    renderStatsList(icon, title, list, (row, index) => renderStatsPlayerRow(row, index, valueOf(row), extraOf ? extraOf(row) : ""), emptyMessage, `video-${title}`, tagOf(list.map((row) => row.status)));
+    renderStatsList(icon, title, list, (row, index) => renderStatsPlayerRow(row, index, valueOf(row), extraOf ? extraOf(row) : ""), emptyMessage, tagOf(list.map((row) => row.status)));
   return `
     <section class="hof-section">
       ${head}
+      <div class="hof-rail" data-hof-rail>
       ${card("pace", "Motor · m/min", motor, (row) => `${formatTrackingNumber(row.summary.pace.value)} m/min`, null, "Sem dados.")}
       ${card("distance", "Maratonista · distância", marathon, (row) => `${formatTrackingNumber(row.summary.distance.totalM / 1000, 1)} km`, null, "Sem dados.")}
       ${card("speed", "Relâmpago · velocidade máx.", lightning, (row) => `${formatTrackingNumber(row.summary.maxSpeed.value, 1)} km/h`,
@@ -5119,7 +5119,8 @@ function renderStatsVideoSection(range, partial) {
           ? ` <button type="button" class="hof-moment" data-stats-moment="${escapeHtml(row.summary.maxSpeed.gameId)}" data-stats-moment-at="${row.summary.maxSpeed.atS}" aria-label="Ver o momento">▶</button>` : ""), "Sem dados.")}
       ${card("sprints", "Sprinter · sprints por jogo", sprinter, (row) => formatTrackingNumber(row.avg, 1), null, "Sem dados.")}
       ${card("passes", "Passador · passes detetados", passer, (row) => `${formatTrackingNumber(row.summary.passes.total)} passes`, null, "Sem dados.")}
-      ${renderStatsList("people", "Ligação · mais passes entre dois", pairs, (row, index) => renderPassPairRow(row, index), "Sem ligações detetadas.", "video-ligacao", FooterInsights.statusText("detected"))}
+      ${renderStatsList("people", "Ligação · mais passes entre dois", pairs, (row, index) => renderPassPairRow(row, index), "Sem ligações detetadas.", FooterInsights.statusText("detected"))}
+      </div>
     </section>`;
 }
 
@@ -5177,7 +5178,7 @@ function renderStatsPanel() {
       ${periodControl}
       <p class="hof-summary">${activeRows.length} jogadores · ${gamesCount} ${gamesCount === 1 ? "jogo" : "jogos"} · ${mvpHistoryRows.length} MVPs${monthOpen ? ` <span class="hof-partial">Parcial · mês em curso</span>` : ""}</p>
 
-      <div class="hof-carousel" aria-label="Destaques">
+      <div class="hof-carousel" data-hof-rail aria-label="Destaques">
         ${renderStatsHighlight("trophy", "Mais vitorias", mostWins?.wins || 0, mostWins?.player, `${mostWins?.appearances || 0} presencas`, "gold")}
         ${renderStatsHighlight("star", "Mais MVPs", mostMvps?.mvpCount || 0, mostMvps?.player, `${mostMvps?.appearances || 0} jogos`, "violet")}
         ${renderStatsHighlight("flame", "Maior sequencia", bestStreak?.bestWinStreak || 0, bestStreak?.player, "vitorias seguidas", "coral")}
@@ -5186,24 +5187,30 @@ function renderStatsPanel() {
 
       <section class="hof-section">
         <h3 class="hof-section-title">Resultados</h3>
+        <div class="hof-rail" data-hof-rail>
         ${renderStatsRanking("trophy", "Mais vitorias", activeRows.slice().sort(sortByWins).slice(0, 5), (row) => `${row.wins}V em ${row.appearances}J`)}
         ${renderStatsRanking("chart", "Melhor win rate", winRateRows, (row) => `${row.winRate}% · ${row.wins}V/${row.appearances}J`)}
         ${renderStatsRanking("flame", "Vitorias seguidas", activeRows.slice().sort(sortByWinStreak).slice(0, 5), (row) => `${row.bestWinStreak} seguidas`)}
         ${renderStatsRanking("target", "Golos marcados por jogo", goalsForRows, (row) => formatStatsAverage(row.goalsForAverage), statsPeriod === "month" ? "Ainda sem jogos neste mes." : "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.", partialGoals ? "Parcial" : "")}
         ${renderStatsRanking("shield", "Menos golos sofridos por jogo", goalsAgainstRows, (row) => formatStatsAverage(row.goalsAgainstAverage), statsPeriod === "month" ? "Ainda sem jogos neste mes." : "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.", partialGoals ? "Parcial" : "")}
+        </div>
       </section>
 
       <section class="hof-section">
         <h3 class="hof-section-title">Presenca e premios</h3>
+        <div class="hof-rail" data-hof-rail>
         ${renderStatsRanking("calendar", "Mais presencas", activeRows.slice().sort(sortByAppearances).slice(0, 5), (row) => `${row.appearances} jogos`)}
         ${renderStatsRanking("star", "Mais MVPs", activeRows.slice().sort(sortByMvps).slice(0, 5), (row) => `${row.mvpCount} MVP${row.mvpCount === 1 ? "" : "s"}`)}
         ${renderMvpHistoryRanking(mvpHistoryRows)}
+        </div>
       </section>
 
       <section class="hof-section">
         <h3 class="hof-section-title">Combinacoes</h3>
+        <div class="hof-rail" data-hof-rail>
         ${renderPairRanking(pairRows)}
         ${renderTrioRanking(trioRows)}
+        </div>
       </section>
 
       ${renderStatsVideoSection(range, monthOpen)}
@@ -5222,12 +5229,26 @@ function renderStatsPanel() {
   els.statsPanel.querySelectorAll("[data-stats-moment]").forEach((button) => {
     button.addEventListener("click", () => openSpeedMoment(button.dataset.statsMoment, Number(button.dataset.statsMomentAt)));
   });
-  els.statsPanel.querySelectorAll("details[data-stats-list]").forEach((details) => {
-    details.addEventListener("toggle", () => {
-      if (details.open) openStatsLists.add(details.dataset.statsList);
-      else openStatsLists.delete(details.dataset.statsList);
-    });
-  });
+  els.statsPanel.querySelectorAll("[data-hof-rail]").forEach(bindHofRail);
+}
+
+// Pontos de pagina por baixo de cada carrossel; acompanham o cartao mais proximo do inicio.
+function bindHofRail(rail) {
+  const cards = [...rail.children];
+  if (cards.length < 2) return;
+  const dots = document.createElement("div");
+  dots.className = "hof-dots";
+  dots.setAttribute("aria-hidden", "true");
+  dots.innerHTML = cards.map((_, index) => `<i class="${index ? "" : "active"}"></i>`).join("");
+  rail.after(dots);
+  const update = () => {
+    const atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
+    const index = atEnd ? cards.length - 1 : cards.reduce((best, card, i) => (
+      Math.abs(card.offsetLeft - rail.scrollLeft) < Math.abs(cards[best].offsetLeft - rail.scrollLeft) ? i : best
+    ), 0);
+    [...dots.children].forEach((dot, i) => dot.classList.toggle("active", i === index));
+  };
+  rail.addEventListener("scroll", update, { passive: true });
 }
 
 function hasValidFinalScore(game) {
@@ -5432,24 +5453,20 @@ function renderStatsHighlight(icon, label, value, playerData, detail, tone) {
   `;
 }
 
-const STATS_LIST_VISIBLE = 3;
+const HOF_TONES = {
+  trophy: "gold", chart: "blue", flame: "coral", target: "green", shield: "teal", calendar: "blue",
+  star: "violet", people: "teal", history: "slate", pace: "teal", distance: "blue", speed: "orange", sprints: "coral", passes: "gold",
+};
+const STATS_LIST_LIMIT = 5;
 
-// Lista agrupada ao estilo iOS: top 3 sempre visivel, o resto abre em "Ver todos".
-function renderStatsList(icon, title, items, renderRow, emptyMessage, key, badge = "") {
-  const visible = items.slice(0, STATS_LIST_VISIBLE);
-  const rest = items.slice(STATS_LIST_VISIBLE);
+// Cartao de um carrossel: cor propria, icone, titulo e as primeiras linhas da lista.
+function renderStatsList(icon, title, items, renderRow, emptyMessage, badge = "") {
   return `
-    <article class="hof-card">
+    <article class="hof-card hof-tone-${HOF_TONES[icon] || "blue"}">
       <h4 class="hof-card-title">${hofIcon(icon)}${escapeHtml(title)}${badge ? ` <span class="hof-badge">${escapeHtml(badge)}</span>` : ""}</h4>
       <div class="hof-list">
-        ${items.length ? visible.map((item, index) => renderRow(item, index)).join("") : `<p class="hof-empty">${escapeHtml(emptyMessage)}</p>`}
+        ${items.length ? items.slice(0, STATS_LIST_LIMIT).map((item, index) => renderRow(item, index)).join("") : `<p class="hof-empty">${escapeHtml(emptyMessage)}</p>`}
       </div>
-      ${rest.length ? `
-        <details class="hof-more" data-stats-list="${escapeHtml(key)}" ${openStatsLists.has(key) ? "open" : ""}>
-          <summary>Ver todos</summary>
-          <div class="hof-list">${rest.map((item, index) => renderRow(item, index + STATS_LIST_VISIBLE)).join("")}</div>
-        </details>
-      ` : ""}
     </article>
   `;
 }
@@ -5467,7 +5484,7 @@ function renderStatsPlayerRow(row, index, valueText, extraHtml = "") {
 }
 
 function renderStatsRanking(icon, title, rows, valueRenderer, emptyMessage = "Sem dados.", badge = "") {
-  return renderStatsList(icon, title, rows, (row, index) => renderStatsPlayerRow(row, index, valueRenderer(row)), emptyMessage, title, badge);
+  return renderStatsList(icon, title, rows, (row, index) => renderStatsPlayerRow(row, index, valueRenderer(row)), emptyMessage, badge);
 }
 
 function renderCombinationRow(row, index) {
@@ -5483,21 +5500,21 @@ function renderCombinationRow(row, index) {
 }
 
 function renderPairRanking(rows) {
-  return renderStatsList("people", "Melhor dupla", rows, renderCombinationRow, "Ainda nao ha duplas com 2 jogos.", "duplas");
+  return renderStatsList("people", "Melhor dupla", rows, renderCombinationRow, "Ainda nao ha duplas com 2 jogos.");
 }
 
 function renderTrioRanking(rows) {
-  return renderStatsList("people", "Melhores triplas", rows, renderCombinationRow, "Ainda nao ha triplas com 3 jogos.", "triplas");
+  return renderStatsList("people", "Melhores triplas", rows, renderCombinationRow, "Ainda nao ha triplas com 3 jogos.");
 }
 
 function renderMvpHistoryRanking(rows) {
-  return renderStatsList("history", "Historico de MVPs", rows, (row) => `
+  return renderStatsList("history", "Historico de MVPs", rows.slice(0, 6), (row) => `
     <div class="hof-row hof-row-history">
       <span class="hof-date">${escapeHtml(formatDate(row.game.date))}</span>
       <span class="hof-winners">${row.winners.map((playerData) => `<button class="hof-row-player" data-open-stats-player="${playerData.id}" type="button">${renderAvatar(playerData)}<span>${escapeHtml(playerData.name)}</span></button>`).join("")}</span>
       <small class="hof-value">${row.totalVotes} votos</small>
     </div>
-  `, "Ainda nao ha MVPs fechados.", "mvp-historico");
+  `, "Ainda nao ha MVPs fechados.");
 }
 
 function renderPaymentRow(row, games) {

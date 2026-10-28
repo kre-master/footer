@@ -8,6 +8,14 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.10.0",
+      date: "2026-10-28",
+      title: "Hall of Fame em carrosséis",
+      items: [
+        "Cada secção do Hall of Fame (Resultados, Presença e prémios, Combinações e Em campo) é agora um carrossel de cartões coloridos que deslizas para o lado.",
+      ],
+    },
+    {
       version: "1.9.0",
       date: "2026-10-28",
       title: "Revisão do mês e números de vídeo",
