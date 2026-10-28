@@ -4992,72 +4992,111 @@ function renderPaymentsPanel() {
   });
 }
 
+// Hall of Fame: periodo escolhido no seletor e listas abertas sobrevivem aos re-renders.
+let statsPeriod = "all";
+const openStatsLists = new Set();
+const STATS_PERIODS = [["month", "Este mes"], ["season", "Epoca"], ["all", "Sempre"]];
+const HOF_ICONS = {
+  trophy: "M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6M10 17h4",
+  chart: "M4 20h16M7 16v-5M12 16V6M17 16v-8",
+  calendar: "M5 5h14v15H5zM5 9h14M9 3v4M15 3v4M9 14l2 2 4-4",
+  star: "M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6l-5.4 2.9 1.2-6L3.3 9.3l6.1-.7z",
+  flame: "M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z",
+  target: "M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 11.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1z",
+  shield: "M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z",
+  people: "M9 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5M16 11a2.5 2.5 0 1 0 0-5M16 15c3 0 5 1.5 5 4",
+  history: "M4 12a8 8 0 1 0 3-6.2M4 4v4h4M12 8v4l3 2",
+};
+
+function hofIcon(name) {
+  return `<svg class="hof-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${HOF_ICONS[name]}"/></svg>`;
+}
+
+function getStatsRange() {
+  const key = statsPeriod === "month" ? `month:${monthKey(new Date())}` : statsPeriod;
+  return FooterInsights.periodRange(key);
+}
+
 function renderStatsPanel() {
   if (!els.statsPanel) return;
-  const rows = getPlayerHistoryStatsRows();
+  const range = getStatsRange();
+  const rows = getPlayerHistoryStatsRows(range);
   const activeRows = rows.filter((row) => row.appearances > 0 || row.mvpCount > 0);
   const winRateBaseRows = activeRows.filter((row) => row.appearances >= 5);
   const winRateRows = (winRateBaseRows.length ? winRateBaseRows : activeRows)
     .slice()
     .sort(sortByWinRate)
     .slice(0, 5);
-  const showDebtStats = canShowDebtStats();
-  const currentDebts = showDebtStats ? getCurrentDebtRows().slice(0, 5) : [];
-  const pairRows = getBestPairStats(5);
-  const trioRows = getBestTrioStats(5);
+  const pairRows = getBestPairStats(5, range);
+  const trioRows = getBestTrioStats(5, range);
   const goalEligibleRows = activeRows.filter((row) => row.goalAverageEligible);
   const goalsForRows = goalEligibleRows.slice().sort(sortByGoalsForAverage).slice(0, 5);
   const goalsAgainstRows = goalEligibleRows.slice().sort(sortByGoalsAgainstAverage).slice(0, 5);
-  const mvpHistoryRows = getMvpHistoryRows(10);
+  const mvpHistoryRows = getMvpHistoryRows(999, range);
+  const gamesCount = getFinishedGames().filter((game) => isGameInStatsRange(game, range)).length;
 
-  if (!activeRows.length) {
-    els.statsPanel.innerHTML = `<div class="empty-state">Ainda nao ha historico suficiente para gerar stats.</div>`;
-    return;
-  }
-
-  const mostWins = activeRows.slice().sort(sortByWins)[0];
-  const mostAppearances = activeRows.slice().sort(sortByAppearances)[0];
-  const mostMvps = activeRows.slice().sort(sortByMvps)[0];
-  const bestStreak = activeRows.slice().sort(sortByWinStreak)[0];
-
-  els.statsPanel.innerHTML = `
-    <section class="stats-arena">
-      <div>
-        <p class="eyebrow">Liga Footer</p>
-        <h3>📊 Quadro de honra</h3>
-        <span>Os destaques historicos do grupo, calculados pelos jogos finalizados.</span>
-      </div>
-      <div class="stats-arena-badges">
-        <span>${activeRows.length} jogadores</span>
-        <span>${getFinishedGames().length} jogos</span>
-        <span>${mvpHistoryRows.length} MVPs fechados</span>
-      </div>
-    </section>
-
-    <div class="stats-highlight-grid">
-      ${renderStatsHighlight("🏆 Mais vitorias", mostWins?.wins || 0, mostWins ? mostWins.player : null, `${mostWins?.appearances || 0} presencas`)}
-      ${renderStatsHighlight("👟 Mais presencas", mostAppearances?.appearances || 0, mostAppearances ? mostAppearances.player : null, `${mostAppearances?.wins || 0} vitorias`)}
-      ${renderStatsHighlight("⭐ Mais MVPs", mostMvps?.mvpCount || 0, mostMvps ? mostMvps.player : null, `${mostMvps?.appearances || 0} jogos`)}
-      ${renderStatsHighlight("🔥 Maior sequencia", bestStreak?.bestWinStreak || 0, bestStreak ? bestStreak.player : null, "vitorias seguidas")}
-    </div>
-
-    <div class="stats-rank-grid">
-      ${renderStatsRanking("🏆 Mais vitorias", activeRows.slice().sort(sortByWins).slice(0, 5), (row) => `${row.wins}V em ${row.appearances} jogos`)}
-      ${renderStatsRanking("📈 Melhor win rate", winRateRows, (row) => `${row.winRate}% (${row.wins}V/${row.appearances}J)`)}
-      ${renderStatsRanking("👟 Mais presencas", activeRows.slice().sort(sortByAppearances).slice(0, 5), (row) => `${row.appearances} jogos`)}
-      ${renderStatsRanking("⭐ Mais MVPs", activeRows.slice().sort(sortByMvps).slice(0, 5), (row) => `${row.mvpCount} MVP${row.mvpCount === 1 ? "" : "s"}`)}
-      ${renderStatsRanking("🔥 Vitorias seguidas", activeRows.slice().sort(sortByWinStreak).slice(0, 5), (row) => `${row.bestWinStreak} seguidas`)}
-      ${renderStatsRanking("⚽ Melhor media de golos marcados", goalsForRows, (row) => `${formatStatsAverage(row.goalsForAverage)} golos/jogo`, "Preciso de 5 jogos e nao estar ausente ha mais de 5 jogos.")}
-      ${renderStatsRanking("🧤 Menos golos sofridos", goalsAgainstRows, (row) => `${formatStatsAverage(row.goalsAgainstAverage)} golos/jogo`, "Preciso de 5 jogos e nao estar ausente ha mais de 5 jogos.")}
-      ${showDebtStats ? renderDebtRanking(currentDebts) : renderDebtRankingUnavailable()}
-      ${renderPairRanking(pairRows)}
-      ${renderTrioRanking(trioRows)}
-      ${renderMvpHistoryRanking(mvpHistoryRows)}
+  const periodControl = `
+    <div class="hof-segmented" role="tablist" aria-label="Periodo">
+      ${STATS_PERIODS.map(([key, label]) => `<button type="button" role="tab" aria-selected="${key === statsPeriod}" class="${key === statsPeriod ? "active" : ""}" data-stats-period="${key}">${label}</button>`).join("")}
     </div>
   `;
 
+  if (!activeRows.length) {
+    els.statsPanel.innerHTML = `${periodControl}<div class="empty-state">Ainda nao ha jogos neste periodo.</div>`;
+  } else {
+    const mostWins = activeRows.slice().sort(sortByWins)[0];
+    const mostAppearances = activeRows.slice().sort(sortByAppearances)[0];
+    const mostMvps = activeRows.slice().sort(sortByMvps)[0];
+    const bestStreak = activeRows.slice().sort(sortByWinStreak)[0];
+    els.statsPanel.innerHTML = `
+      ${periodControl}
+      <p class="hof-summary">${activeRows.length} jogadores · ${gamesCount} ${gamesCount === 1 ? "jogo" : "jogos"} · ${mvpHistoryRows.length} MVPs</p>
+
+      <div class="hof-carousel" aria-label="Destaques">
+        ${renderStatsHighlight("trophy", "Mais vitorias", mostWins?.wins || 0, mostWins?.player, `${mostWins?.appearances || 0} presencas`, "gold")}
+        ${renderStatsHighlight("star", "Mais MVPs", mostMvps?.mvpCount || 0, mostMvps?.player, `${mostMvps?.appearances || 0} jogos`, "violet")}
+        ${renderStatsHighlight("flame", "Maior sequencia", bestStreak?.bestWinStreak || 0, bestStreak?.player, "vitorias seguidas", "coral")}
+        ${renderStatsHighlight("calendar", "Mais presencas", mostAppearances?.appearances || 0, mostAppearances?.player, `${mostAppearances?.wins || 0} vitorias`, "blue")}
+      </div>
+
+      <section class="hof-section">
+        <h3 class="hof-section-title">Resultados</h3>
+        ${renderStatsRanking("trophy", "Mais vitorias", activeRows.slice().sort(sortByWins).slice(0, 5), (row) => `${row.wins}V em ${row.appearances}J`)}
+        ${renderStatsRanking("chart", "Melhor win rate", winRateRows, (row) => `${row.winRate}% · ${row.wins}V/${row.appearances}J`)}
+        ${renderStatsRanking("flame", "Vitorias seguidas", activeRows.slice().sort(sortByWinStreak).slice(0, 5), (row) => `${row.bestWinStreak} seguidas`)}
+        ${renderStatsRanking("target", "Golos marcados por jogo", goalsForRows, (row) => formatStatsAverage(row.goalsForAverage), "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.")}
+        ${renderStatsRanking("shield", "Menos golos sofridos por jogo", goalsAgainstRows, (row) => formatStatsAverage(row.goalsAgainstAverage), "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.")}
+      </section>
+
+      <section class="hof-section">
+        <h3 class="hof-section-title">Presenca e premios</h3>
+        ${renderStatsRanking("calendar", "Mais presencas", activeRows.slice().sort(sortByAppearances).slice(0, 5), (row) => `${row.appearances} jogos`)}
+        ${renderStatsRanking("star", "Mais MVPs", activeRows.slice().sort(sortByMvps).slice(0, 5), (row) => `${row.mvpCount} MVP${row.mvpCount === 1 ? "" : "s"}`)}
+        ${renderMvpHistoryRanking(mvpHistoryRows)}
+      </section>
+
+      <section class="hof-section">
+        <h3 class="hof-section-title">Combinacoes</h3>
+        ${renderPairRanking(pairRows)}
+        ${renderTrioRanking(trioRows)}
+      </section>
+    `;
+  }
+
+  els.statsPanel.querySelectorAll("[data-stats-period]").forEach((button) => {
+    button.addEventListener("click", () => {
+      statsPeriod = button.dataset.statsPeriod;
+      renderStatsPanel();
+    });
+  });
   els.statsPanel.querySelectorAll("[data-open-stats-player]").forEach((button) => {
     button.addEventListener("click", () => openPlayerProfile(button.dataset.openStatsPlayer));
+  });
+  els.statsPanel.querySelectorAll("details[data-stats-list]").forEach((details) => {
+    details.addEventListener("toggle", () => {
+      if (details.open) openStatsLists.add(details.dataset.statsList);
+      else openStatsLists.delete(details.dataset.statsList);
+    });
   });
 }
 
@@ -5071,11 +5110,16 @@ function hasValidFinalScore(game) {
   );
 }
 
-function getPlayerHistoryStatsRows() {
+// "range" (FooterInsights.periodRange) limita as contas a um periodo; sem ele contam todos os jogos.
+function isGameInStatsRange(game, range) {
+  return !range || FooterInsights.inPeriod(game.date, range);
+}
+
+function getPlayerHistoryStatsRows(range = null) {
   return state.players.map((playerData) => {
     const summary = getPlayerMatchSummary(playerData.id);
     const finishedGames = summary.games.filter(
-      (item) => item.outcome !== "open" && hasValidFinalScore(item.game)
+      (item) => item.outcome !== "open" && hasValidFinalScore(item.game) && isGameInStatsRange(item.game, range)
     );
     const appearances = finishedGames.length;
     const outcomes = finishedGames.reduce(
@@ -5094,9 +5138,9 @@ function getPlayerHistoryStatsRows() {
         return { playerId: playerData.id, goalsFor, goalsAgainst };
       })
     );
-    const mvpCount = getFinishedGames().reduce((count, game) => count + (getOfficialMvpIdsForGame(game).has(playerData.id) ? 1 : 0), 0);
+    const mvpCount = getFinishedGames().filter((game) => isGameInStatsRange(game, range)).reduce((count, game) => count + (getOfficialMvpIdsForGame(game).has(playerData.id) ? 1 : 0), 0);
     const bestWinStreak = FooterStats.calculateBestWinStreak(
-      getFinishedGamesAsc().map((game) => {
+      getFinishedGamesAsc().filter((game) => isGameInStatsRange(game, range)).map((game) => {
         const valid = hasValidFinalScore(game);
         if (!valid) return { valid, outcome: "absent" };
         const participation = getPlayerParticipation(game, playerData.id);
@@ -5126,19 +5170,8 @@ function getPlayerHistoryStatsRows() {
   });
 }
 
-function getCurrentDebtRows() {
-  const report = buildMonthlyPaymentReport(monthKey(new Date()));
-  return report.rows
-    .filter((row) => row.currentBalance > 0)
-    .sort((a, b) => b.currentBalance - a.currentBalance || a.player.name.localeCompare(b.player.name));
-}
-
-function canShowDebtStats() {
-  return isAdmin;
-}
-
-function getFinishedTeamPerformances() {
-  return getFinishedGames().filter(hasValidFinalScore).flatMap((game) =>
+function getFinishedTeamPerformances(range = null) {
+  return getFinishedGames().filter((game) => hasValidFinalScore(game) && isGameInStatsRange(game, range)).flatMap((game) =>
     ["A", "B"].map((side) => {
       const outcome = getPlayerOutcome(game, side);
       return {
@@ -5173,9 +5206,9 @@ function sortCombinationStats(a, b) {
     || compareCanonicalIdKeys(a.playerIds, b.playerIds);
 }
 
-function getBestCombinationStats(groupSize, minimumGames, limit) {
+function getBestCombinationStats(groupSize, minimumGames, limit, range = null) {
   const ranking = FooterStats.buildCombinationRanking(
-    getFinishedTeamPerformances(),
+    getFinishedTeamPerformances(range),
     groupSize,
     minimumGames,
     undefined,
@@ -5191,16 +5224,17 @@ function getBestCombinationStats(groupSize, minimumGames, limit) {
   return Number.isInteger(limit) ? ranking.slice(0, Math.max(0, limit)) : ranking;
 }
 
-function getBestPairStats(limit = 5) {
-  return getBestCombinationStats(2, 2, limit);
+function getBestPairStats(limit = 5, range = null) {
+  return getBestCombinationStats(2, 2, limit, range);
 }
 
-function getBestTrioStats(limit = 5) {
-  return getBestCombinationStats(3, 3, limit);
+function getBestTrioStats(limit = 5, range = null) {
+  return getBestCombinationStats(3, 3, limit, range);
 }
 
-function getMvpHistoryRows(limit = 10) {
+function getMvpHistoryRows(limit = 10, range = null) {
   return getFinishedGames()
+    .filter((game) => isGameInStatsRange(game, range))
     .map((game) => {
       const winners = [...getOfficialMvpIdsForGame(game)].map(findPlayer).filter(Boolean);
       return { game, winners, totalVotes: getMvpTotalVotes(game.id) };
@@ -5252,120 +5286,87 @@ function formatStatsAverage(value) {
   }).format(Number(value) || 0);
 }
 
-function renderStatsHighlight(label, value, playerData, detail) {
+function renderStatsHighlight(icon, label, value, playerData, detail, tone) {
   return `
-    <article class="stats-hero-card">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-      ${playerData ? `<button class="stats-player-link" data-open-stats-player="${playerData.id}" type="button">${escapeHtml(playerData.name)}</button>` : "<em>-</em>"}
+    <article class="hof-hero hof-tone-${tone}">
+      <span class="hof-hero-label">${hofIcon(icon)}${escapeHtml(label)}</span>
+      <strong class="hof-hero-value">${escapeHtml(value)}</strong>
+      ${playerData ? `
+        <button class="hof-hero-player" data-open-stats-player="${playerData.id}" type="button">
+          ${renderAvatar(playerData)}<span>${escapeHtml(playerData.name)}</span>
+        </button>
+      ` : "<em>-</em>"}
       <small>${escapeHtml(detail || "")}</small>
     </article>
   `;
 }
 
-function renderStatsRanking(title, rows, valueRenderer, emptyMessage = "Sem dados.") {
+const STATS_LIST_VISIBLE = 3;
+
+// Lista agrupada ao estilo iOS: top 3 sempre visivel, o resto abre em "Ver todos".
+function renderStatsList(icon, title, items, renderRow, emptyMessage, key) {
+  const visible = items.slice(0, STATS_LIST_VISIBLE);
+  const rest = items.slice(STATS_LIST_VISIBLE);
   return `
-    <section class="stats-ranking-card">
-      <h3>${escapeHtml(title)}</h3>
-      <div class="stats-ranking-list">
-        ${rows.length ? rows.map((row, index) => `
-          <article class="stats-ranking-row stats-ranking-row-${index + 1}">
-            <span class="stats-rank-number">${index + 1}</span>
-            <button class="stats-player-link" data-open-stats-player="${row.player.id}" type="button">${escapeHtml(row.player.name)}</button>
-            <strong>${escapeHtml(valueRenderer(row))}</strong>
-          </article>
-        `).join("") : `<div class="empty-state compact">${escapeHtml(emptyMessage)}</div>`}
+    <article class="hof-card">
+      <h4 class="hof-card-title">${hofIcon(icon)}${escapeHtml(title)}</h4>
+      <div class="hof-list">
+        ${items.length ? visible.map((item, index) => renderRow(item, index)).join("") : `<p class="hof-empty">${escapeHtml(emptyMessage)}</p>`}
       </div>
-    </section>
+      ${rest.length ? `
+        <details class="hof-more" data-stats-list="${escapeHtml(key)}" ${openStatsLists.has(key) ? "open" : ""}>
+          <summary>Ver todos</summary>
+          <div class="hof-list">${rest.map((item, index) => renderRow(item, index + STATS_LIST_VISIBLE)).join("")}</div>
+        </details>
+      ` : ""}
+    </article>
   `;
 }
 
-function renderDebtRanking(rows) {
+function renderStatsPlayerRow(row, index, valueText) {
   return `
-    <section class="stats-ranking-card">
-      <h3>💸 Maior caloteiro atual</h3>
-      <div class="stats-ranking-list">
-        ${rows.length ? rows.map((row, index) => `
-          <article class="stats-ranking-row stats-ranking-row-${index + 1}">
-            <span class="stats-rank-number">${index + 1}</span>
-            <button class="stats-player-link" data-open-stats-player="${row.player.id}" type="button">${escapeHtml(row.player.name)}</button>
-            <strong>${euro(row.currentBalance)}</strong>
-          </article>
-        `).join("") : `<div class="empty-state compact">Ninguem em divida neste mes.</div>`}
-      </div>
-    </section>
+    <div class="hof-row hof-rank-${index + 1}">
+      <span class="hof-rank">${index + 1}</span>
+      <button class="hof-row-player" data-open-stats-player="${row.player.id}" type="button">
+        ${renderAvatar(row.player)}<span>${escapeHtml(row.player.name)}</span>
+      </button>
+      <strong class="hof-value">${escapeHtml(valueText)}</strong>
+    </div>
   `;
 }
 
-function renderDebtRankingUnavailable() {
+function renderStatsRanking(icon, title, rows, valueRenderer, emptyMessage = "Sem dados.") {
+  return renderStatsList(icon, title, rows, (row, index) => renderStatsPlayerRow(row, index, valueRenderer(row)), emptyMessage, title);
+}
+
+function renderCombinationRow(row, index) {
   return `
-    <section class="stats-ranking-card">
-      <h3>ðŸ’¸ Maior caloteiro atual</h3>
-      <div class="stats-ranking-list">
-        <div class="empty-state compact">Ranking financeiro disponivel so para admins.</div>
-      </div>
-    </section>
+    <div class="hof-row hof-rank-${index + 1}">
+      <span class="hof-rank">${index + 1}</span>
+      <span class="hof-combo">${row.players.map((playerData) => `
+        <button class="hof-row-player" data-open-stats-player="${playerData.id}" type="button">${renderAvatar(playerData)}<span>${escapeHtml(playerData.name)}</span></button>
+      `).join("")}</span>
+      <strong class="hof-value">${row.winRate}% · ${row.wins}V/${row.gamesTogether}J</strong>
+    </div>
   `;
 }
 
 function renderPairRanking(rows) {
-  return `
-    <section class="stats-ranking-card">
-      <h3>🤝 Melhor dupla</h3>
-      <div class="stats-ranking-list">
-        ${rows.length ? rows.map((row, index) => `
-          <article class="stats-ranking-row stats-combination-row stats-ranking-row-${index + 1}">
-            <span class="stats-rank-number">${index + 1}</span>
-            <span class="stats-combination-names">${renderCombinationMembers(row.players)}</span>
-            <strong>${row.winRate}% (${row.wins}V/${row.gamesTogether}J)</strong>
-          </article>
-        `).join("") : `<div class="empty-state compact">Ainda nao ha duplas com 2 jogos.</div>`}
-      </div>
-    </section>
-  `;
-}
-
-function renderCombinationMembers(players) {
-  return players.map((playerData, index) => `
-    <span class="stats-combination-member">
-      ${index ? '<span class="stats-combination-separator" aria-hidden="true">+</span>' : ""}
-      <button class="stats-player-link" data-open-stats-player="${playerData.id}" type="button">${escapeHtml(playerData.name)}</button>
-    </span>
-  `).join("");
+  return renderStatsList("people", "Melhor dupla", rows, renderCombinationRow, "Ainda nao ha duplas com 2 jogos.", "duplas");
 }
 
 function renderTrioRanking(rows) {
-  return `
-    <section class="stats-ranking-card">
-      <h3>🤝 Melhores triplas</h3>
-      <div class="stats-ranking-list">
-        ${rows.length ? rows.map((row, index) => `
-          <article class="stats-ranking-row stats-combination-row stats-ranking-row-${index + 1}">
-            <span class="stats-rank-number">${index + 1}</span>
-            <span class="stats-combination-names">${renderCombinationMembers(row.players)}</span>
-            <strong>${row.winRate}% (${row.wins}V/${row.gamesTogether}J)</strong>
-          </article>
-        `).join("") : `<div class="empty-state compact">Ainda nao ha triplas com 3 jogos.</div>`}
-      </div>
-    </section>
-  `;
+  return renderStatsList("people", "Melhores triplas", rows, renderCombinationRow, "Ainda nao ha triplas com 3 jogos.", "triplas");
 }
 
 function renderMvpHistoryRanking(rows) {
-  return `
-    <section class="stats-ranking-card stats-history-card">
-      <h3>🗂️ Historico de MVPs</h3>
-      <div class="stats-ranking-list">
-        ${rows.length ? rows.map((row) => `
-          <article class="stats-ranking-row stats-mvp-history-row">
-            <span>${escapeHtml(formatDate(row.game.date))}</span>
-            <strong>${row.winners.map((playerData) => `<button class="stats-player-link" data-open-stats-player="${playerData.id}" type="button">${escapeHtml(playerData.name)}</button>`).join(" + ")}</strong>
-            <small>${row.totalVotes} votos</small>
-          </article>
-        `).join("") : `<div class="empty-state compact">Ainda nao ha MVPs fechados.</div>`}
-      </div>
-    </section>
-  `;
+  return renderStatsList("history", "Historico de MVPs", rows, (row) => `
+    <div class="hof-row hof-row-history">
+      <span class="hof-date">${escapeHtml(formatDate(row.game.date))}</span>
+      <span class="hof-winners">${row.winners.map((playerData) => `<button class="hof-row-player" data-open-stats-player="${playerData.id}" type="button">${renderAvatar(playerData)}<span>${escapeHtml(playerData.name)}</span></button>`).join("")}</span>
+      <small class="hof-value">${row.totalVotes} votos</small>
+    </div>
+  `, "Ainda nao ha MVPs fechados.", "mvp-historico");
 }
 
 function renderPaymentRow(row, games) {

@@ -70,3 +70,4 @@ Depois de alterar:
 - Validar visualmente a nova pagina Jogos (telemovel) e afinar o cartao compacto.
 - Decidir se o campo deve permitir trocar jogadores por toque; a caixa de convidados deixou de existir na vista de equipas (usar "Gerir convocatoria").
 - Retomar fase 3.1 (jogos publicos).
+- Hall of Fame fase 2: categorias de video (ver [[03 - Decisoes e regras]], seccao Hall of Fame). Validar primeiro o novo desenho no telemovel.

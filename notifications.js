@@ -8,6 +8,18 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.8.0",
+      date: "2026-10-28",
+      title: "Jogos mais simples e novo Hall of Fame",
+      items: [
+        "Em Jogos há \"Os meus jogos\", \"Jogos públicos\" e, para os admins, \"Nova convocatória\".",
+        "Cada convocatória é mais compacta e mostra sempre quem vai, quem talvez vá e quem não vai.",
+        "Fazer equipas ficou mais direto: confirmar equipas no topo e ajustar com A e B lado a lado.",
+        "O Hall of Fame tem um desenho novo, com destaques deslizantes e filtro por mês, época ou sempre.",
+        "Saiu o ranking de dívidas do Hall of Fame.",
+      ],
+    },
+    {
       version: "1.7.0",
       date: "2026-10-23",
       title: "Disponibilidade e convites",

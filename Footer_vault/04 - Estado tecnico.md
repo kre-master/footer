@@ -482,3 +482,6 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 - VM `orq`: instalado Node 20.19.2 / npm 9.2.0 via apt; credenciais git guardadas com `credential.helper store` (token limitado a este repo).
 - Chromium/Playwright nao arrancam na VM (faltam libs do sistema): a UI de Jogos nao foi testada visualmente, so `check`, `test:stats`, `test:postgame`, `test:monthly`.
 - `showView` mostra agora so a vista pedida (antes empilhava `events` + `today`).
+
+- Hall of Fame redesenhado: `renderStatsPanel` em `app.js` com classes `hof-*` em `styles.css` (CSS antigo `stats-*` removido). Funcoes de dados aceitam `range` (FooterInsights.periodRange). `statsPeriod` e `openStatsLists` guardam o estado entre renders.
+- Versao 1.8.0 no CHANGELOG de `notifications.js`. Cache-buster JS/CSS: `20261028-hof1`.

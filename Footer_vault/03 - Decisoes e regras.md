@@ -198,3 +198,10 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - O admin faz equipas sempre a partir da convocatoria: o passo 1 (selecao manual) fica escondido para o admin; o campo vem primeiro e "Ajustar equipas e adicionar jogadores" fica recolhido por baixo.
 - Desde 2026-10-28 (2): "Quem vai / Talvez / Nao vou" fica sempre visivel no cartao (admin e jogadores); so "Gerir convocatoria" e recolhido. Na vista de equipas, "Ajustar equipas e adicionar jogadores" fica no topo (aberto), acima do campo/radar, com Equipa A e B lado a lado.
 - Desde 2026-10-28 (3): na vista de equipas, ordem: Auto/Baralhar, Confirmar equipas, WhatsApp, Terminar jogo/resultado, Ajustar equipas (A e B lado a lado, cruz vermelha para remover, "Passar para A/B"), campo/radar e, por fim, a data do jogo (`#step-date`, so em proposta).
+
+## Hall of Fame (2026-10-28)
+
+- Desenho estilo iOS: seletor segmentado Este mes / Epoca / Sempre (por defeito Sempre), carrossel de 4 destaques (vitorias, MVPs, sequencia, presencas), listas agrupadas com top 3 e "Ver todos", icones SVG de linha (sem emojis). Seccoes: Resultados, Presenca e premios, Combinacoes.
+- O periodo filtra tudo (presencas, V/E/D, MVPs, sequencia, golos, duplas/triplas, historico de MVPs). A elegibilidade das medias de golos (5 jogos, sem ausencia recente) mantem-se, por isso num mes curto as listas de golos podem aparecer vazias.
+- Removido o ranking "Maior caloteiro" (e as funcoes que so ele usava). As dividas continuam so em Pagamentos (admin).
+- Fase 2 (por fazer): seccao "Em campo (video)" com etiqueta Beta, so jogadores elegiveis (>= 10 min validos e nao guarda-redes), por defeito "Este mes". Categorias: Motor (m/min, medido), Maratonista (distancia, medido), Relampago (vel. max., preliminar, com "Ver o momento"), Sprinter (sprints/jogo, indicativo), Passador e Ligacao (passes detetados, sem auditoria). Fora: forma fisica, calorias, "quem cansa mais", ataques (estimativa), posicao.
