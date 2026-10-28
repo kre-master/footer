@@ -101,3 +101,9 @@ test("quality labels explain each metric status", () => {
   assert.equal(insights.statusText("detected"), "detetado, sem auditoria");
   assert.equal(insights.statusText("unknown"), null);
 });
+
+test("weakestOf picks the least reliable status", () => {
+  assert.equal(insights.weakestOf(["measured", "indicative", "detected"]), "indicative");
+  assert.equal(insights.weakestOf([null, undefined]), null);
+  assert.equal(insights.weakestOf([]), null);
+});

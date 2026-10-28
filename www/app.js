@@ -273,6 +273,7 @@ const els = {
   adminLogout: document.querySelector("#admin-logout"),
   mvpGate: document.querySelector("#mvp-gate"),
   monthlyAutoGate: document.querySelector("#monthly-auto-gate"),
+  monthReview: document.querySelector("#month-review"),
   accountPanel: document.querySelector("#account-panel"),
   claimsList: document.querySelector("#claims-list"),
   accountsList: document.querySelector("#accounts-list"),
@@ -2618,6 +2619,7 @@ const NOTIFY_ICONS = {
   video: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/>',
   moment: '<path d="M7 4h10v16l-5-3.5L7 20z"/>',
   mvp: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  review: '<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>',
 };
 
 // As novidades sao por grupo (os Futeboleiros mantem a chave antiga); a versao vista e do dispositivo.
@@ -2681,6 +2683,12 @@ function getNotificationFeed() {
         text: `MVP: ${mvpNames.join(" e ")} · ${getGameTitle(game)}` });
     }
   });
+  const reviewer = getLinkedPlayer();
+  const reviewKey = reviewer ? getReadyReviewMonths(reviewer.id)[0] : null;
+  if (reviewKey) {
+    items.push({ id: `review:${reviewKey}`, kind: "review", at: getMonthReviewStatus(reviewKey).readyAt.toISOString(), monthKey: reviewKey,
+      text: `A tua revisão de ${getShortMonthName(reviewKey)} está pronta` });
+  }
   const gameIds = new Set(state.games.map((game) => game.id));
   videoBookmarks.forEach((item) => {
     if (!gameIds.has(item.gameId) || (userId && item.createdBy === userId)) return;
@@ -2768,6 +2776,12 @@ function toggleNotifyPanel(force) {
 }
 
 function openNotification(item) {
+  if (item.kind === "review") {
+    toggleNotifyPanel(false);
+    const reviewer = getLinkedPlayer();
+    if (reviewer) openMonthReview(reviewer.id, item.monthKey);
+    return;
+  }
   if (item.kind === "event") {
     currentEventId = item.eventId;
     showView("events");
@@ -3324,6 +3338,7 @@ function renderPlayerProfile() {
 
   els.playerProfile.innerHTML = `
     ${renderProfileHero(playerData, form, variant)}
+    ${isOwnProfile ? renderMonthReviewCard(playerData) : ""}
     ${renderProfilePeriodNav(months)}
     ${renderProfileSummary(playerData, period, { isOwnProfile })}
 
@@ -3648,9 +3663,9 @@ function renderProfileSummary(playerData, period, { isOwnProfile }) {
 }
 
 // So para o proprio: usa o peso privado e as respostas pos-jogo.
-function renderProfilePrivateExtras(playerData, period) {
+// Estimativas privadas do jogador (peso e respostas pos-jogo); so aparecem no proprio perfil e na revisao do mes.
+function getPeriodEffort(playerData, period) {
   const feedback = period.games.map((game) => gameFeedback.find((item) => item.gameId === game.id && item.playerId === playerData.id)).filter(Boolean);
-  const energy = FooterMonthly.average(feedback.map((item) => item.remainingEnergy));
   const calories = period.games.reduce((sum, game) => {
     const row = period.rows.find((item) => item.gameId === game.id);
     const participation = getPlayerParticipation(game, playerData.id);
@@ -3658,6 +3673,15 @@ function renderProfilePrivateExtras(playerData, period) {
     const answer = feedback.find((item) => item.gameId === game.id);
     return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerData.id, game.date), minutes, met: FooterMonthly.metForIntensity(answer?.gameIntensity) });
   }, 0);
+  return {
+    calories,
+    energy: FooterMonthly.average(feedback.map((item) => item.remainingEnergy)),
+    intensity: FooterMonthly.average(feedback.map((item) => item.gameIntensity)),
+  };
+}
+
+function renderProfilePrivateExtras(playerData, period) {
+  const { calories, energy } = getPeriodEffort(playerData, period);
   return `
     <div class="pp-extras">
       <span>${statIcon("calories")}≈ ${formatTrackingNumber(calories)} kcal <small>estimativa com o teu peso</small></span>
@@ -3770,14 +3794,14 @@ function bindProfileOverview(playerData) {
     if (note) note.hidden = !note.hidden;
   }));
   root.querySelectorAll("[data-profile-moment]").forEach((button) => button.addEventListener("click", () => {
-    const gameId = button.dataset.profileMoment;
-    const target = getProfileMomentTarget(gameId, Number(button.dataset.profileMomentAt));
-    if (!target) return;
-    openVideoLightbox(gameId, {
-      clip: { youtubeId: target.part.youtubeId, startS: Math.max(0, Math.floor(target.seconds - 4)), endS: Math.ceil(target.seconds + 4), note: "Velocidade máxima" },
-    });
+    openSpeedMoment(button.dataset.profileMoment, Number(button.dataset.profileMomentAt));
   }));
   root.querySelectorAll("[data-profile-video]").forEach((button) => button.addEventListener("click", () => openVideoLightbox(button.dataset.profileVideo)));
+  root.querySelector("[data-month-review]")?.addEventListener("click", (event) => openMonthReview(playerData.id, event.currentTarget.dataset.monthReview));
+  root.querySelector("[data-month-review-pick]")?.addEventListener("change", (event) => {
+    if (event.target.value) openMonthReview(playerData.id, event.target.value);
+    event.target.value = "";
+  });
   root.querySelector("[data-profile-card]")?.addEventListener("click", () => openProfileCardModal(playerData));
 }
 
@@ -5012,6 +5036,105 @@ function hofIcon(name) {
   return `<svg class="hof-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${HOF_ICONS[name]}"/></svg>`;
 }
 
+function getStatsPeriodKey() {
+  return statsPeriod === "month" ? `month:${monthKey(new Date())}` : statsPeriod;
+}
+
+function openSpeedMoment(gameId, seconds) {
+  const target = getProfileMomentTarget(gameId, seconds);
+  if (!target) return;
+  openVideoLightbox(gameId, {
+    clip: { youtubeId: target.part.youtubeId, startS: Math.max(0, Math.floor(target.seconds - 4)), endS: Math.ceil(target.seconds + 4), note: "Velocidade máxima" },
+  });
+}
+
+// Resultados do tracker visiveis para este utilizador (rascunhos so para admins).
+function getVisibleTrackingEntry(gameId) {
+  const entry = getTrackingEntry(gameId);
+  return entry?.result?.players && !(entry.status === "draft" && !isAdmin) ? entry : null;
+}
+
+// Passes detetados entre dois jogadores no periodo (nos dois sentidos).
+function getHallPassPairs(range, limit = 5) {
+  const totals = new Map();
+  getFinishedGames().filter((game) => isGameInStatsRange(game, range)).forEach((game) => {
+    const entry = getVisibleTrackingEntry(game.id);
+    (entry?.result?.ball?.passLinks || []).forEach((link) => {
+      const a = entry.mapping?.[link.from];
+      const b = entry.mapping?.[link.to];
+      if (!a || !b || a === b) return;
+      const key = [a, b].sort().join("::");
+      totals.set(key, (totals.get(key) || 0) + link.count);
+    });
+  });
+  return [...totals]
+    .map(([key, count]) => ({ players: key.split("::").map(findPlayer).filter(Boolean), count }))
+    .filter((row) => row.players.length === 2)
+    .sort((x, y) => y.count - x.count || x.players[0].name.localeCompare(y.players[0].name, "pt-PT"))
+    .slice(0, limit);
+}
+
+// Seccao "Em campo": numeros do tracker de video, so jogadores com minutos observados suficientes e fora da baliza.
+function renderStatsVideoSection(range, partial) {
+  const periodKey = getStatsPeriodKey();
+  const rows = state.players
+    .map((playerData) => ({ player: playerData, summary: getProfilePeriodData(playerData.id, periodKey).summary }))
+    .filter((row) => row.summary.trackedGames > 0)
+    .filter((row) => (row.summary.minutes.total ?? 0) >= 10 && (row.summary.pace.goalkeeperMin ?? 0) < row.summary.minutes.total / 2);
+  const finished = getFinishedGames().filter((game) => hasValidFinalScore(game) && isGameInStatsRange(game, range));
+  const analysed = finished.filter((game) => getVisibleTrackingEntry(game.id)).length;
+  const head = `
+    <h3 class="hof-section-title">Em campo <span class="hof-beta">Beta</span>${partial ? ` <span class="hof-partial">Parcial</span>` : ""}</h3>
+    <p class="hof-note">Números do tracking de vídeo · ${analysed} de ${finished.length} jogos analisados. Só entram jogadores com 10 min ou mais observados e fora da baliza.</p>`;
+  if (!rows.length) {
+    return `<section class="hof-section">${head}<article class="hof-card"><p class="hof-empty">Ainda não há jogos analisados por vídeo neste período.</p></article></section>`;
+  }
+  const tagOf = (list) => {
+    const status = FooterInsights.weakestOf(list);
+    return status && status !== "measured" ? FooterInsights.statusText(status) : "";
+  };
+  const top = (value, status) => rows
+    .filter((row) => value(row.summary) != null)
+    .sort((a, b) => value(b.summary) - value(a.summary) || a.player.name.localeCompare(b.player.name, "pt-PT"))
+    .slice(0, 5)
+    .map((row) => ({ ...row, status: status(row.summary) }));
+  const motor = top((s) => s.pace.value, (s) => s.pace.status);
+  const marathon = top((s) => s.distance.totalM, (s) => s.distance.status);
+  const lightning = top((s) => s.maxSpeed.value, (s) => s.maxSpeed.status);
+  const sprinter = rows
+    .filter((row) => row.summary.sprints.total != null && row.summary.sprints.games)
+    .map((row) => ({ ...row, avg: row.summary.sprints.total / row.summary.sprints.games, status: row.summary.sprints.status }))
+    .sort((a, b) => b.avg - a.avg || a.player.name.localeCompare(b.player.name, "pt-PT")).slice(0, 5);
+  const passer = top((s) => s.passes.total, (s) => s.passes.status);
+  const pairs = getHallPassPairs(range);
+  const card = (icon, title, list, valueOf, extraOf, emptyMessage) =>
+    renderStatsList(icon, title, list, (row, index) => renderStatsPlayerRow(row, index, valueOf(row), extraOf ? extraOf(row) : ""), emptyMessage, `video-${title}`, tagOf(list.map((row) => row.status)));
+  return `
+    <section class="hof-section">
+      ${head}
+      ${card("pace", "Motor · m/min", motor, (row) => `${formatTrackingNumber(row.summary.pace.value)} m/min`, null, "Sem dados.")}
+      ${card("distance", "Maratonista · distância", marathon, (row) => `${formatTrackingNumber(row.summary.distance.totalM / 1000, 1)} km`, null, "Sem dados.")}
+      ${card("speed", "Relâmpago · velocidade máx.", lightning, (row) => `${formatTrackingNumber(row.summary.maxSpeed.value, 1)} km/h`,
+        (row) => (getProfileMomentTarget(row.summary.maxSpeed.gameId, row.summary.maxSpeed.atS)
+          ? ` <button type="button" class="hof-moment" data-stats-moment="${escapeHtml(row.summary.maxSpeed.gameId)}" data-stats-moment-at="${row.summary.maxSpeed.atS}" aria-label="Ver o momento">▶</button>` : ""), "Sem dados.")}
+      ${card("sprints", "Sprinter · sprints por jogo", sprinter, (row) => formatTrackingNumber(row.avg, 1), null, "Sem dados.")}
+      ${card("passes", "Passador · passes detetados", passer, (row) => `${formatTrackingNumber(row.summary.passes.total)} passes`, null, "Sem dados.")}
+      ${renderStatsList("people", "Ligação · mais passes entre dois", pairs, (row, index) => renderPassPairRow(row, index), "Sem ligações detetadas.", "video-ligacao", FooterInsights.statusText("detected"))}
+    </section>`;
+}
+
+function renderPassPairRow(row, index) {
+  return `
+    <div class="hof-row hof-rank-${index + 1}">
+      <span class="hof-rank">${index + 1}</span>
+      <span class="hof-combo">${row.players.map((playerData) => `
+        <button class="hof-row-player" data-open-stats-player="${playerData.id}" type="button">${renderAvatar(playerData)}<span>${escapeHtml(playerData.name)}</span></button>
+      `).join("")}</span>
+      <strong class="hof-value">${row.count} passes</strong>
+    </div>
+  `;
+}
+
 function getStatsRange() {
   const key = statsPeriod === "month" ? `month:${monthKey(new Date())}` : statsPeriod;
   return FooterInsights.periodRange(key);
@@ -5034,6 +5157,8 @@ function renderStatsPanel() {
   const goalsAgainstRows = goalEligibleRows.slice().sort(sortByGoalsAgainstAverage).slice(0, 5);
   const mvpHistoryRows = getMvpHistoryRows(999, range);
   const gamesCount = getFinishedGames().filter((game) => isGameInStatsRange(game, range)).length;
+  const monthOpen = statsPeriod === "month" && !getMonthReviewStatus(monthKey(new Date())).ready;
+  const partialGoals = statsPeriod === "month" && goalEligibleRows.some((row) => row.appearances < 5);
 
   const periodControl = `
     <div class="hof-segmented" role="tablist" aria-label="Periodo">
@@ -5050,7 +5175,7 @@ function renderStatsPanel() {
     const bestStreak = activeRows.slice().sort(sortByWinStreak)[0];
     els.statsPanel.innerHTML = `
       ${periodControl}
-      <p class="hof-summary">${activeRows.length} jogadores · ${gamesCount} ${gamesCount === 1 ? "jogo" : "jogos"} · ${mvpHistoryRows.length} MVPs</p>
+      <p class="hof-summary">${activeRows.length} jogadores · ${gamesCount} ${gamesCount === 1 ? "jogo" : "jogos"} · ${mvpHistoryRows.length} MVPs${monthOpen ? ` <span class="hof-partial">Parcial · mês em curso</span>` : ""}</p>
 
       <div class="hof-carousel" aria-label="Destaques">
         ${renderStatsHighlight("trophy", "Mais vitorias", mostWins?.wins || 0, mostWins?.player, `${mostWins?.appearances || 0} presencas`, "gold")}
@@ -5064,8 +5189,8 @@ function renderStatsPanel() {
         ${renderStatsRanking("trophy", "Mais vitorias", activeRows.slice().sort(sortByWins).slice(0, 5), (row) => `${row.wins}V em ${row.appearances}J`)}
         ${renderStatsRanking("chart", "Melhor win rate", winRateRows, (row) => `${row.winRate}% · ${row.wins}V/${row.appearances}J`)}
         ${renderStatsRanking("flame", "Vitorias seguidas", activeRows.slice().sort(sortByWinStreak).slice(0, 5), (row) => `${row.bestWinStreak} seguidas`)}
-        ${renderStatsRanking("target", "Golos marcados por jogo", goalsForRows, (row) => formatStatsAverage(row.goalsForAverage), "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.")}
-        ${renderStatsRanking("shield", "Menos golos sofridos por jogo", goalsAgainstRows, (row) => formatStatsAverage(row.goalsAgainstAverage), "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.")}
+        ${renderStatsRanking("target", "Golos marcados por jogo", goalsForRows, (row) => formatStatsAverage(row.goalsForAverage), statsPeriod === "month" ? "Ainda sem jogos neste mes." : "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.", partialGoals ? "Parcial" : "")}
+        ${renderStatsRanking("shield", "Menos golos sofridos por jogo", goalsAgainstRows, (row) => formatStatsAverage(row.goalsAgainstAverage), statsPeriod === "month" ? "Ainda sem jogos neste mes." : "Precisa de 5 jogos e de nao estar ausente ha mais de 5 jogos.", partialGoals ? "Parcial" : "")}
       </section>
 
       <section class="hof-section">
@@ -5080,6 +5205,8 @@ function renderStatsPanel() {
         ${renderPairRanking(pairRows)}
         ${renderTrioRanking(trioRows)}
       </section>
+
+      ${renderStatsVideoSection(range, monthOpen)}
     `;
   }
 
@@ -5091,6 +5218,9 @@ function renderStatsPanel() {
   });
   els.statsPanel.querySelectorAll("[data-open-stats-player]").forEach((button) => {
     button.addEventListener("click", () => openPlayerProfile(button.dataset.openStatsPlayer));
+  });
+  els.statsPanel.querySelectorAll("[data-stats-moment]").forEach((button) => {
+    button.addEventListener("click", () => openSpeedMoment(button.dataset.statsMoment, Number(button.dataset.statsMomentAt)));
   });
   els.statsPanel.querySelectorAll("details[data-stats-list]").forEach((details) => {
     details.addEventListener("toggle", () => {
@@ -5165,7 +5295,8 @@ function getPlayerHistoryStatsRows(range = null) {
       goalsForAverage: goalSummary.averageGoalsFor,
       goalsAgainstAverage: goalSummary.averageGoalsAgainst,
       recentAbsences,
-      goalAverageEligible: FooterStats.isGoalAverageEligible({ appearances, recentAbsences }),
+      // No mes em curso mostram-se resultados parciais: basta 1 jogo (a lista avisa "Parcial").
+      goalAverageEligible: FooterStats.isGoalAverageEligible({ appearances, recentAbsences, minimumGames: range?.kind === "month" ? 1 : 5 }),
     };
   });
 }
@@ -5304,12 +5435,12 @@ function renderStatsHighlight(icon, label, value, playerData, detail, tone) {
 const STATS_LIST_VISIBLE = 3;
 
 // Lista agrupada ao estilo iOS: top 3 sempre visivel, o resto abre em "Ver todos".
-function renderStatsList(icon, title, items, renderRow, emptyMessage, key) {
+function renderStatsList(icon, title, items, renderRow, emptyMessage, key, badge = "") {
   const visible = items.slice(0, STATS_LIST_VISIBLE);
   const rest = items.slice(STATS_LIST_VISIBLE);
   return `
     <article class="hof-card">
-      <h4 class="hof-card-title">${hofIcon(icon)}${escapeHtml(title)}</h4>
+      <h4 class="hof-card-title">${hofIcon(icon)}${escapeHtml(title)}${badge ? ` <span class="hof-badge">${escapeHtml(badge)}</span>` : ""}</h4>
       <div class="hof-list">
         ${items.length ? visible.map((item, index) => renderRow(item, index)).join("") : `<p class="hof-empty">${escapeHtml(emptyMessage)}</p>`}
       </div>
@@ -5323,20 +5454,20 @@ function renderStatsList(icon, title, items, renderRow, emptyMessage, key) {
   `;
 }
 
-function renderStatsPlayerRow(row, index, valueText) {
+function renderStatsPlayerRow(row, index, valueText, extraHtml = "") {
   return `
     <div class="hof-row hof-rank-${index + 1}">
       <span class="hof-rank">${index + 1}</span>
       <button class="hof-row-player" data-open-stats-player="${row.player.id}" type="button">
         ${renderAvatar(row.player)}<span>${escapeHtml(row.player.name)}</span>
       </button>
-      <strong class="hof-value">${escapeHtml(valueText)}</strong>
+      <strong class="hof-value">${escapeHtml(valueText)}${extraHtml}</strong>
     </div>
   `;
 }
 
-function renderStatsRanking(icon, title, rows, valueRenderer, emptyMessage = "Sem dados.") {
-  return renderStatsList(icon, title, rows, (row, index) => renderStatsPlayerRow(row, index, valueRenderer(row)), emptyMessage, title);
+function renderStatsRanking(icon, title, rows, valueRenderer, emptyMessage = "Sem dados.", badge = "") {
+  return renderStatsList(icon, title, rows, (row, index) => renderStatsPlayerRow(row, index, valueRenderer(row)), emptyMessage, title, badge);
 }
 
 function renderCombinationRow(row, index) {
@@ -7403,15 +7534,176 @@ function renderMonthlyRecap() {
   bindAwardDetailCards(els.monthlyPanel, playerData, data.awards);
   maybeOpenMonthlyRecap(playerData.id, currentMonthlyMonth, months, data);
 }
+// ---- Revisao do mes: abre quando o mes acabou e todos os jogos tem resultado e MVP fechado ----
+function getMonthReviewStatus(key) {
+  const games = state.games
+    .filter((game) => monthKey(game.date) === key)
+    .map((game) => ({
+      date: game.date,
+      finished: isFinishedGame(game) && hasValidFinalScore(game),
+      // O MVP fecha quando passa o prazo de votacao, mesmo com poucos votos, ou quando ja ha um MVP oficial.
+      mvpClosed: getOfficialMvpIdsForGame(game).size > 0 || Boolean(getMvpLockAt(game) && Date.now() >= getMvpLockAt(game).getTime()),
+      closedAt: getMvpLockAt(game)?.toISOString() || game.date,
+    }));
+  return FooterMonthReview.reviewStatus({ key, games });
+}
+
+function getReadyReviewMonths(playerId) {
+  return getProfileMonths(playerId).filter((key) => getMonthReviewStatus(key).ready);
+}
+
+function getShortMonthName(key) {
+  const [year, month] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("pt-PT", { month: "long" }).format(new Date(year, month - 1, 1));
+}
+
+function getMonthReviewData(playerData, key) {
+  const period = getProfilePeriodData(playerData.id, `month:${key}`);
+  const s = period.summary;
+  const prevKey = FooterMonthReview.previousKey(key);
+  const prevSummary = getProfilePeriodData(playerData.id, `month:${prevKey}`).summary;
+  const kmOf = (summary) => (summary.trackedGames && summary.distance.totalM != null ? summary.distance.totalM / 1000 : null);
+  const awards = getPeriodAwards(playerData.id, period.games);
+  const moment = getProfileMomentTarget(s.maxSpeed.gameId, s.maxSpeed.atS) ? { gameId: s.maxSpeed.gameId, atS: s.maxSpeed.atS } : null;
+  const effort = getPeriodEffort(playerData, period);
+  return {
+    playerName: playerData.name,
+    monthTitle: formatMonthLabel(key),
+    message: getMonthlyMessage(getMonthlyRecapData(playerData.id, key)),
+    played: s.played,
+    teamGames: s.teamGames,
+    wins: s.wins,
+    draws: s.draws,
+    losses: s.losses,
+    mvps: s.mvps,
+    tracked: {
+      games: s.trackedGames,
+      distanceKm: kmOf(s),
+      paceMpm: s.pace.value,
+      maxSpeedKmh: s.maxSpeed.value,
+      sprints: s.sprints.total,
+      passes: s.passes.total,
+      status: { distance: s.distance.status, pace: s.pace.status, maxSpeed: s.maxSpeed.status, sprints: s.sprints.status, passes: s.passes.status },
+      moment,
+    },
+    previous: prevSummary.played ? {
+      label: getShortMonthName(prevKey),
+      played: prevSummary.played,
+      distanceKm: kmOf(prevSummary),
+      paceMpm: prevSummary.trackedGames ? prevSummary.pace.value : null,
+      maxSpeedKmh: prevSummary.trackedGames ? prevSummary.maxSpeed.value : null,
+      sprints: prevSummary.trackedGames ? prevSummary.sprints.total : null,
+      passes: prevSummary.trackedGames ? prevSummary.passes.total : null,
+    } : null,
+    awards: { count: awards.length, firstCount: awards.filter((award) => award.isFirst).length },
+    effort,
+    facts: period.facts,
+  };
+}
+
+function renderMonthReviewCard(playerData) {
+  const months = getReadyReviewMonths(playerData.id);
+  if (!months.length) return "";
+  const [latest, ...others] = months;
+  return `
+    <section class="pp-review">
+      <button type="button" class="pp-review-open" data-month-review="${latest}">
+        <span class="pp-review-eyebrow">Revisão do mês</span>
+        <strong>${escapeHtml(formatMonthLabel(latest))}</strong>
+        <span class="pp-review-cta">Ver a minha revisão <i aria-hidden="true">›</i></span>
+      </button>
+      ${others.length ? `
+        <label class="pp-review-others">
+          <span class="sr-only">Outros meses</span>
+          <select data-month-review-pick>
+            <option value="">Outros meses</option>
+            ${others.map((key) => `<option value="${key}">${escapeHtml(formatMonthLabel(key))}</option>`).join("")}
+          </select>
+        </label>` : ""}
+    </section>`;
+}
+
+function renderReviewSlide(slide, index) {
+  const status = slide.status && slide.status !== "measured" ? FooterInsights.statusText(slide.status) : null;
+  return `
+    <section class="mr-slide mr-tone-${slide.tone}" data-slide="${index}" aria-label="${escapeHtml(slide.eyebrow || slide.title || "")}">
+      <div class="mr-slide-inner">
+        ${slide.eyebrow ? `<p class="mr-eyebrow">${escapeHtml(slide.eyebrow)}</p>` : ""}
+        ${slide.big != null ? `<p class="mr-big">${escapeHtml(slide.big)}<small>${escapeHtml(slide.unit || "")}</small></p>` : ""}
+        ${slide.title ? `<h2 class="mr-title">${escapeHtml(slide.title)}</h2>` : ""}
+        ${slide.caption ? `<p class="mr-caption">${escapeHtml(slide.caption)}</p>` : ""}
+        ${slide.delta ? `<p class="mr-delta">${escapeHtml(slide.delta)}</p>` : ""}
+        ${status ? `<span class="mr-tag">Beta · ${escapeHtml(status)}</span>` : ""}
+        ${slide.action ? `<button type="button" class="mr-action" data-review-action="${slide.action.type}" ${slide.action.gameId ? `data-game="${escapeHtml(slide.action.gameId)}" data-at="${slide.action.atS}"` : ""}>${escapeHtml(slide.action.label)}</button>` : ""}
+      </div>
+    </section>`;
+}
+
+let monthReviewKeyHandler = null;
+
+function closeMonthReview() {
+  els.monthReview?.classList.add("hidden");
+  document.body.classList.remove("mr-open");
+  if (monthReviewKeyHandler) window.removeEventListener("keydown", monthReviewKeyHandler);
+  monthReviewKeyHandler = null;
+}
+
+function openMonthReview(playerId, key) {
+  const playerData = findPlayer(playerId);
+  if (!els.monthReview || !playerData || !getMonthReviewStatus(key).ready) return;
+  const slides = FooterMonthReview.buildSlides(getMonthReviewData(playerData, key));
+  els.monthReview.innerHTML = `
+    <button type="button" class="mr-close" data-review-close aria-label="Fechar">&times;</button>
+    <div class="mr-track" tabindex="0">${slides.map(renderReviewSlide).join("")}</div>
+    <button type="button" class="mr-nav mr-prev" data-review-step="-1" aria-label="Anterior">‹</button>
+    <button type="button" class="mr-nav mr-next" data-review-step="1" aria-label="Seguinte">›</button>
+    <div class="mr-dots" aria-hidden="true">${slides.map((_, index) => `<i class="${index ? "" : "active"}"></i>`).join("")}</div>`;
+  els.monthReview.classList.remove("hidden");
+  document.body.classList.add("mr-open");
+
+  const track = els.monthReview.querySelector(".mr-track");
+  const dots = [...els.monthReview.querySelectorAll(".mr-dots i")];
+  const current = () => Math.max(0, Math.min(slides.length - 1, Math.round(track.scrollLeft / track.clientWidth)));
+  const goTo = (index) => track.scrollTo({ left: Math.max(0, Math.min(slides.length - 1, index)) * track.clientWidth, behavior: "smooth" });
+  track.addEventListener("scroll", () => {
+    const active = current();
+    dots.forEach((dot, index) => dot.classList.toggle("active", index === active));
+  }, { passive: true });
+  els.monthReview.querySelector("[data-review-close]").addEventListener("click", closeMonthReview);
+  els.monthReview.querySelectorAll("[data-review-step]").forEach((button) => button.addEventListener("click", () => goTo(current() + Number(button.dataset.reviewStep))));
+  els.monthReview.querySelectorAll("[data-review-action]").forEach((button) => button.addEventListener("click", () => {
+    closeMonthReview();
+    if (button.dataset.reviewAction === "profile") {
+      profilePeriod = `month:${key}`;
+      openPlayerProfile(playerData.id);
+      return;
+    }
+    openSpeedMoment(button.dataset.game, Number(button.dataset.at));
+  }));
+  monthReviewKeyHandler = (event) => {
+    if (event.key === "Escape") closeMonthReview();
+    if (event.key === "ArrowRight") goTo(current() + 1);
+    if (event.key === "ArrowLeft") goTo(current() - 1);
+  };
+  window.addEventListener("keydown", monthReviewKeyHandler);
+  track.focus({ preventScroll: true });
+}
+
+// Aviso unico quando a revisao do mes anterior fica pronta; depois fica sempre no perfil.
 function maybeOpenMonthlyRecap(playerId, key, months, data) {
   if (key !== getPreviousMonthKey() || !months.includes(key) || !data.games.length || !els.monthlyAutoGate) return;
+  if (!getMonthReviewStatus(key).ready) return;
   if (getPendingPostgameCheckins().length || getPendingOfficialMvpRevealRequirement() || getPendingAwardRevealRequirement()) return;
   const storageKey = `footer-monthly-open-${playerId}-${key}`;
   if (localStorage.getItem(storageKey)) return;
   localStorage.setItem(storageKey, "1");
   els.monthlyAutoGate.classList.remove("hidden"); document.body.classList.add("mvp-gate-open");
-  els.monthlyAutoGate.innerHTML = `<div class="mvp-gate-card"><p class="eyebrow">Olha como foi o teu último mês</p><h2>${escapeHtml(getMonthlyMessage(data))}</h2><p>${data.games.length} jogos · ${data.wins} vitórias · ${data.calories} kcal estimadas</p><button class="primary-btn" data-open-monthly>Ver resumo</button></div>`;
-  els.monthlyAutoGate.querySelector("[data-open-monthly]").addEventListener("click", () => { els.monthlyAutoGate.classList.add("hidden"); document.body.classList.remove("mvp-gate-open"); showView("monthly"); renderMonthlyRecap(); });
+  els.monthlyAutoGate.innerHTML = `<div class="mvp-gate-card"><p class="eyebrow">A tua revisão de ${escapeHtml(getShortMonthName(key))} está pronta</p><h2>${escapeHtml(getMonthlyMessage(data))}</h2><p>${data.games.length} jogos · ${data.wins} vitórias</p><button class="primary-btn" data-open-monthly>Ver a minha revisão</button></div>`;
+  els.monthlyAutoGate.querySelector("[data-open-monthly]").addEventListener("click", () => {
+    els.monthlyAutoGate.classList.add("hidden");
+    document.body.classList.remove("mvp-gate-open");
+    openMonthReview(playerId, key);
+  });
 }
 
 function getPendingPostgameCheckins() {

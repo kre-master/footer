@@ -485,3 +485,8 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 
 - Hall of Fame redesenhado: `renderStatsPanel` em `app.js` com classes `hof-*` em `styles.css` (CSS antigo `stats-*` removido). Funcoes de dados aceitam `range` (FooterInsights.periodRange). `statsPeriod` e `openStatsLists` guardam o estado entre renders.
 - Versao 1.8.0 no CHANGELOG de `notifications.js`. Cache-buster JS/CSS: `20261028-hof1`.
+
+- Novo `month-review.js` (regras de abertura `reviewStatus` e cartoes `buildSlides`; testes em `tests/month-review.test.mjs`, `npm run test:review`). `player-insights.js` exporta `weakestOf`. Integracao em `app.js`: `getMonthReviewStatus`, `getMonthReviewData`, `openMonthReview`, `renderStatsVideoSection`.
+- Versao 1.9.0. Cache-buster `20261028-review1`.
+- Validar UI sem browser: instalar `jsdom` no scratchpad, carregar `index.html` com um ResourceLoader local (sem rede; `app-config.js` vazio para nao ir ao Supabase), semear `five-a-side-balancer-state-v1` e `footer-tracking-test-v1` no localStorage e chamar `renderStatsPanel()` / `openMonthReview()`.
+- Bug antigo encontrado (por corrigir): `let pitchCatalogPromise` (app.js, perto de `loadPitchCatalog`) e usado por `bindPitchPicker` antes de ser inicializado (TDZ), por isso o seletor Concelho/Campo da nova convocatoria nunca aparece. Mover a declaracao para o topo resolve.

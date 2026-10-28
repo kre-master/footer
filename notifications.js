@@ -8,6 +8,17 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.9.0",
+      date: "2026-10-28",
+      title: "Revisão do mês e números de vídeo",
+      items: [
+        "Quando um mês acaba e todos os jogos têm resultado e MVP, abre a tua Revisão do mês: cartões que deslizas com presenças, vitórias, MVP, distância, ritmo, sprints, passes e cartas.",
+        "Encontras a revisão no teu perfil e há um aviso quando fica pronta.",
+        "O Hall of Fame tem uma secção Em campo (Beta) com o jogador mais rápido, o que mais corre e as ligações de passes.",
+        "No mês em curso o Hall of Fame mostra resultados parciais, marcados como Parcial.",
+      ],
+    },
+    {
       version: "1.8.0",
       date: "2026-10-28",
       title: "Jogos mais simples e novo Hall of Fame",

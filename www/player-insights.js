@@ -60,12 +60,15 @@
 
   // Estado mais fraco entre os jogos usados numa metrica (para o aviso de qualidade).
   const STATUS_RANK = ["measured", "detected", "preliminary", "indicative", "estimate"];
-  function weakestStatus(rows, metric) {
-    const key = METRICS[metric].status;
-    return rows
-      .map((row) => row.metricStatus?.[key])
+  function weakestOf(statuses) {
+    return (statuses || [])
       .filter(Boolean)
       .sort((a, b) => STATUS_RANK.indexOf(b) - STATUS_RANK.indexOf(a))[0] || null;
+  }
+
+  function weakestStatus(rows, metric) {
+    const key = METRICS[metric].status;
+    return weakestOf(rows.map((row) => row.metricStatus?.[key]));
   }
 
   function summarize(rows, { teamGames = null } = {}) {
@@ -178,5 +181,5 @@
     return STATUS_TEXT[status] || null;
   }
 
-  return { METRICS, buildGameRow, summarize, periodRange, inPeriod, highlights, statusText };
+  return { METRICS, buildGameRow, summarize, periodRange, inPeriod, highlights, statusText, weakestOf };
 });

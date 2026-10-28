@@ -71,3 +71,5 @@ Depois de alterar:
 - Decidir se o campo deve permitir trocar jogadores por toque; a caixa de convidados deixou de existir na vista de equipas (usar "Gerir convocatoria").
 - Retomar fase 3.1 (jogos publicos).
 - Hall of Fame fase 2: categorias de video (ver [[03 - Decisoes e regras]], seccao Hall of Fame). Validar primeiro o novo desenho no telemovel.
+- Corrigir o seletor de campos (TDZ em `pitchCatalogPromise`), ver [[04 - Estado tecnico]].
+- Rever a Revisao do mes no telemovel com um mes real fechado (outubro fecha depois do ultimo jogo + 24 h de MVP e do dia 1 de novembro).

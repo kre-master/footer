@@ -9,6 +9,7 @@ const files = [
   "postgame-feedback.js",
   "monthly-recap.js",
   "player-insights.js",
+  "month-review.js",
   "tracking-metrics.js",
   "notifications.js",
   "app-config.js",

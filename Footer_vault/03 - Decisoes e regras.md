@@ -205,3 +205,10 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - O periodo filtra tudo (presencas, V/E/D, MVPs, sequencia, golos, duplas/triplas, historico de MVPs). A elegibilidade das medias de golos (5 jogos, sem ausencia recente) mantem-se, por isso num mes curto as listas de golos podem aparecer vazias.
 - Removido o ranking "Maior caloteiro" (e as funcoes que so ele usava). As dividas continuam so em Pagamentos (admin).
 - Fase 2 (por fazer): seccao "Em campo (video)" com etiqueta Beta, so jogadores elegiveis (>= 10 min validos e nao guarda-redes), por defeito "Este mes". Categorias: Motor (m/min, medido), Maratonista (distancia, medido), Relampago (vel. max., preliminar, com "Ver o momento"), Sprinter (sprints/jogo, indicativo), Passador e Ligacao (passes detetados, sem auditoria). Fora: forma fisica, calorias, "quem cansa mais", ataques (estimativa), posicao.
+
+## Revisao do mes e video no Hall of Fame (2026-10-28)
+
+- A Revisao do mes abre quando o mes acabou e todos os jogos desse mes tem resultado e MVP fechado (MVP fechado = ja ha MVP oficial ou passou o prazo de votacao). A analise de video so aparece se existir; sem ela a revisao abre na mesma, com um cartao "Sem jogos analisados".
+- Acesso: cartao "Revisao do mes" no proprio perfil (mais recente + "Outros meses"), aviso unico para o mes anterior (gate `monthly-auto-gate`) e entrada nas novidades (sino, `kind: review`).
+- Carrossel em ecra cheio (`#month-review`): capa, presencas, MVP, distancia, ritmo, velocidade max. (com "Ver o momento"), sprints, passes, cartas, esforco (kcal e forma sentida, so o proprio ve) e fecho. So aparecem cartoes com dados; compara com o mes anterior em factos ("+1,2 km face a setembro"), sem juizos.
+- Hall of Fame, seccao "Em campo (Beta)": Motor, Maratonista, Relampago, Sprinter, Passador e Ligacao (passes entre dois). Entram jogadores com >= 10 min observados e fora da baliza; cada lista mostra a etiqueta de qualidade do tracker. No periodo "Este mes" os resultados sao parciais (etiqueta Parcial); as medias de golos passam a exigir 1 jogo em vez de 5 so nesse periodo.
