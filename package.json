@@ -2,6 +2,7 @@
   "name": "footer",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "node server.mjs 5173",
     "check": "node --check app.js",
