@@ -220,3 +220,11 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Cartao de entrada para jogadores (PNG 1080x1790 com QR para a app) gerado com `qrcode` + `@resvg/resvg-js` + fonte Inter (`fonts-inter`), a partir de um SVG; o QR generico abre a app, o convite e por grupo.
 
 - 2026-10-28: repositorio mantem-se publico (o site publicado expoe sempre o JS). Adicionado `LICENSE` "todos os direitos reservados" e `"license": "UNLICENSED"` no `package.json`. A protecao real esta no Supabase (dados + RLS), nao no codigo. Alternativa se um dia fizer falta: repo privado + Cloudflare Pages (Direct Upload ou Git) ou GitHub Pro (~4 USD/mes) para manter o Pages.
+
+## Seguranca da base de dados (auditoria 2026-10-28)
+
+- As 26 tabelas de `public` tem RLS; as funcoes RPC verificam sessao e permissao e tem `search_path` fixo.
+- Um jogador so pode alterar a propria foto em `players` (gatilho `players_guard_self_update`); admins do grupo continuam a poder tudo. Antes, um jogador podia mudar a propria nota e o `group_id` pela API.
+- O papel `anon` deixou de ter permissoes de escrita nas tabelas; `TRUNCATE`, `TRIGGER` e `REFERENCES` sairam de `anon` e `authenticated`.
+- Decisao do utilizador: manter a password minima em 6 caracteres.
+- Riscos conhecidos e aceites por agora: `email_for_login` revela o email de quem souber o username; um admin de grupo pode editar email/username/nome dos membros do seu grupo; protecao contra passwords vazadas desligada.

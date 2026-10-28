@@ -490,3 +490,6 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 - Versao 1.9.0. Cache-buster `20261028-review1`.
 - Validar UI sem browser: instalar `jsdom` no scratchpad, carregar `index.html` com um ResourceLoader local (sem rede; `app-config.js` vazio para nao ir ao Supabase), semear `five-a-side-balancer-state-v1` e `footer-tracking-test-v1` no localStorage e chamar `renderStatsPanel()` / `openMonthReview()`.
 - Corrigido (1.10.1): `let pitchCatalogPromise` passou para o topo do `app.js`; estava a ser usada por `bindPitchPicker` antes de inicializar (TDZ) e o seletor Concelho/Campo nunca aparecia.
+
+- Migracao `supabase/security-hardening-migration.sql`, aplicada pelo utilizador no SQL Editor a 2026-10-28. A funcao do gatilho nao pode ser SECURITY DEFINER (precisa de `current_user` = papel de quem faz o pedido). Testada com transacoes desfeitas: jogador a mudar a nota falha (`players_self_update_only_photo`), jogador a mudar a foto passa, admin a mudar a nota passa. A app so envia `photo_data_url` e `updated_at` no upload de foto (`updateOwnPlayerPhoto`), por isso nada parte.
+- Pedidos de permissao do MCP Supabase (apply_migration) podem nao aparecer ao utilizador e ficam parados indefinidamente; nesse caso, dar-lhe o SQL para correr no SQL Editor.
