@@ -6325,14 +6325,11 @@ function renderEventCard(eventData) {
         <span class="metric ${missing ? "warn-pill" : "good-pill"}">${missing ? `Faltam ${missing}` : "Pronto"}</span>
       </div>
       ${renderResponseActions(eventData, myResponse)}
-      <details class="event-more" ${detailsAttrs("roster")}>
-        <summary>Quem vai e quem nao vai</summary>
-        <div class="event-roster">
-          ${renderRosterMini("Vou", going, eventData, "going")}
-          ${renderRosterMini("Talvez", maybe, eventData, "maybe")}
-          ${renderRosterMini("Nao vou", notGoing, eventData, "not_going")}
-        </div>
-      </details>
+      <div class="event-roster">
+        ${renderRosterMini("Vou", going, eventData, "going")}
+        ${renderRosterMini("Talvez", maybe, eventData, "maybe")}
+        ${renderRosterMini("Nao vou", notGoing, eventData, "not_going")}
+      </div>
       ${confirmedGame ? renderEventTeams(confirmedGame) : ""}
       <div class="actions admin-actions">
         ${isCancelled ? "" : confirmedGame ? `

@@ -6359,3 +6359,36 @@ body:not(.non-admin-mode) #view-today .selection-panel {
 body:not(.non-admin-mode) #view-today .layout-grid {
   grid-template-columns: 1fr;
 }
+
+/* Editor de equipas: A e B lado a lado, mesmo no telemovel */
+#roster-editor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#roster-editor .roster-column {
+  padding: 8px;
+  min-width: 0;
+}
+
+#roster-editor .roster-row strong {
+  font-size: 14px;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#roster-editor .roster-row .avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+#roster-editor .roster-actions .mini-btn {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+#edit-tools {
+  margin: 0 0 16px;
+}

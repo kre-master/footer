@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261028-jogos1">
+    <link rel="stylesheet" href="styles.css?v=20261028-jogos2">
   </head>
   <body>
     <div class="app-shell">
@@ -205,8 +205,7 @@
                 Carrega em Auto para fazer as equipas mais equilibradas com quem vai a jogo.
               </div>
               <div id="current-game" class="game-detail hidden">
-                <div class="field-card" id="field-card"></div>
-                <details class="edit-tools admin-only" id="edit-tools">
+                <details class="edit-tools admin-only" id="edit-tools" open>
                   <summary>Ajustar equipas e adicionar jogadores</summary>
                   <div class="roster-editor" id="roster-editor"></div>
                   <div class="add-to-game">
@@ -214,6 +213,7 @@
                     <button id="add-player-game-btn" class="ghost-btn">Adicionar ao jogo</button>
                   </div>
                 </details>
+                <div class="field-card" id="field-card"></div>
                 <div class="game-step admin-only" id="step-confirm">
                   <label class="game-date-control">
                     <span>Data do jogo</span>
@@ -544,6 +544,6 @@
     <script src="player-insights.js?v=20261021-profile1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
     <script src="notifications.js?v=20261024-clube6"></script>
-    <script src="app.js?v=20261028-jogos1"></script>
+    <script src="app.js?v=20261028-jogos2"></script>
   </body>
 </html>
