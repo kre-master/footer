@@ -150,6 +150,8 @@ let availabilityWeekOffset = 0;
 const recruitOpen = new Set();
 // Blocos abertos nos cartoes de convocatoria; sobrevivem aos re-renders.
 const openEventDetails = new Set();
+// Declarada aqui porque bindEvents() (no fim do ficheiro de arranque) chama loadPitchCatalog antes do resto do codigo correr.
+let pitchCatalogPromise = null;
 const availableByEvent = new Map();
 const TRAIT_LABELS = {
   fitness: { relaxed: "Descontraido", regular: "Regular", athletic: "Atletico" },
@@ -8715,8 +8717,6 @@ function renderClubSymbol(group, extraClass = "") {
 
 // O separador usa o simbolo do clube ativo; sem clube mantem o icone de estatisticas.
 // Lista de campos da regiao Norte (OpenStreetMap, scripts/fetch-pitches.mjs): concelho -> campo -> campo de texto.
-let pitchCatalogPromise = null;
-
 function loadPitchCatalog() {
   if (!pitchCatalogPromise) {
     pitchCatalogPromise = fetch("data/pitches-norte.json")

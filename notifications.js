@@ -8,6 +8,14 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.10.1",
+      date: "2026-10-28",
+      title: "Escolher o campo",
+      items: [
+        "Na Nova convocatória, os admins voltam a poder escolher o concelho e o campo da lista, em vez de escreverem o local à mão.",
+      ],
+    },
+    {
       version: "1.10.0",
       date: "2026-10-28",
       title: "Hall of Fame em carrosséis",
