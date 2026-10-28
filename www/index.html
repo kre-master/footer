@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261024-clube6">
+    <link rel="stylesheet" href="styles.css?v=20261028-jogos1">
   </head>
   <body>
     <div class="app-shell">
@@ -72,8 +72,9 @@
           </button>
         </nav>
         <nav class="subtabs hidden" data-group="game" aria-label="Jogos">
-          <button class="subtab" type="button" data-view="events">O meu grupo</button>
+          <button class="subtab" type="button" data-view="events">Os meus jogos</button>
           <button class="subtab" type="button" data-view="public-games" id="public-games-subtab">Jogos publicos</button>
+          <button class="subtab admin-only" type="button" data-view="new-game">Nova convocatoria</button>
         </nav>
         <nav class="subtabs hidden" data-group="history" aria-label="Historico">
           <button class="subtab" type="button" data-view="games">Grupo</button>
@@ -98,7 +99,7 @@
       <main>
         <section class="view active" id="view-events">
           <section class="panel onboarding-panel hidden" id="onboarding-panel"></section>
-          <div class="events-grid">
+          <div class="events-grid single">
             <section class="panel">
               <div class="panel-head">
                 <div>
@@ -109,13 +110,17 @@
               <div id="events-list" class="events-list"></div>
             </section>
 
-            <details class="panel new-game-panel admin-only">
-              <summary class="panel-head">
+          </div>
+        </section>
+
+        <section class="view" id="view-new-game">
+            <section class="panel new-game-panel admin-only">
+              <div class="panel-head">
                 <div>
                   <p class="eyebrow">Admin</p>
-                  <h2>+ Novo jogo</h2>
+                  <h2>Nova convocatoria</h2>
                 </div>
-              </summary>
+              </div>
               <form id="event-form" class="event-form">
                 <input id="event-title" required placeholder="Nome do jogo">
                 <input id="event-date" type="datetime-local" required>
@@ -127,8 +132,7 @@
                 <input id="event-max-players" type="number" min="10" max="12" value="12" placeholder="Max. jogadores">
                 <button class="primary-btn" type="submit">Lancar evento</button>
               </form>
-            </details>
-          </div>
+            </section>
         </section>
 
         <section class="view" id="view-public-games">
@@ -144,12 +148,13 @@
           </section>
         </section>
 
-        <section class="view active" id="view-today">
+        <section class="view" id="view-today">
           <div class="section-divider" id="generate-anchor">
             <div>
               <p class="eyebrow">Equipas</p>
               <h2>Fazer equipas</h2>
             </div>
+            <button id="back-to-events" class="ghost-btn" type="button">&larr; Os meus jogos</button>
             <button id="toggle-generator" class="ghost-btn non-admin-only" type="button" aria-expanded="false">Experimentar fazer equipas</button>
           </div>
           <div class="layout-grid">
@@ -201,14 +206,14 @@
               </div>
               <div id="current-game" class="game-detail hidden">
                 <div class="field-card" id="field-card"></div>
-                <div class="edit-tools admin-only" id="edit-tools">
-                  <h3>Ajustar equipas</h3>
+                <details class="edit-tools admin-only" id="edit-tools">
+                  <summary>Ajustar equipas e adicionar jogadores</summary>
                   <div class="roster-editor" id="roster-editor"></div>
                   <div class="add-to-game">
                     <select id="add-player-to-game"></select>
                     <button id="add-player-game-btn" class="ghost-btn">Adicionar ao jogo</button>
                   </div>
-                </div>
+                </details>
                 <div class="game-step admin-only" id="step-confirm">
                   <label class="game-date-control">
                     <span>Data do jogo</span>
@@ -539,6 +544,6 @@
     <script src="player-insights.js?v=20261021-profile1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
     <script src="notifications.js?v=20261024-clube6"></script>
-    <script src="app.js?v=20261024-clube6"></script>
+    <script src="app.js?v=20261028-jogos1"></script>
   </body>
 </html>

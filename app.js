@@ -148,6 +148,8 @@ const PUBLIC_SEEN_KEY = "footer-public-games-seen-v1";
 let myAvailability = [];
 let availabilityWeekOffset = 0;
 const recruitOpen = new Set();
+// Blocos abertos nos cartoes de convocatoria; sobrevivem aos re-renders.
+const openEventDetails = new Set();
 const availableByEvent = new Map();
 const TRAIT_LABELS = {
   fitness: { relaxed: "Descontraido", regular: "Regular", athletic: "Atletico" },
@@ -2490,6 +2492,7 @@ const VIEW_GROUPS = {
   events: "game",
   today: "game",
   "public-games": "game",
+  "new-game": "game",
   games: "history",
   "history-game": "history",
   "my-games": "history",
@@ -2515,11 +2518,11 @@ function showView(viewName, options = {}) {
     previewGame = null;
   }
   currentViewName = viewName;
-  const visibleViews = group === "game" && viewName !== "public-games" ? ["events", "today"] : [viewName];
+  const visibleViews = [viewName];
   els.tabs.forEach((tab) => tab.classList.toggle("active", VIEW_GROUPS[tab.dataset.view] === group));
   els.views.forEach((view) => view.classList.toggle("active", visibleViews.includes(view.id.replace(/^view-/, ""))));
   document.querySelectorAll(".subtabs").forEach((nav) => nav.classList.toggle("hidden", nav.dataset.group !== group));
-  // "Fazer equipas" (today) conta como "O meu grupo" no mini-separador.
+  // "Fazer equipas" (today) conta como "Os meus jogos" no mini-separador.
   const activeSubtab = viewName === "today" ? "events" : viewName;
   document.querySelectorAll(".subtab").forEach((button) => button.classList.toggle("active", button.dataset.view === activeSubtab));
   if (viewName === "public-games") markPublicGamesSeen();
@@ -2545,6 +2548,7 @@ function toggleAccountMenu(force) {
 
 function bindNavigation() {
   document.querySelectorAll(".subtab").forEach((button) => on(button, "click", () => showView(button.dataset.view)));
+  on(document.querySelector("#back-to-events"), "click", () => showView("events"));
   on(document.querySelector("#account-menu-btn"), "click", (event) => {
     event.stopPropagation();
     toggleAccountMenu();
@@ -5862,6 +5866,12 @@ function renderEventsList() {
 
   els.eventsList.innerHTML = events.map((eventData) => renderEventCard(eventData)).join("");
 
+  els.eventsList.querySelectorAll("details[data-event-details]").forEach((details) => {
+    details.addEventListener("toggle", () => {
+      if (details.open) openEventDetails.add(details.dataset.eventDetails);
+      else openEventDetails.delete(details.dataset.eventDetails);
+    });
+  });
   els.eventsList.querySelectorAll("[data-event-response]").forEach((button) => {
     button.addEventListener("click", () => saveEventResponse(button.dataset.eventId, button.dataset.eventResponse));
   });
@@ -6295,11 +6305,13 @@ function renderEventCard(eventData) {
   const isSelected = eventData.id === currentEventId;
   const eventGame = findGameForEventData(eventData);
   const confirmedGame = eventGame && !isFinishedGame(eventGame) ? eventGame : null;
+  const detailsAttrs = (key) => `data-event-details="${eventData.id}:${key}" ${openEventDetails.has(`${eventData.id}:${key}`) ? "open" : ""}`;
+  const isCancelled = eventData.status === "cancelled";
   return `
     <article class="event-card ${isSelected ? "selected" : ""}">
       <div class="event-top">
         <div>
-          <p class="eyebrow">${escapeHtml(eventData.status)}</p>
+          ${isCancelled ? `<p class="eyebrow">Cancelada</p>` : ""}
           <h3>${escapeHtml(eventData.title)}</h3>
           <p>${formatDate(eventData.startsAt)}${eventData.location ? ` - ${escapeHtml(eventData.location)}` : ""}</p>
         </div>
@@ -6312,33 +6324,39 @@ function renderEventCard(eventData) {
         ${isFull ? `<span class="metric warn-pill">Cheio</span>` : ""}
         <span class="metric ${missing ? "warn-pill" : "good-pill"}">${missing ? `Faltam ${missing}` : "Pronto"}</span>
       </div>
-      <div class="event-date-edit admin-actions">
-        <label class="game-date-control">
-          <span>Data/hora</span>
-          <input type="datetime-local" data-event-date-edit="${eventData.id}" value="${toDateTimeLocalInput(eventData.startsAt)}">
-        </label>
-        <button class="ghost-btn" data-save-event-date="${eventData.id}">Guardar data</button>
-      </div>
       ${renderResponseActions(eventData, myResponse)}
-      <div class="event-roster">
-        ${renderRosterMini("Vou", going, eventData, "going")}
-        ${renderRosterMini("Talvez", maybe, eventData, "maybe")}
-        ${renderRosterMini("Nao vou", notGoing, eventData, "not_going")}
-      </div>
+      <details class="event-more" ${detailsAttrs("roster")}>
+        <summary>Quem vai e quem nao vai</summary>
+        <div class="event-roster">
+          ${renderRosterMini("Vou", going, eventData, "going")}
+          ${renderRosterMini("Talvez", maybe, eventData, "maybe")}
+          ${renderRosterMini("Nao vou", notGoing, eventData, "not_going")}
+        </div>
+      </details>
       ${confirmedGame ? renderEventTeams(confirmedGame) : ""}
-      ${renderEventAdminAdds(eventData)}
-      ${renderEventPublicSection(eventData)}
       <div class="actions admin-actions">
-        <button class="ghost-btn" data-event-share="${eventData.id}">WhatsApp</button>
-        ${eventData.status === "cancelled" ? `
-          <button class="danger-btn" data-event-delete="${eventData.id}">Apagar convocatoria</button>
-        ` : `
-          ${confirmedGame ? `
+        ${isCancelled ? "" : confirmedGame ? `
           <button class="primary-btn" data-event-open-game="${confirmedGame.id}" data-event-id="${eventData.id}">Ver equipas</button>
-          ` : `<button class="primary-btn" data-event-generate="${eventData.id}" ${going.length < eventData.minPlayers || going.length > Math.min(eventData.maxPlayers, 12) ? "disabled" : ""}>Fazer equipas</button>`}
-          <button class="danger-btn" data-event-cancel="${eventData.id}">Cancelar</button>
-        `}
+        ` : `<button class="primary-btn" data-event-generate="${eventData.id}" ${going.length < eventData.minPlayers || going.length > Math.min(eventData.maxPlayers, 12) ? "disabled" : ""}>Fazer equipas</button>`}
+        <button class="ghost-btn" data-event-share="${eventData.id}">WhatsApp</button>
       </div>
+      <details class="event-more admin-actions" ${detailsAttrs("manage")}>
+        <summary>Gerir convocatoria</summary>
+        <div class="event-date-edit">
+          <label class="game-date-control">
+            <span>Data/hora</span>
+            <input type="datetime-local" data-event-date-edit="${eventData.id}" value="${toDateTimeLocalInput(eventData.startsAt)}">
+          </label>
+          <button class="ghost-btn" data-save-event-date="${eventData.id}">Guardar data</button>
+        </div>
+        ${renderEventAdminAdds(eventData)}
+        ${renderEventPublicSection(eventData)}
+        <div class="actions">
+          ${isCancelled
+            ? `<button class="danger-btn" data-event-delete="${eventData.id}">Apagar convocatoria</button>`
+            : `<button class="danger-btn" data-event-cancel="${eventData.id}">Cancelar convocatoria</button>`}
+        </div>
+      </details>
     </article>
   `;
 }
@@ -6449,6 +6467,7 @@ async function saveEventFromForm(event) {
   els.eventForm.reset();
   els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
   render();
+  showView("events");
 }
 
 async function saveEventDateFromList(eventId) {

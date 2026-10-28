@@ -6311,3 +6311,51 @@ body.stage-open .profile-section {
 .pitch-picker select {
   min-width: 0;
 }
+
+/* Jogos: cartao compacto, ferramentas recolhidas e vista de equipas simplificada */
+.events-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.event-more {
+  border: 1px solid rgba(130,175,255,.186);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(120,165,255,.067);
+}
+
+.event-more > summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.event-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.event-more[open] > summary {
+  margin-bottom: 10px;
+}
+
+.event-more .event-date-edit {
+  margin: 0 0 12px;
+}
+
+.edit-tools > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.edit-tools[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* O admin parte sempre da convocatoria; a lista manual so serve ao modo "Experimentar". */
+body:not(.non-admin-mode) #view-today .selection-panel {
+  display: none;
+}
+
+body:not(.non-admin-mode) #view-today .layout-grid {
+  grid-template-columns: 1fr;
+}
