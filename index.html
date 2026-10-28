@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261028-jogos2">
+    <link rel="stylesheet" href="styles.css?v=20261028-jogos4">
   </head>
   <body>
     <div class="app-shell">
@@ -205,20 +205,7 @@
                 Carrega em Auto para fazer as equipas mais equilibradas com quem vai a jogo.
               </div>
               <div id="current-game" class="game-detail hidden">
-                <details class="edit-tools admin-only" id="edit-tools" open>
-                  <summary>Ajustar equipas e adicionar jogadores</summary>
-                  <div class="roster-editor" id="roster-editor"></div>
-                  <div class="add-to-game">
-                    <select id="add-player-to-game"></select>
-                    <button id="add-player-game-btn" class="ghost-btn">Adicionar ao jogo</button>
-                  </div>
-                </details>
-                <div class="field-card" id="field-card"></div>
                 <div class="game-step admin-only" id="step-confirm">
-                  <label class="game-date-control">
-                    <span>Data do jogo</span>
-                    <input id="game-date" type="datetime-local">
-                  </label>
                   <button id="confirm-game" class="primary-btn" disabled>Confirmar equipas</button>
                 </div>
                 <div class="game-step" id="step-share">
@@ -239,6 +226,21 @@
                     </label>
                     <button id="save-score" class="primary-btn">Guardar resultado</button>
                   </div>
+                </div>
+                <details class="edit-tools admin-only" id="edit-tools" open>
+                  <summary>Ajustar equipas e adicionar jogadores</summary>
+                  <div class="roster-editor" id="roster-editor"></div>
+                  <div class="add-to-game">
+                    <select id="add-player-to-game"></select>
+                    <button id="add-player-game-btn" class="ghost-btn">Adicionar ao jogo</button>
+                  </div>
+                </details>
+                <div class="field-card" id="field-card"></div>
+                <div class="game-step admin-only" id="step-date">
+                  <label class="game-date-control">
+                    <span>Data do jogo</span>
+                    <input id="game-date" type="datetime-local">
+                  </label>
                 </div>
               </div>
             </section>
@@ -544,6 +546,6 @@
     <script src="player-insights.js?v=20261021-profile1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
     <script src="notifications.js?v=20261024-clube6"></script>
-    <script src="app.js?v=20261028-jogos2"></script>
+    <script src="app.js?v=20261028-jogos4"></script>
   </body>
 </html>

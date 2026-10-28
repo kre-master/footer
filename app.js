@@ -232,6 +232,7 @@ const els = {
   currentGame: document.querySelector("#current-game"),
   fieldCard: document.querySelector("#field-card"),
   stepConfirm: document.querySelector("#step-confirm"),
+  stepDate: document.querySelector("#step-date"),
   stepShare: document.querySelector("#step-share"),
   stepFinish: document.querySelector("#step-finish"),
   confirmGame: document.querySelector("#confirm-game"),
@@ -7230,6 +7231,7 @@ function renderCurrentGame() {
   if (!game) return;
 
   els.stepConfirm?.classList.toggle("hidden", !isPreview);
+  els.stepDate?.classList.toggle("hidden", !isPreview);
   els.stepShare?.classList.toggle("hidden", isPreview && isAdmin);
   els.stepFinish?.classList.toggle("hidden", isPreview);
   const isFinishing = finishingGame === game.id;
@@ -7949,10 +7951,12 @@ function renderRosterRow(playerData, currentGroup) {
 
   return `
     <div class="roster-row">
-      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+      <div class="roster-row-head">
+        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+        <button class="roster-remove" type="button" data-remove-player="${playerData.id}" aria-label="Remover ${escapeHtml(playerData.name)}" title="Remover">&times;</button>
+      </div>
       <div class="roster-actions">
         ${actions.map(([key, label]) => `<button class="mini-btn" data-move-player="${playerData.id}" data-to-group="${key}">${label}</button>`).join("")}
-        <button class="mini-btn" data-remove-player="${playerData.id}">Remover</button>
       </div>
     </div>
   `;

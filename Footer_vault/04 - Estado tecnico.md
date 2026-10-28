@@ -478,7 +478,7 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 
 ## 2026-10-28
 
-- Commits: `c88eee9` (rename footer) e `a906e31` (reorganizacao de Jogos). Cache-buster JS/CSS: `20261028-jogos2`.
+- Commits: `c88eee9` (rename footer) e `a906e31` (reorganizacao de Jogos). Cache-buster JS/CSS: `20261028-jogos4`.
 - VM `orq`: instalado Node 20.19.2 / npm 9.2.0 via apt; credenciais git guardadas com `credential.helper store` (token limitado a este repo).
 - Chromium/Playwright nao arrancam na VM (faltam libs do sistema): a UI de Jogos nao foi testada visualmente, so `check`, `test:stats`, `test:postgame`, `test:monthly`.
 - `showView` mostra agora so a vista pedida (antes empilhava `events` + `today`).
