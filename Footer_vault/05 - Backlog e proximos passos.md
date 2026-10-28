@@ -64,3 +64,9 @@ Depois de alterar:
 - Correr `node --check www\app.js` depois do build.
 - Rever `git status --short`.
 - Actualizar este vault com decisoes, bugs e validacoes novas.
+
+## Pendentes (2026-10-28)
+
+- Validar visualmente a nova pagina Jogos (telemovel) e afinar o cartao compacto.
+- Decidir se o campo deve permitir trocar jogadores por toque; a caixa de convidados deixou de existir na vista de equipas (usar "Gerir convocatoria").
+- Retomar fase 3.1 (jogos publicos).

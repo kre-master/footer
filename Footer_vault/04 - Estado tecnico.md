@@ -475,3 +475,10 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 - Velocidade max. tem atalho "Ver o momento" quando o jogo tem video (usa `maxSustainedAtS` e `videoSeekTarget`).
 - Proximas fases: evolucao com grafico grande e escolha de metrica, mapa de calor orientado para o ataque, duas colunas no computador; depois relacoes com contexto, passes, comparacao opcional com o grupo, stories.
 - Cache-buster JS/CSS: `20261021-profile1`.
+
+## 2026-10-28
+
+- Commits: `c88eee9` (rename footer) e `a906e31` (reorganizacao de Jogos). Cache-buster JS/CSS: `20261028-jogos1`.
+- VM `orq`: instalado Node 20.19.2 / npm 9.2.0 via apt; credenciais git guardadas com `credential.helper store` (token limitado a este repo).
+- Chromium/Playwright nao arrancam na VM (faltam libs do sistema): a UI de Jogos nao foi testada visualmente, so `check`, `test:stats`, `test:postgame`, `test:monthly`.
+- `showView` mostra agora so a vista pedida (antes empilhava `events` + `today`).

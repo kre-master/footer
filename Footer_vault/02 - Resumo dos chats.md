@@ -173,3 +173,8 @@ Validacoes:
 - `npm.cmd run build:web` passou.
 - `node --check www\app.js` passou.
 - Smoke test local em `http://127.0.0.1:5173/` devolveu `STATUS=200` e `CACHE_BUSTER=ok` com cache-buster `20260604-mvpmonth2`.
+
+## 2026-10-28 - Renomear para footer e reorganizar Jogos
+
+- Projecto renomeado para `footer`: repo `kre-master/footer`, pasta local `~/orquestrador/footer`, package, bundle ids `com.kremaster.footer`, URL Pages https://kre-master.github.io/footer/ (o link antigo deixou de existir). Pages exige repo publico.
+- Pagina Jogos reorganizada: subtabs Os meus jogos / Jogos publicos / Nova convocatoria (admin), cartao compacto, vista de equipas propria. Ver [[03 - Decisoes e regras]] e [[04 - Estado tecnico]].

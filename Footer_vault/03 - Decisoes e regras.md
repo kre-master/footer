@@ -192,3 +192,7 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Linguagem prudente: factos observados ("percorreste mais 1,1 km") e nunca juizos de forma fisica ou qualidade de jogo a partir do tracking.
 - Cada metrica mostra a cobertura (jogos analisados vs disputados) e o estado de qualidade do tracker. Sem dados aparece como "sem dados".
 - Comparar primeiro o jogador consigo proprio; comparacao com o grupo so como opcao e com quem tem dados comparaveis.
+
+- Desde 2026-10-28: Jogos tem subtabs "Os meus jogos", "Jogos publicos" e "Nova convocatoria" (so admin cria convocatorias). "Fazer equipas" (view `today`) e uma vista propria, aberta a partir do cartao, com botao de voltar.
+- Cartao da convocatoria compacto: titulo, data/local, contadores e resposta visiveis; "Quem vai e quem nao vai" e "Gerir convocatoria" (data, adicionar jogadores/convidados, procurar jogadores, cancelar) ficam recolhidos. Estado aberto guardado em `openEventDetails`.
+- O admin faz equipas sempre a partir da convocatoria: o passo 1 (selecao manual) fica escondido para o admin; o campo vem primeiro e "Ajustar equipas e adicionar jogadores" fica recolhido por baixo.
