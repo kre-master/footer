@@ -213,3 +213,8 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Carrossel em ecra cheio (`#month-review`): capa, presencas, MVP, distancia, ritmo, velocidade max. (com "Ver o momento"), sprints, passes, cartas, esforco (kcal e forma sentida, so o proprio ve) e fecho. So aparecem cartoes com dados; compara com o mes anterior em factos ("+1,2 km face a setembro"), sem juizos.
 - Hall of Fame, seccao "Em campo (Beta)": Motor, Maratonista, Relampago, Sprinter, Passador e Ligacao (passes entre dois). Entram jogadores com >= 10 min observados e fora da baliza; cada lista mostra a etiqueta de qualidade do tracker. No periodo "Este mes" os resultados sao parciais (etiqueta Parcial); as medias de golos passam a exigir 1 jogo em vez de 5 so nesse periodo.
 - Hall of Fame (2026-10-28, 2): cada seccao (Resultados, Presenca e premios, Combinacoes, Em campo) e um carrossel `.hof-rail` de cartoes com cor propria (`HOF_TONES` por icone), 5 linhas por cartao, pontos de pagina por baixo (`bindHofRail`). Foi removido o "Ver todos".
+
+## Onboarding de um grupo novo (2026-10-28)
+
+- Fluxo: representante cria conta -> "A minha conta > Criar um grupo novo" (pedido com nome, campo, dia/hora) -> o dono da app aprova em Admin > Pedidos -> painel "Primeiros passos" (jogadores com nota 1-100, link de convite para o WhatsApp, primeira convocatoria em "Nova convocatoria") -> jogadores entram pelo link `?convite=CODIGO`, criam conta, escolhem o perfil e o admin aprova em Pedidos.
+- Cartao de entrada para jogadores (PNG 1080x1790 com QR para a app) gerado com `qrcode` + `@resvg/resvg-js` + fonte Inter (`fonts-inter`), a partir de um SVG; o QR generico abre a app, o convite e por grupo.

@@ -8,6 +8,14 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.10.2",
+      date: "2026-10-28",
+      title: "Primeiros passos do grupo",
+      items: [
+        "Nos primeiros passos de um grupo novo, \"Criar convocatória\" leva agora ao separador Nova convocatória.",
+      ],
+    },
+    {
       version: "1.10.1",
       date: "2026-10-28",
       title: "Escolher o campo",

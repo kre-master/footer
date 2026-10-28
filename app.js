@@ -1684,7 +1684,7 @@ function renderOnboardingPanel() {
       </li>
       <li class="${hasGame ? "done" : ""}">
         <strong>Primeira convocatoria</strong>
-        <p class="hint">Em "+ Novo jogo", logo abaixo.</p>
+        <p class="hint">No separador "Nova convocatoria".</p>
         <div class="actions"><button class="ghost-btn" data-onboarding-event>Criar convocatoria</button></div>
       </li>
     </ol>
@@ -1694,13 +1694,7 @@ function renderOnboardingPanel() {
     showView("claims");
     await loadInviteCode(false);
   });
-  panel.querySelector("[data-onboarding-event]")?.addEventListener("click", () => {
-    const details = document.querySelector(".new-game-panel");
-    if (details) {
-      details.open = true;
-      details.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
+  panel.querySelector("[data-onboarding-event]")?.addEventListener("click", () => showView("new-game"));
 }
 
 // "Nome 75" -> nota 75; sem nota usa a media das notas dadas (ou 60 se nenhuma).
