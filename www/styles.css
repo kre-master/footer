@@ -4389,6 +4389,51 @@ body.stage-open .profile-section {
   right: calc(10px + env(safe-area-inset-right, 0px));
 }
 
+.stage-zoom {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.video-stage.is-fullscreen .stage-zoom {
+  display: grid;
+  top: calc(50% + 46px);
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  opacity: .75;
+}
+
+.video-stage.is-zoomed .stage-zoom {
+  border-color: var(--amber);
+  color: #f6d38f;
+  opacity: 1;
+}
+
+/* Com zoom o iframe fica maior que o palco; --stage-pan-x/y (0 a 1) escolhem a zona que se ve. */
+.video-stage.is-fullscreen.is-zoomed .game-video-frame iframe {
+  inset: auto;
+  left: calc((1 - var(--stage-zoom, 1)) * var(--stage-pan-x, .5) * 100%);
+  top: calc((1 - var(--stage-zoom, 1)) * var(--stage-pan-y, .5) * 100%);
+  width: calc(var(--stage-zoom, 1) * 100%);
+  height: calc(var(--stage-zoom, 1) * 100%);
+}
+
+.stage-pan {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: grab;
+  touch-action: none;
+}
+
+.stage-pan:active {
+  cursor: grabbing;
+}
+
+.video-stage:not(.is-fullscreen) .stage-pan {
+  display: none !important;
+}
+
 @media (max-height: 500px) {
   .video-stage.is-fullscreen .stage-mark {
     bottom: auto;

@@ -10652,6 +10652,8 @@ const STAGE_EXIT_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9
 function renderStageControls() {
   return `
     <button type="button" class="stage-btn stage-fs" data-stage-fullscreen aria-label="Ecra cheio">${STAGE_FS_ICON}</button>
+    <button type="button" class="stage-btn stage-zoom" data-stage-zoom aria-label="Zoom 2x">1×</button>
+    <div class="stage-pan hidden" data-stage-pan aria-hidden="true"></div>
     ${canMarkMoments() ? `
       <button type="button" class="stage-btn stage-mark" data-stage-mark aria-label="Marcar momento">🔖</button>
       ${renderMomentForm("stage-form")}` : ""}`;
@@ -10668,7 +10670,74 @@ function setStageFullscreenUi(stage, active) {
     button.innerHTML = active ? STAGE_EXIT_ICON : STAGE_FS_ICON;
     button.setAttribute("aria-label", active ? "Sair do ecra cheio" : "Ecra cheio");
   }
-  if (!active) stage.querySelector(".stage-form")?.classList.add("hidden");
+  if (!active) {
+    stage.querySelector(".stage-form")?.classList.add("hidden");
+    setStageZoom(stage, 1);
+  }
+}
+
+// Zoom em ecra cheio (1x, 2x, 3x). O leitor do YouTube nao deixa ampliar por dentro, por isso o iframe
+// fica 2 ou 3 vezes maior dentro do palco (o YouTube escolhe a qualidade pelo tamanho, por isso fica nitido)
+// e uma camada por cima deixa arrastar para escolher a zona; um toque pausa ou continua o video.
+const STAGE_ZOOM_LEVELS = [1, 2, 3];
+
+function setStageZoom(stage, zoom, panX = 0.5, panY = 0.5) {
+  if (!stage) return;
+  const clamp = (value) => Math.min(1, Math.max(0, value));
+  stage.dataset.zoom = String(zoom);
+  stage.dataset.panX = String(clamp(panX));
+  stage.dataset.panY = String(clamp(panY));
+  stage.classList.toggle("is-zoomed", zoom > 1);
+  stage.style.setProperty("--stage-zoom", String(zoom));
+  stage.style.setProperty("--stage-pan-x", stage.dataset.panX);
+  stage.style.setProperty("--stage-pan-y", stage.dataset.panY);
+  stage.querySelector("[data-stage-pan]")?.classList.toggle("hidden", zoom <= 1);
+  const button = stage.querySelector("[data-stage-zoom]");
+  if (button) {
+    const next = STAGE_ZOOM_LEVELS[(STAGE_ZOOM_LEVELS.indexOf(zoom) + 1) % STAGE_ZOOM_LEVELS.length];
+    button.textContent = `${zoom}×`;
+    button.setAttribute("aria-label", next === 1 ? "Tirar o zoom" : `Zoom ${next}x`);
+  }
+}
+
+function bindStageZoom(stage) {
+  const button = stage.querySelector("[data-stage-zoom]");
+  const pan = stage.querySelector("[data-stage-pan]");
+  if (!button || !pan) return;
+  setStageZoom(stage, 1);
+  on(button, "click", () => {
+    const zoom = Number(stage.dataset.zoom) || 1;
+    const next = STAGE_ZOOM_LEVELS[(STAGE_ZOOM_LEVELS.indexOf(zoom) + 1) % STAGE_ZOOM_LEVELS.length];
+    setStageZoom(stage, next, Number(stage.dataset.panX), Number(stage.dataset.panY));
+  });
+  let drag = null;
+  on(pan, "pointerdown", (event) => {
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, panX: Number(stage.dataset.panX), panY: Number(stage.dataset.panY), moved: false };
+    pan.setPointerCapture(event.pointerId);
+  });
+  on(pan, "pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
+    if (!drag.moved) return;
+    // Arrastar para a direita mostra o que esta a esquerda, como numa foto ampliada.
+    const zoom = Number(stage.dataset.zoom) || 1;
+    const overflowX = pan.clientWidth * (zoom - 1) || 1;
+    const overflowY = pan.clientHeight * (zoom - 1) || 1;
+    setStageZoom(stage, zoom, drag.panX - dx / overflowX, drag.panY - dy / overflowY);
+  });
+  const end = (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const tapped = !drag.moved && event.type === "pointerup";
+    drag = null;
+    if (!tapped) return;
+    const frame = stage.querySelector("iframe");
+    const clock = frame?.contentWindow ? videoClocks.get(frame.contentWindow) : null;
+    sendVideoCommand(frame, clock?.playing === false ? "playVideo" : "pauseVideo");
+  };
+  on(pan, "pointerup", end);
+  on(pan, "pointercancel", end);
 }
 
 async function toggleStageFullscreen(stage) {
@@ -10709,6 +10778,7 @@ function bindVideoStage(stage) {
   if (!document.querySelector("[data-video-stage].pseudo-fullscreen")) document.body.classList.remove("stage-open");
   if (!stage) return;
   on(stage.querySelector("[data-stage-fullscreen]"), "click", () => toggleStageFullscreen(stage));
+  bindStageZoom(stage);
 }
 
 function exitStageFullscreen(stage) {

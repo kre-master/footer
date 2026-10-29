@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.15.0",
+      date: "2026-10-29",
+      title: "Zoom nos vídeos",
+      items: [
+        "Em ecrã cheio há um botão novo para ampliar o vídeo 2 ou 3 vezes (carrega outra vez para voltar ao normal).",
+        "Com zoom, arrasta o dedo para escolher a zona do campo; um toque pausa ou continua o vídeo.",
+      ],
+    },
+    {
       version: "1.14.1",
       date: "2026-10-29",
       title: "Momentos em repetição",
