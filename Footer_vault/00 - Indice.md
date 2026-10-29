@@ -10,6 +10,8 @@ Este vault e a memoria organizada do projecto Footer. Deve ser lido antes de tra
 - [[04 - Estado tecnico]] - ficheiros principais, commits recentes, builds e cuidados tecnicos.
 - [[05 - Backlog e proximos passos]] - ideias pendentes e proximas linhas de trabalho.
 - [[06 - Spec - Historico alargado e revelacao de cartas]] - desenho aprovado para auditar cartas de vitorias, mostrar historico de 20 jogos e revelar cartas novas apos jogo.
+- [[09 - Fase 3 - Multi-grupo]] - desenho e estado da fase 3 (grupos, convites, jogos publicos, disponibilidade).
+- [[10 - Mapa de futuro e estrategia]] - fases, estrategia, rentabilidade, idiomas e registo de decisoes; fonte do PDF em `pdf/`.
 
 ## Regra de uso
 

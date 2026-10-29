@@ -39,7 +39,7 @@ O schema Supabase e de um grupo so: `profiles.role` e global (`is_admin()`), qua
 3. 3.2 Convites e onboarding do jogador.
 4. 3.3 Criar grupo com aprovacao + wizard do admin.
 5. 3.4 Piloto de 4 a 6 semanas.
-6. 3.9 Apps, dominio proprio e precos - proposta em [[10 - Fase 3.9 - Apps, dominio e precos]].
+6. 3.9 Apps, dominio proprio e precos - ver [[10 - Mapa de futuro e estrategia]] (folhas 2, 10 e 11).
 
 ## Passo 3.0 - estado
 

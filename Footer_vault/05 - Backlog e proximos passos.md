@@ -73,3 +73,9 @@ Depois de alterar:
 - Hall of Fame fase 2: categorias de video (ver [[03 - Decisoes e regras]], seccao Hall of Fame). Validar primeiro o novo desenho no telemovel.
 - Rever a Revisao do mes no telemovel com um mes real fechado (outubro fecha depois do ultimo jogo + 24 h de MVP e do dia 1 de novembro).
 - Opcional: "Transferir dono" de um grupo para outro admin.
+
+## Mapa de futuro (2026-10-29)
+
+- Estrategia, fases e proximos 90 dias em [[10 - Mapa de futuro e estrategia]] (PDF em `Footer_vault/pdf/`).
+- Proximos passos da fase 3: 3.4 piloto, 3.5 convidado ve o jogo e as equipas, 3.6 idiomas/fuso/moeda, 3.7 lojas e push; fecho = Footer 2.0.
+- Decisoes em aberto listadas na folha 14 da nota 10; registar la as respostas.
