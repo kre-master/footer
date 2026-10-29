@@ -146,7 +146,14 @@ let myTraits = null;
 const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 const PUBLIC_SEEN_KEY = "footer-public-games-seen-v1";
 let myAvailability = [];
+let myWeeklyAvailability = [];
+// null = a conta ainda nao gravou opcoes; o painel decide o modo por omissao.
+let myAvailabilitySettings = null;
+// Escolhas ainda nao gravadas (visivel e modo) para sobreviverem aos re-renders do painel.
+let availabilityDraft = null;
 let availabilityWeekOffset = 0;
+// Dias da semana ISO (1 = segunda) como em player_weekly_availability.weekday.
+const ISO_WEEKDAYS = [[1, "Seg"], [2, "Ter"], [3, "Qua"], [4, "Qui"], [5, "Sex"], [6, "Sab"], [7, "Dom"]];
 const recruitOpen = new Set();
 // Blocos abertos nos cartoes de convocatoria; sobrevivem aos re-renders.
 const openEventDetails = new Set();
@@ -1776,17 +1783,39 @@ async function loadGroupRequests() {
 
 async function loadMyAvailability() {
   myAvailability = [];
+  myWeeklyAvailability = [];
+  myAvailabilitySettings = null;
+  availabilityDraft = null;
   if (!supabaseClient || !currentSession?.user) return;
-  const { data, error } = await supabaseClient
-    .from("player_availability")
-    .select("*")
-    .gte("day", toLocalDateKey(new Date()))
-    .order("day", { ascending: true });
-  if (error) {
-    console.warn("Availability load failed. Run supabase/availability-migration.sql.", error);
+  const [dates, weekly, settings] = await Promise.all([
+    supabaseClient
+      .from("player_availability")
+      .select("*")
+      .gte("day", toLocalDateKey(new Date()))
+      .order("day", { ascending: true }),
+    supabaseClient.from("player_weekly_availability").select("*").order("weekday", { ascending: true }),
+    supabaseClient.from("player_availability_settings").select("*").maybeSingle(),
+  ]);
+  if (dates.error) {
+    console.warn("Availability load failed. Run supabase/availability-migration.sql.", dates.error);
+  } else {
+    myAvailability = dates.data || [];
+  }
+  if (weekly.error || settings.error) {
+    console.warn("Weekly availability load failed. Run supabase/availability-weekly-migration.sql.", weekly.error || settings.error);
     return;
   }
-  myAvailability = data || [];
+  myWeeklyAvailability = weekly.data || [];
+  myAvailabilitySettings = settings.data || null;
+}
+
+// Sem opcoes gravadas: quem ja tinha dias marcados fica em "dias concretos", os outros em semanal.
+function getAvailabilityChoice() {
+  if (availabilityDraft) return availabilityDraft;
+  return {
+    visible: myAvailabilitySettings?.visible ?? true,
+    mode: myAvailabilitySettings?.mode || (myAvailability.length ? "dates" : "weekly"),
+  };
 }
 
 function toLocalDateKey(date) {
@@ -1806,23 +1835,16 @@ function getWeekDays(offset) {
   });
 }
 
-// "Jogos publicos": disponibilidade da semana. Ver tambem list_available_players no Supabase.
+// "A minha disponibilidade": perfil visivel e disponibilidade semanal ou por dias.
+// Ver tambem list_available_players no Supabase.
 function renderAvailabilityPanel() {
   const panel = document.querySelector("#availability-panel");
   if (!panel) return;
   if (!remoteEnabled || !currentSession?.user) {
-    panel.innerHTML = "";
+    panel.innerHTML = `<section class="panel"><div class="empty-state">Entra na tua conta para dizeres quando podes jogar.</div></section>`;
     return;
   }
-  const days = getWeekDays(availabilityWeekOffset);
-  const todayKey = toLocalDateKey(new Date());
-  const weekKeys = days.map(toLocalDateKey);
-  const weekRows = myAvailability.filter((row) => weekKeys.includes(row.day));
-  const selected = new Set(weekRows.map((row) => row.day));
-  const from = weekRows[0]?.from_hour ?? 19;
-  const to = weekRows[0]?.to_hour ?? 23;
-  const hours = (min, max, value) => Array.from({ length: max - min + 1 }, (_, i) => min + i)
-    .map((hour) => `<option value="${hour}" ${hour === value ? "selected" : ""}>${hour}h</option>`).join("");
+  const choice = getAvailabilityChoice();
   const hasTraits = Boolean(myTraits?.fitness && myTraits?.position && myTraits?.age_band);
   panel.innerHTML = `
     <section class="panel">
@@ -1833,30 +1855,33 @@ function renderAvailabilityPanel() {
         </div>
       </div>
       <div class="availability-body">
-        <p class="hint">Diz em que dias e horas podes jogar. Os admins de grupos com vagas veem o teu nome, as tuas caracteristicas e a tua disponibilidade, e podem convidar-te.</p>
+        <label class="recruit-switch">
+          <input type="checkbox" data-avail-visible ${choice.visible ? "checked" : ""}>
+          <span>Quero o meu perfil visivel</span>
+        </label>
+        <p class="hint" data-avail-visible-hint>${availabilityVisibleHint(choice.visible)}</p>
         <div class="week-switch">
-          <button class="ghost-btn ${availabilityWeekOffset === 0 ? "selected" : ""}" data-avail-week="0">Esta semana</button>
-          <button class="ghost-btn ${availabilityWeekOffset === 1 ? "selected" : ""}" data-avail-week="1">Proxima semana</button>
+          <button class="ghost-btn ${choice.mode === "weekly" ? "selected" : ""}" data-avail-mode="weekly">Semanal</button>
+          <button class="ghost-btn ${choice.mode === "dates" ? "selected" : ""}" data-avail-mode="dates">Dias concretos</button>
         </div>
-        <div class="day-chips">
-          ${days.map((day) => {
-            const key = toLocalDateKey(day);
-            const past = key < todayKey;
-            return `<label class="day-chip ${selected.has(key) ? "selected" : ""} ${past ? "disabled" : ""}">
-              <input type="checkbox" data-avail-day="${key}" ${selected.has(key) ? "checked" : ""} ${past ? "disabled" : ""}>
-              ${WEEKDAY_SHORT[day.getDay()]} ${day.getDate()}
-            </label>`;
-          }).join("")}
-        </div>
-        <div class="traits-row">
-          <label class="game-date-control"><span>Das</span><select data-avail-from>${hours(7, 23, from)}</select></label>
-          <label class="game-date-control"><span>As</span><select data-avail-to>${hours(8, 24, to)}</select></label>
-        </div>
+        ${choice.mode === "weekly" ? renderWeeklyAvailability() : renderDatesAvailability()}
         ${hasTraits ? "" : `<p class="hint warn">Preenche tambem as tuas caracteristicas na Conta, para os admins saberem como jogas.</p>`}
         <div class="actions"><button class="primary-btn" data-save-availability>Guardar disponibilidade</button></div>
       </div>
     </section>
   `;
+  panel.querySelector("[data-avail-visible]")?.addEventListener("change", (event) => {
+    // Sem re-render, para nao perder dias marcados que ainda nao foram gravados.
+    availabilityDraft = { ...getAvailabilityChoice(), visible: event.target.checked };
+    const hint = panel.querySelector("[data-avail-visible-hint]");
+    if (hint) hint.textContent = availabilityVisibleHint(event.target.checked);
+  });
+  panel.querySelectorAll("[data-avail-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      availabilityDraft = { ...getAvailabilityChoice(), mode: button.dataset.availMode };
+      renderAvailabilityPanel();
+    });
+  });
   panel.querySelectorAll("[data-avail-week]").forEach((button) => {
     button.addEventListener("click", () => {
       availabilityWeekOffset = Number(button.dataset.availWeek);
@@ -1866,17 +1891,138 @@ function renderAvailabilityPanel() {
   panel.querySelectorAll("[data-avail-day]").forEach((input) => {
     input.addEventListener("change", () => input.closest(".day-chip")?.classList.toggle("selected", input.checked));
   });
+  panel.querySelectorAll("[data-avail-weekday]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const row = input.closest(".weekday-row");
+      row?.querySelector(".day-chip")?.classList.toggle("selected", input.checked);
+      row?.querySelectorAll("select").forEach((select) => { select.disabled = !input.checked; });
+    });
+  });
   panel.querySelector("[data-save-availability]")?.addEventListener("click", saveMyAvailability);
+}
+
+function availabilityVisibleHint(visible) {
+  return visible
+    ? "Os admins de grupos com vagas veem o teu nome, as tuas caracteristicas e a tua disponibilidade, e podem convidar-te. So conta depois de Guardar."
+    : "O teu perfil fica escondido: os admins nao te veem nem te podem convidar. A disponibilidade fica guardada para quando voltares a ligar.";
+}
+
+function availabilityHourOptions(min, max, value) {
+  return Array.from({ length: max - min + 1 }, (_, i) => min + i)
+    .map((hour) => `<option value="${hour}" ${hour === value ? "selected" : ""}>${hour}h</option>`).join("");
+}
+
+// Semanal: cada dia da semana tem as suas horas e repete-se todas as semanas.
+function renderWeeklyAvailability() {
+  const byWeekday = new Map(myWeeklyAvailability.map((row) => [row.weekday, row]));
+  return `
+    <p class="hint">Marca os dias em que costumas poder jogar e as horas de cada um. Repete-se todas as semanas.</p>
+    <div class="weekday-rows">
+      ${ISO_WEEKDAYS.map(([weekday, label]) => {
+        const row = byWeekday.get(weekday);
+        return `<div class="weekday-row">
+          <label class="day-chip ${row ? "selected" : ""}">
+            <input type="checkbox" data-avail-weekday="${weekday}" ${row ? "checked" : ""}>
+            ${label}
+          </label>
+          <label class="game-date-control"><span>Das</span><select data-weekday-from="${weekday}" ${row ? "" : "disabled"}>${availabilityHourOptions(7, 23, row?.from_hour ?? 19)}</select></label>
+          <label class="game-date-control"><span>As</span><select data-weekday-to="${weekday}" ${row ? "" : "disabled"}>${availabilityHourOptions(8, 24, row?.to_hour ?? 23)}</select></label>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+// Dias concretos: esta semana ou a proxima, com as mesmas horas para os dias marcados.
+function renderDatesAvailability() {
+  const days = getWeekDays(availabilityWeekOffset);
+  const todayKey = toLocalDateKey(new Date());
+  const weekKeys = days.map(toLocalDateKey);
+  const weekRows = myAvailability.filter((row) => weekKeys.includes(row.day));
+  const selected = new Set(weekRows.map((row) => row.day));
+  const from = weekRows[0]?.from_hour ?? 19;
+  const to = weekRows[0]?.to_hour ?? 23;
+  return `
+    <div class="week-switch">
+      <button class="ghost-btn ${availabilityWeekOffset === 0 ? "selected" : ""}" data-avail-week="0">Esta semana</button>
+      <button class="ghost-btn ${availabilityWeekOffset === 1 ? "selected" : ""}" data-avail-week="1">Proxima semana</button>
+    </div>
+    <div class="day-chips">
+      ${days.map((day) => {
+        const key = toLocalDateKey(day);
+        const past = key < todayKey;
+        return `<label class="day-chip ${selected.has(key) ? "selected" : ""} ${past ? "disabled" : ""}">
+          <input type="checkbox" data-avail-day="${key}" ${selected.has(key) ? "checked" : ""} ${past ? "disabled" : ""}>
+          ${WEEKDAY_SHORT[day.getDay()]} ${day.getDate()}
+        </label>`;
+      }).join("")}
+    </div>
+    <div class="traits-row">
+      <label class="game-date-control"><span>Das</span><select data-avail-from>${availabilityHourOptions(7, 23, from)}</select></label>
+      <label class="game-date-control"><span>As</span><select data-avail-to>${availabilityHourOptions(8, 24, to)}</select></label>
+    </div>
+  `;
 }
 
 async function saveMyAvailability() {
   if (!supabaseClient || !currentSession?.user) return;
   const panel = document.querySelector("#availability-panel");
+  const userId = currentSession.user.id;
+  const choice = getAvailabilityChoice();
+  const saved = choice.mode === "weekly"
+    ? await saveWeeklyAvailability(panel, userId)
+    : await saveDatesAvailability(panel, userId);
+  if (!saved) return;
+  const { error } = await supabaseClient
+    .from("player_availability_settings")
+    .upsert({ user_id: userId, visible: choice.visible, mode: choice.mode, updated_at: new Date().toISOString() });
+  if (error) {
+    alert(`Nao consegui guardar: ${error.message}`);
+    return;
+  }
+  await loadMyAvailability();
+  renderAvailabilityPanel();
+  renderPublicGames();
+  renderGamesTabBadge();
+}
+
+async function saveWeeklyAvailability(panel, userId) {
+  const rows = [...(panel?.querySelectorAll("[data-avail-weekday]:checked") || [])].map((input) => {
+    const weekday = Number(input.dataset.availWeekday);
+    return {
+      user_id: userId,
+      weekday,
+      from_hour: Number(panel.querySelector(`[data-weekday-from="${weekday}"]`)?.value),
+      to_hour: Number(panel.querySelector(`[data-weekday-to="${weekday}"]`)?.value),
+    };
+  });
+  const invalid = rows.find((row) => !(row.to_hour > row.from_hour));
+  if (invalid) {
+    alert(`${ISO_WEEKDAYS.find(([weekday]) => weekday === invalid.weekday)?.[1]}: a hora de fim tem de ser depois da hora de inicio.`);
+    return false;
+  }
+  // A semana tipo e substituida inteira.
+  const { error: deleteError } = await supabaseClient.from("player_weekly_availability").delete().eq("user_id", userId);
+  if (deleteError) {
+    alert(`Nao consegui guardar: ${deleteError.message}`);
+    return false;
+  }
+  if (rows.length) {
+    const { error } = await supabaseClient.from("player_weekly_availability").insert(rows);
+    if (error) {
+      alert(`Nao consegui guardar: ${error.message}`);
+      return false;
+    }
+  }
+  return true;
+}
+
+async function saveDatesAvailability(panel, userId) {
   const fromHour = Number(panel?.querySelector("[data-avail-from]")?.value);
   const toHour = Number(panel?.querySelector("[data-avail-to]")?.value);
   if (!(toHour > fromHour)) {
     alert("A hora de fim tem de ser depois da hora de inicio.");
-    return;
+    return false;
   }
   const weekKeys = getWeekDays(availabilityWeekOffset).map(toLocalDateKey);
   const todayKey = toLocalDateKey(new Date());
@@ -1885,23 +2031,22 @@ async function saveMyAvailability() {
   const { error: deleteError } = await supabaseClient
     .from("player_availability")
     .delete()
-    .eq("user_id", currentSession.user.id)
+    .eq("user_id", userId)
     .gte("day", weekKeys[0] < todayKey ? todayKey : weekKeys[0])
     .lte("day", weekKeys[6]);
   if (deleteError) {
     alert(`Nao consegui guardar: ${deleteError.message}`);
-    return;
+    return false;
   }
   if (days.length) {
-    const rows = days.map((day) => ({ user_id: currentSession.user.id, day, from_hour: fromHour, to_hour: toHour }));
+    const rows = days.map((day) => ({ user_id: userId, day, from_hour: fromHour, to_hour: toHour }));
     const { error } = await supabaseClient.from("player_availability").insert(rows);
     if (error) {
       alert(`Nao consegui guardar: ${error.message}`);
-      return;
+      return false;
     }
   }
-  await loadMyAvailability();
-  renderAvailabilityPanel();
+  return true;
 }
 
 function readPublicSeen() {
@@ -1924,19 +2069,39 @@ function markPublicGamesSeen() {
   renderAdminBadges();
 }
 
-// Bolinha vermelha em Jogos: pedidos por decidir (admin), convites recebidos e jogos publicos novos.
+// Numero em Jogos: pedidos por decidir (admin), convites recebidos e jogos publicos novos.
 // Pedidos para jogar nos jogos do grupo (admins) ficam em "Os meus jogos"; convites e jogos novos de outros grupos em "Jogos publicos".
+// Vermelho: pedidos, convites e jogos novos dentro da minha disponibilidade. Amarelo: os outros jogos novos.
 function getGamesAttention() {
   const pendingRequests = isAdmin ? joinRequests.filter((row) => row.status === "pending").length : 0;
   const invites = publicEvents.filter((row) => row.my_status === "invited").length;
   const seen = readPublicSeen();
-  const newGames = publicEvents.filter((row) => !row.my_status && !seen.has(row.event_id)).length;
-  return { mine: pendingRequests, public: invites + newGames };
+  const newGames = publicEvents.filter((row) => !row.my_status && !seen.has(row.event_id));
+  const newInAvailability = newGames.filter((row) => isInMyAvailability(row.starts_at)).length;
+  return {
+    mine: pendingRequests,
+    public: invites + newGames.length,
+    publicUrgent: invites + newInAvailability,
+  };
 }
 
 function getGamesAttentionCount() {
   const attention = getGamesAttention();
   return attention.mine + attention.public;
+}
+
+// O jogo comeca num periodo em que disse que podia jogar (semanal ou dias concretos, conforme o modo).
+function isInMyAvailability(startsAt) {
+  const start = new Date(startsAt);
+  if (Number.isNaN(start.getTime())) return false;
+  const hour = start.getHours();
+  const fitsHours = (row) => row.from_hour <= hour && row.to_hour > hour;
+  if (getAvailabilityChoice().mode === "weekly") {
+    const weekday = ((start.getDay() + 6) % 7) + 1;
+    return myWeeklyAvailability.some((row) => row.weekday === weekday && fitsHours(row));
+  }
+  const dayKey = toLocalDateKey(start);
+  return myAvailability.some((row) => row.day === dayKey && fitsHours(row));
 }
 
 // Numero vermelho em Admin e em Pedidos: perfis por aprovar e (dono da app) grupos pedidos.
@@ -1952,18 +2117,21 @@ function renderAdminBadges() {
   setBadgeCount("#claims-subtab-badge", count);
 }
 
-function setBadgeCount(selector, count) {
+// tone "info" = amarelo (ha novidades, nada urgente); por omissao vermelho.
+function setBadgeCount(selector, count, tone = "alert") {
   const badge = document.querySelector(selector);
   if (!badge) return;
   badge.classList.toggle("hidden", !count);
+  badge.classList.toggle("badge-info", tone === "info");
   badge.textContent = count > 9 ? "9+" : String(count || "");
 }
 
 function renderGamesTabBadge() {
   const attention = getGamesAttention();
-  setBadgeCount("#games-tab-badge", attention.mine + attention.public);
+  const publicTone = attention.publicUrgent ? "alert" : "info";
+  setBadgeCount("#games-tab-badge", attention.mine + attention.public, attention.mine ? "alert" : publicTone);
   setBadgeCount("#mygames-subtab-badge", attention.mine);
-  setBadgeCount("#public-subtab-badge", attention.public);
+  setBadgeCount("#public-subtab-badge", attention.public, publicTone);
 }
 
 async function loadMyTraits() {
@@ -2524,6 +2692,7 @@ const VIEW_GROUPS = {
   events: "game",
   today: "game",
   "public-games": "game",
+  availability: "game",
   "new-game": "game",
   games: "history",
   "history-game": "history",
@@ -6378,6 +6547,7 @@ function renderPublicGames() {
           <div class="event-counts">
             ${row.needs ? `<span class="metric">Precisam de: ${escapeHtml(NEEDS_LABELS[row.needs] || row.needs)}</span>` : ""}
             ${fits ? `<span class="metric good-pill">Encaixas</span>` : ""}
+            ${isInMyAvailability(row.starts_at) ? `<span class="metric good-pill">Na tua disponibilidade</span>` : ""}
             ${status === "invited" ? `<span class="metric warn-pill">Convidaram-te</span>` : ""}
             ${status === "pending" ? `<span class="metric warn-pill">Pedido enviado</span>` : ""}
             ${status === "accepted" ? `<span class="metric good-pill">Aceite - contamos contigo</span>` : ""}

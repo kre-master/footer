@@ -5669,9 +5669,25 @@ body.stage-open .profile-section {
   gap: 8px;
 }
 
-.week-switch .selected {
-  border-color: var(--accent);
-  color: var(--accent);
+.weekday-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.weekday-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.weekday-row .day-chip {
+  min-width: 72px;
+  justify-content: center;
+}
+
+.weekday-row select:disabled {
+  opacity: .4;
 }
 
 .day-chip {
@@ -6804,6 +6820,13 @@ body.mr-open {
 
 .subtab-badge.hidden {
   display: none;
+}
+
+/* Amarelo: jogos publicos novos fora da minha disponibilidade */
+.tab-badge.badge-info,
+.subtab-badge.badge-info {
+  background: var(--amber);
+  color: #1a1300;
 }
 
 /* Clube: apagar o grupo (so o dono) */

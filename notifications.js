@@ -8,6 +8,17 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.13.0",
+      date: "2026-10-29",
+      title: "A minha disponibilidade",
+      items: [
+        "Em Jogos há um separador novo, A minha disponibilidade, separado dos Jogos públicos.",
+        "Podes escolher se o teu perfil fica visível aos admins de outros grupos.",
+        "Disponibilidade semanal: marcas os dias da semana e as horas de cada um, e repete-se todas as semanas. Continua a dar para marcar dias concretos desta semana ou da próxima.",
+        "Jogos públicos novos aparecem com um número amarelo; se calharem num período em que estás disponível, o número fica vermelho e o jogo diz Na tua disponibilidade.",
+      ],
+    },
+    {
       version: "1.12.0",
       date: "2026-10-28",
       title: "Avisos de admin e apagar grupos",
