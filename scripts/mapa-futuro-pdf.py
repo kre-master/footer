@@ -1,6 +1,7 @@
 """Gera o PDF "Footer - Mapa de futuro" a partir da nota do vault.
 
-Normalmente corre sozinho no GitHub (.github/workflows/mapa-futuro-pdf.yml) sempre que a nota muda,
+Normalmente corre sozinho no GitHub (.github/workflows/mapa-futuro-pdf.yml chama scripts/mapa-futuro-pdf.sh)
+sempre que a nota muda,
 ou no botao "Run workflow" do separador Actions.
 
 Para correr na VM (precisa de reportlab e das fontes DejaVu):
