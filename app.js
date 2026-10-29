@@ -10361,6 +10361,22 @@ async function addVideoBookmark(bookmark) {
   videoBookmarks = [videoBookmarkFromRow(data), ...videoBookmarks];
 }
 
+async function updateVideoBookmark(id, changes) {
+  const index = videoBookmarks.findIndex((item) => item.id === id);
+  if (index < 0) throw new Error("Este momento ja nao existe.");
+  if (!videoBookmarksRemote) {
+    videoBookmarks[index] = { ...videoBookmarks[index], ...changes };
+    if (!saveLocalBookmarks()) throw new Error("Nao foi possivel guardar neste dispositivo.");
+    return;
+  }
+  const { data, error } = await supabaseClient.from("game_video_bookmarks").update({
+    moment_s: changes.momentS, start_s: changes.startS, end_s: changes.endS, note: changes.note,
+  }).eq("id", id).select("*").maybeSingle();
+  if (error) throw new Error(`Nao foi possivel alterar o momento: ${error.message}`);
+  if (!data) throw new Error("Nao foi possivel alterar o momento (sem permissao).");
+  videoBookmarks[index] = videoBookmarkFromRow(data);
+}
+
 async function removeVideoBookmark(id) {
   if (videoBookmarksRemote) {
     const { error } = await supabaseClient.from("game_video_bookmarks").delete().eq("id", id);
@@ -10370,6 +10386,7 @@ async function removeVideoBookmark(id) {
   if (!videoBookmarksRemote) saveLocalBookmarks();
 }
 
+// Quem pode apagar tambem pode editar: o autor do momento ou um admin.
 function canDeleteBookmark(bookmark) {
   if (isAdmin) return true;
   const userId = currentSession?.user?.id || "local";
@@ -10472,7 +10489,7 @@ function tickMomentTrackers() {
     const now = getVideoCurrentTime(frame);
     const items = youtubeId ? getGameBookmarks(tracker.game.id).filter((item) => item.youtubeId === youtubeId) : [];
 
-    const key = `${youtubeId}|${duration}|${items.map((item) => item.id).join(",")}`;
+    const key = `${youtubeId}|${duration}|${items.map((item) => `${item.id}@${item.momentS}:${item.note}`).join(",")}`;
     if (key !== tracker.key) {
       tracker.key = key;
       tracker.timeline.classList.toggle("hidden", !duration || !items.length);
@@ -10523,6 +10540,7 @@ function renderMomentsList(game) {
             </span>
           </button>
           ${renderMomentShareButton(item)}
+          ${canDeleteBookmark(item) ? `<button type="button" class="moment-edit" data-moment-edit="${escapeHtml(item.id)}" aria-label="Editar momento" title="Editar">✎</button>` : ""}
           ${canDeleteBookmark(item) ? `<button type="button" class="moment-delete" data-moment-delete="${escapeHtml(item.id)}" aria-label="Apagar momento">&times;</button>` : ""}
         </li>`;
     }).join("")}
@@ -10645,6 +10663,8 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
   const errorBox = form.querySelector("[data-moment-error]");
   let offsets = { before: BOOKMARK_BEFORE_S, after: BOOKMARK_AFTER_S };
   let youtubeId = null;
+  let editingId = null;
+  const submitButton = form.querySelector("button[type=submit]");
 
   const readMoment = () => window.FooterTracking.parseClock(form.moment.value);
   const updateWindow = () => {
@@ -10660,9 +10680,14 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
     errorBox.textContent = message;
     errorBox.hidden = !message;
   };
+  const setEditing = (id) => {
+    editingId = id;
+    submitButton.textContent = id ? "Guardar alteracoes" : "Guardar momento";
+  };
   const close = () => {
     form.classList.add("hidden");
     showError("");
+    setEditing(null);
     if (resumeAfter) sendVideoCommand(getFrame(), "playVideo");
   };
 
@@ -10681,23 +10706,22 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
     const note = form.note.value.trim();
     if (moment == null) return showError("Escreve o momento como mm:ss (por exemplo 23:41).");
     if (!note) return showError("Escreve um comentario curto.");
-    const submit = form.querySelector("button[type=submit]");
-    submit.disabled = true;
+    submitButton.disabled = true;
+    const timing = {
+      momentS: Math.round(moment * 10) / 10,
+      startS: Math.max(0, Math.floor(moment - offsets.before)),
+      endS: Math.ceil(moment + offsets.after),
+      note,
+    };
     try {
-      await addVideoBookmark({
-        gameId: game.id,
-        youtubeId: youtubeId || getGameVideoParts(game.id)[0]?.youtubeId,
-        momentS: Math.round(moment * 10) / 10,
-        startS: Math.max(0, Math.floor(moment - offsets.before)),
-        endS: Math.ceil(moment + offsets.after),
-        note,
-      });
+      if (editingId) await updateVideoBookmark(editingId, timing);
+      else await addVideoBookmark({ gameId: game.id, youtubeId: youtubeId || getGameVideoParts(game.id)[0]?.youtubeId, ...timing });
       close();
       onSaved();
     } catch (error) {
       showError(error.message || "Nao foi possivel guardar o momento.");
     } finally {
-      submit.disabled = false;
+      submitButton.disabled = false;
     }
   });
 
@@ -10708,12 +10732,25 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
       const now = getVideoCurrentTime(frame);
       sendVideoCommand(frame, "pauseVideo");
       offsets = { before: BOOKMARK_BEFORE_S, after: BOOKMARK_AFTER_S };
+      setEditing(null);
       form.moment.value = now == null ? "" : formatVideoClock(now);
       form.note.value = "";
       showError(now == null ? "Nao consegui ler o tempo do video. Escreve o momento (mm:ss)." : "");
       form.classList.remove("hidden");
       updateWindow();
       (now == null ? form.moment : form.note).focus();
+    },
+    // Abre o formulario com um momento ja guardado, para corrigir o texto, o tempo ou o pedaco.
+    edit(item) {
+      youtubeId = item.youtubeId;
+      offsets = { before: Math.max(0, item.momentS - getClipStart(item)), after: Math.max(1, item.endS - item.momentS) };
+      setEditing(item.id);
+      form.moment.value = formatVideoClock(item.momentS);
+      form.note.value = item.note;
+      showError("");
+      form.classList.remove("hidden");
+      updateWindow();
+      form.note.focus();
     },
   };
 }
@@ -10727,7 +10764,15 @@ function bindMomentsBlock(root, game, { getFrame, playClip }) {
     bindList();
     if (galleryMode === "highlights") renderGallery();
   };
+  let main = null;
   const bindList = () => {
+    block.querySelectorAll("[data-moment-edit]").forEach((button) => on(button, "click", () => {
+      const item = videoBookmarks.find((entry) => entry.id === button.dataset.momentEdit);
+      if (item && main) {
+        main.edit(item);
+        mainForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }));
     block.querySelectorAll("[data-moment-play]").forEach((button) => on(button, "click", () => {
       const item = videoBookmarks.find((entry) => entry.id === button.dataset.momentPlay);
       if (item) playClip(item);
@@ -10752,7 +10797,7 @@ function bindMomentsBlock(root, game, { getFrame, playClip }) {
 
   const mainForm = block.querySelector("[data-moment-form]");
   if (mainForm) {
-    const main = wireMomentForm(mainForm, game, { getFrame, onSaved: refreshList });
+    main = wireMomentForm(mainForm, game, { getFrame, onSaved: refreshList });
     on(block.querySelector("[data-moment-mark]"), "click", () => main.open());
   }
   const stage = getFrame()?.closest("[data-video-stage]");

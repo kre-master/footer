@@ -179,6 +179,7 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Desde 2026-10-15: quatro separadores para todos (Jogo, Historico, Galeria, Stats) e Admin so para admins. Novas vistas devem entrar num destes grupos (`VIEW_GROUPS`) em vez de criar mais separadores.
 - Desde 2026-10-22: separador Jogador (o perfil do proprio) no inicio da barra, so com conta ligada a jogador; e a pagina inicial. Conta continua no menu do avatar.
 - Desde 2026-10-23: o separador Jogo passa a Jogos, com mini-separadores "O meu grupo" (convocatorias; para admins tambem Fazer equipas) e "Jogos publicos" (jogos abertos de outros grupos). Fazer equipas desaparece para quem nao e admin; as equipas confirmadas aparecem no cartao da convocatoria para todos.
+- Momentos nos videos (desde 2026-10-29): so quem marcou o momento ou um admin o pode editar ou apagar. Editar muda texto, tempo e pedaco; o jogo, o video e o autor ficam.
 - Notificacoes no simbolo do Footer: bolinha vermelha com o numero de novidades do grupo por ver (convocatoria lancada, video adicionado, momento marcado por outro jogador, MVP eleito); bolinha verde fluorescente quando ha versao nova da app. Abrir o painel poe ambas a zero. O "visto" e por dispositivo (localStorage).
 
 ## Versoes da app

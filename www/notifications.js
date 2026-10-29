@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.14.0",
+      date: "2026-10-29",
+      title: "Editar momentos",
+      items: [
+        "Quem marcou um momento num vídeo pode agora corrigi-lo: carrega no lápis ✎ ao lado do momento.",
+        "Dá para mudar o texto, o tempo e o início e o fim do pedaço, sem ter de apagar e marcar de novo.",
+      ],
+    },
+    {
       version: "1.13.0",
       date: "2026-10-29",
       title: "A minha disponibilidade",

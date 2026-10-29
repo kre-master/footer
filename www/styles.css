@@ -3935,7 +3935,7 @@ th.stat-col {
 
 .moment-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -3983,6 +3983,23 @@ th.stat-col {
 .moment-text small {
   color: var(--muted);
   font-size: 12px;
+}
+
+.moment-edit {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 16px;
+}
+
+.moment-edit:hover,
+.moment-edit:focus-visible {
+  color: var(--ink);
+  background: var(--accent-soft);
 }
 
 .moment-delete {

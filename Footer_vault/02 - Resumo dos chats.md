@@ -178,3 +178,9 @@ Validacoes:
 
 - Projecto renomeado para `footer`: repo `kre-master/footer`, pasta local `~/orquestrador/footer`, package, bundle ids `com.kremaster.footer`, URL Pages https://kre-master.github.io/footer/ (o link antigo deixou de existir). Pages exige repo publico.
 - Pagina Jogos reorganizada: subtabs Os meus jogos / Jogos publicos / Nova convocatoria (admin), cartao compacto, vista de equipas propria. Ver [[03 - Decisoes e regras]] e [[04 - Estado tecnico]].
+
+## 2026-10-29 - Editar momentos
+
+- Um jogador reportou o "quarto falhanco" a aparecer duas vezes. Nao era erro: eram dois momentos diferentes (39:01 e 51:44) com o mesmo texto escrito pelo autor. Pediu para os momentos serem editaveis.
+- Feito: quem marcou o momento (ou um admin) corrige texto, tempo e pedaco com o botao ✎. Versao 1.14.0. Ver [[04 - Estado tecnico]].
+- Pendente: o momento das 51:44 do jogo de 29/10 (amandio.torres) continua com o texto "Quarto falhanco"; deve passar a "Quinto falhanco" (o autor ou um admin, agora pela app).
