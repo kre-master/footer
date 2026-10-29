@@ -76,6 +76,6 @@ Depois de alterar:
 
 ## Mapa de futuro (2026-10-29)
 
-- Estrategia, fases e proximos 90 dias em [[10 - Mapa de futuro e estrategia]] (PDF em `Footer_vault/pdf/`).
+- Estrategia, fases e proximos 90 dias em [[10 - Mapa de futuro e estrategia]] (PDF gerado a pedido; nao fica no Git).
 - Proximos passos da fase 3: 3.4 piloto, 3.5 convidado ve o jogo e as equipas, 3.6 idiomas/fuso/moeda, 3.7 lojas e push; fecho = Footer 2.0.
 - Decisoes em aberto listadas na folha 14 da nota 10; registar la as respostas.

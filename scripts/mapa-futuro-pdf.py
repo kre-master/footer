@@ -1,8 +1,8 @@
 """Gera o PDF "Footer - Mapa de futuro" a partir da nota do vault.
 
-Normalmente corre sozinho no GitHub (.github/workflows/mapa-futuro-pdf.yml chama scripts/mapa-futuro-pdf.sh)
-sempre que a nota muda,
-ou no botao "Run workflow" do separador Actions.
+O PDF nao fica no Git (Footer_vault/pdf/ esta no .gitignore). Gera-se a pedido: na VM, ou no GitHub em
+Actions > "Mapa de futuro (PDF)" > Run workflow (o workflow chama scripts/mapa-futuro-pdf.sh e oferece o PDF
+para descarregar).
 
 Para correr na VM (precisa de reportlab e das fontes DejaVu):
     python3 -m venv ~/.venvs/footer-pdf && ~/.venvs/footer-pdf/bin/pip install reportlab

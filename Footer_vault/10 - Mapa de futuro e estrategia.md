@@ -2,7 +2,7 @@
 
 Documento vivo. Versão 1 — 29 de outubro de 2026 (app 1.13.0).
 
-Esta nota é a fonte do PDF «Footer — Mapa de futuro». Quando a nota muda no GitHub, o PDF é refeito sozinho em cerca de um minuto (ver Folha 14).
+Esta nota é a fonte do PDF «Footer — Mapa de futuro». O PDF não fica guardado no GitHub: gera-se a pedido (ver Folha 14).
 
 > Onde estamos: Fase 3 — expansão para grupos e jogadores fora dos Futeboleiros. As fundações multi-grupo, os convites, os grupos criados pelo próprio utilizador, os jogos públicos e a disponibilidade já estão em produção. Falta o piloto com um grupo real e as bases para crescer (idiomas, fusos horários, lojas de apps).
 
@@ -373,10 +373,9 @@ Princípio: o essencial é grátis para sempre (é o que cria a rede); paga-se o
 
 ### Como continuar este raciocínio (sem instalar nada)
 
-- **Ver o PDF** em qualquer aparelho: github.com/kre-master/footer → pasta `Footer_vault/pdf` → «Footer - Mapa de futuro.pdf» (botão de descarregar no canto).
 - **Mudar o mapa com o Claude**: em qualquer chat no orquestrador, pedir «vamos continuar o mapa de futuro». O Claude lê esta nota, discute, regista as decisões abaixo e envia para o GitHub.
-- **Mudar o mapa à mão**: abrir esta nota no GitHub, tocar no lápis («Edit»), escrever e carregar em «Commit changes». O PDF novo aparece em cerca de um minuto.
-- **Gerar o PDF a pedido**: GitHub → Actions → «Mapa de futuro (PDF)» → «Run workflow».
+- **Mudar o mapa à mão**: abrir esta nota no GitHub, tocar no lápis («Edit»), escrever e carregar em «Commit changes».
+- **Ter o PDF em qualquer aparelho**: GitHub → Actions → «Mapa de futuro (PDF)» → «Run workflow»; ao fim de um minuto, abrir a execução e descarregar «footer-mapa-de-futuro» (fica disponível 1 dia).
 - Quando uma decisão muda o plano, actualizar a folha respectiva e subir a versão do documento no topo.
 
 ### Registo de decisões
