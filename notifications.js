@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.14.1",
+      date: "2026-10-29",
+      title: "Momentos em repetição",
+      items: [
+        "Ao ver um momento, o pedaço repete-se em vez de parar no fim.",
+        "Carrega em Continuar o jogo para o vídeo seguir dali, ou salta para outro ponto do vídeo.",
+      ],
+    },
+    {
       version: "1.14.0",
       date: "2026-10-29",
       title: "Editar momentos",

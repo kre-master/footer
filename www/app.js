@@ -3143,9 +3143,10 @@ function getLightboxFrame() {
 function playLightboxPart(index, youtubeId, start = 0, end = null) {
   const holder = document.querySelector("#video-lightbox-frame");
   if (!holder) return;
-  holder.innerHTML = `<iframe src="${gameVideoEmbedUrl(youtubeId, start, true, end)}" data-youtube-id="${escapeHtml(youtubeId)}" title="Video do jogo"
+  holder.innerHTML = `<iframe src="${gameVideoEmbedUrl(youtubeId, start, true)}" data-youtube-id="${escapeHtml(youtubeId)}" title="Video do jogo"
     referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
   listenToVideoClock(getLightboxFrame());
+  setMomentLoop(getLightboxFrame(), end == null ? null : start, end);
   document.querySelectorAll("#video-lightbox-parts [data-lightbox-part]").forEach((button) => {
     const active = Number(button.dataset.lightboxIndex) === index;
     button.classList.toggle("active", active);
@@ -10273,11 +10274,12 @@ async function removeGameVideoPart(game, partId) {
   if (!gameVideosRemote) saveLocalVideos();
 }
 
-function gameVideoEmbedUrl(youtubeId, start = 0, autoplay = false, end = null) {
+// Sem "end" do YouTube: ao chegar ao fim ele para e so oferece voltar ao inicio do video.
+// O fim de um momento e tratado pela repeticao (setMomentLoop).
+function gameVideoEmbedUrl(youtubeId, start = 0, autoplay = false) {
   // fs=0: o ecra cheio e o nosso (data-video-stage), para os momentos poderem ser marcados por cima.
   const params = new URLSearchParams({ enablejsapi: "1", playsinline: "1", rel: "0", fs: "0" });
   if (start > 0) params.set("start", String(Math.floor(start)));
-  if (end != null && end > start) params.set("end", String(Math.ceil(end)));
   if (autoplay) params.set("autoplay", "1");
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeId)}?${params}`;
 }
@@ -10466,12 +10468,27 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     live.setAttribute("aria-live", "polite");
     stage.append(live);
   }
+  let loopButton = stage.querySelector("[data-moment-loop-exit]");
+  if (!loopButton) {
+    loopButton = document.createElement("button");
+    loopButton.type = "button";
+    loopButton.className = "moment-loop hidden";
+    loopButton.dataset.momentLoopExit = "";
+    loopButton.innerHTML = `<span aria-hidden="true">⟲</span> Em repeticao · <strong>Continuar o jogo ▶</strong>`;
+    stage.append(loopButton);
+  }
+  loopButton.onclick = () => {
+    const frame = getFrame();
+    setMomentLoop(frame, null, null);
+    sendVideoCommand(frame, "playVideo");
+    loopButton.classList.add("hidden");
+  };
   timeline.onclick = (event) => {
     const marker = event.target.closest("[data-timeline-moment]");
     const item = marker && videoBookmarks.find((entry) => entry.id === marker.dataset.timelineMoment);
     if (item) playClip(item);
   };
-  momentTrackers.set(stage, { game, getFrame, timeline, live, key: "", liveId: null });
+  momentTrackers.set(stage, { game, getFrame, timeline, live, loopButton, key: "", liveId: null });
   if (!momentTrackerTimer) momentTrackerTimer = setInterval(tickMomentTrackers, 250);
 }
 
@@ -10488,6 +10505,7 @@ function tickMomentTrackers() {
     const duration = getVideoDuration(frame);
     const now = getVideoCurrentTime(frame);
     const items = youtubeId ? getGameBookmarks(tracker.game.id).filter((item) => item.youtubeId === youtubeId) : [];
+    tracker.loopButton.classList.toggle("hidden", !tickMomentLoop(frame, now));
 
     const key = `${youtubeId}|${duration}|${items.map((item) => `${item.id}@${item.momentS}:${item.note}`).join(",")}`;
     if (key !== tracker.key) {
@@ -10520,6 +10538,46 @@ function tickMomentTrackers() {
 
 function sendVideoCommand(frame, func, args = []) {
   frame?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+}
+
+// Repeticao de um momento: ao chegar ao fim do pedaco o video volta ao inicio dele, ate se carregar
+// em "Continuar o jogo" (o video segue dali) ou se saltar para outro ponto do video.
+const MOMENT_LOOP_GRACE_S = 4;
+
+function setMomentLoop(frame, start, end) {
+  if (!frame) return;
+  delete frame.dataset.loopArmed;
+  if (start == null || end == null || end <= start) {
+    delete frame.dataset.loopStart;
+    delete frame.dataset.loopEnd;
+    return;
+  }
+  frame.dataset.loopStart = String(start);
+  frame.dataset.loopEnd = String(end);
+}
+
+function tickMomentLoop(frame, now) {
+  if (!frame?.dataset.loopEnd || now == null) return Boolean(frame?.dataset.loopEnd);
+  const start = Number(frame.dataset.loopStart);
+  const end = Number(frame.dataset.loopEnd);
+  const inside = now >= start - MOMENT_LOOP_GRACE_S && now <= end + MOMENT_LOOP_GRACE_S;
+  // Enquanto o video carrega o tempo pode vir antigo (ou 0): so um salto depois de entrar no pedaco desliga a repeticao.
+  if (!frame.dataset.loopArmed) {
+    if (inside && now < end) frame.dataset.loopArmed = "1";
+    return true;
+  }
+  if (!inside) {
+    setMomentLoop(frame, null, null);
+    return false;
+  }
+  if (now >= end) {
+    sendVideoCommand(frame, "seekTo", [start, true]);
+    sendVideoCommand(frame, "playVideo");
+    // O leitor so envia o tempo novo daqui a pouco; acerta ja o relogio para nao repetir o salto.
+    const clock = videoClocks.get(frame.contentWindow);
+    if (clock) videoClocks.set(frame.contentWindow, { ...clock, time: start, at: performance.now() });
+  }
+  return true;
 }
 
 function renderMomentsList(game) {
@@ -10873,6 +10931,7 @@ function seekGameVideo(container, game, seconds) {
   const target = window.FooterTracking.videoSeekTarget(getGameVideoParts(game.id), seconds);
   const frame = container.querySelector("[data-game-video]");
   if (!target || !frame) return;
+  setMomentLoop(frame, null, null);
   showGameVideoPart(container, target.part.youtubeId);
   if (frame.dataset.youtubeId === target.part.youtubeId && frame.dataset.ready === "1") {
     // Same video already loaded: move it without reloading (YouTube iframe API by postMessage).
@@ -10907,7 +10966,8 @@ function bindGameVideoSection(game, container) {
     showGameVideoPart(section, item.youtubeId);
     frame.dataset.ready = "0";
     frame.dataset.youtubeId = item.youtubeId;
-    frame.src = gameVideoEmbedUrl(item.youtubeId, getClipStart(item), true, item.endS);
+    frame.src = gameVideoEmbedUrl(item.youtubeId, getClipStart(item), true);
+    setMomentLoop(frame, getClipStart(item), item.endS);
     frame.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   bindMomentsBlock(section, game, { getFrame: () => frame, playClip: playSectionClip });
@@ -10927,6 +10987,7 @@ function bindGameVideoSection(game, container) {
       const part = getGameVideoParts(game.id).find((v) => v.youtubeId === button.dataset.videoPart);
       if (!part || !frame) return;
       showGameVideoPart(section, part.youtubeId);
+      setMomentLoop(frame, null, null);
       frame.dataset.ready = "0";
       frame.dataset.youtubeId = part.youtubeId;
       frame.src = gameVideoEmbedUrl(part.youtubeId, part.videoStartS);

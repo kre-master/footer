@@ -5260,6 +5260,34 @@ body.stage-open .profile-section {
   animation: moment-live-in .25s ease-out;
 }
 
+.moment-loop {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 80px);
+  border: 1px solid rgba(243, 179, 64, .6);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: #f6d38f;
+  background: rgba(5, 10, 20, .78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+
+.moment-loop strong {
+  color: #fff;
+}
+
+.moment-loop:hover,
+.moment-loop:focus-visible {
+  background: rgba(5, 10, 20, .92);
+}
+
 .moment-live strong {
   overflow: hidden;
   font-size: 14px;
