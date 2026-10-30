@@ -10486,19 +10486,34 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     live.setAttribute("aria-live", "polite");
     stage.append(live);
   }
-  // Canto superior esquerdo: "Continuar o jogo" na repeticao; "Seguinte" e "Sair" no All Highlights.
+  // Canto superior esquerdo: "Continuar o jogo" na repeticao; no All Highlights uma barra ◀ 1/29 ▶ ✕.
   let loopBar = stage.querySelector("[data-moment-loop-bar]");
   if (!loopBar) {
     loopBar = document.createElement("div");
     loopBar.className = "moment-loop-bar hidden";
     loopBar.dataset.momentLoopBar = "";
     loopBar.innerHTML = `
-      <button type="button" class="moment-loop" data-moment-loop-next></button>
-      <button type="button" class="moment-loop moment-loop-exit hidden" data-moment-reel-exit aria-label="Sair do All Highlights">✕ Sair</button>`;
+      <button type="button" class="moment-loop" data-moment-loop-next><span aria-hidden="true">⟲</span> Em repeticao · <strong>Continuar o jogo ▶</strong></button>
+      <div class="moment-reel hidden" data-moment-reel-bar role="group" aria-label="All Highlights">
+        <button type="button" data-moment-reel-prev aria-label="Momento anterior">◀</button>
+        <span data-moment-reel-count></span>
+        <button type="button" data-moment-reel-next aria-label="Momento seguinte">▶</button>
+        <button type="button" class="moment-reel-exit" data-moment-reel-exit aria-label="Sair do All Highlights">✕</button>
+      </div>`;
     stage.append(loopBar);
   }
   const loopButton = loopBar.querySelector("[data-moment-loop-next]");
+  const reelBar = loopBar.querySelector("[data-moment-reel-bar]");
+  const reelCount = loopBar.querySelector("[data-moment-reel-count]");
   const reelExit = loopBar.querySelector("[data-moment-reel-exit]");
+  loopBar.querySelector("[data-moment-reel-prev]").onclick = () => {
+    const tracker = momentTrackers.get(stage);
+    if (tracker?.reel) stepMomentReel(tracker, -1);
+  };
+  loopBar.querySelector("[data-moment-reel-next]").onclick = () => {
+    const tracker = momentTrackers.get(stage);
+    if (tracker?.reel) advanceMomentReel(tracker);
+  };
   // Sair do All Highlights: o video continua normalmente a partir dali.
   reelExit.onclick = () => {
     stopMomentReel(stage);
@@ -10508,8 +10523,6 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     loopBar.classList.add("hidden");
   };
   loopButton.onclick = () => {
-    const tracker = momentTrackers.get(stage);
-    if (tracker?.reel) return advanceMomentReel(tracker);
     const frame = getFrame();
     setMomentLoop(frame, null, null);
     sendVideoCommand(frame, "playVideo");
@@ -10522,7 +10535,7 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     stopMomentReel(stage);
     playClip(item);
   };
-  momentTrackers.set(stage, { game, getFrame, playClip, timeline, live, loopBar, loopButton, reelExit, key: "", liveId: null, reel: null, loopLabel: "" });
+  momentTrackers.set(stage, { game, getFrame, playClip, timeline, live, loopBar, loopButton, reelBar, reelCount, key: "", liveId: null, reel: null });
   if (!momentTrackerTimer) momentTrackerTimer = setInterval(tickMomentTrackers, 250);
 }
 
@@ -10542,13 +10555,11 @@ function tickMomentTrackers() {
     const looping = tickMomentLoop(frame, now, tracker.reel ? () => advanceMomentReel(tracker) : null);
     if (!looping && tracker.reel) tracker.reel = null;
     tracker.loopBar.classList.toggle("hidden", !looping);
-    tracker.reelExit.classList.toggle("hidden", !tracker.reel);
-    const loopLabel = tracker.reel
-      ? `<span aria-hidden="true">⏭</span> All Highlights ${tracker.reel.index + 1} de ${tracker.reel.items.length} · <strong>Seguinte ▶</strong>`
-      : `<span aria-hidden="true">⟲</span> Em repeticao · <strong>Continuar o jogo ▶</strong>`;
-    if (loopLabel !== tracker.loopLabel) {
-      tracker.loopLabel = loopLabel;
-      tracker.loopButton.innerHTML = loopLabel;
+    tracker.loopButton.classList.toggle("hidden", Boolean(tracker.reel));
+    tracker.reelBar.classList.toggle("hidden", !tracker.reel);
+    if (tracker.reel) {
+      const count = `${tracker.reel.index + 1}/${tracker.reel.items.length}`;
+      if (tracker.reelCount.textContent !== count) tracker.reelCount.textContent = count;
     }
     tickStageSpeed(stage, frame);
 
@@ -10613,6 +10624,14 @@ function startMomentReel(stage, items) {
   if (!tracker || !items.length) return;
   tracker.reel = { items, index: 0 };
   tracker.playClip(items[0]);
+}
+
+// Recuar no All Highlights: volta ao momento anterior (no primeiro, recomeca esse).
+function stepMomentReel(tracker, delta) {
+  const reel = tracker.reel;
+  if (!reel) return;
+  reel.index = Math.max(0, Math.min(reel.items.length - 1, reel.index + delta));
+  tracker.playClip(reel.items[reel.index]);
 }
 
 function advanceMomentReel(tracker) {

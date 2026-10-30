@@ -8,6 +8,14 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.16.2",
+      date: "2026-10-30",
+      title: "All Highlights mais simples",
+      items: [
+        "No All Highlights, a barra no canto do vídeo fica só com ◀ 1/29 ▶ ✕: setas para o momento anterior ou seguinte e ✕ para sair.",
+      ],
+    },
+    {
       version: "1.16.1",
       date: "2026-10-30",
       title: "All Highlights",

@@ -5370,9 +5370,50 @@ body.stage-open .profile-section {
   background: rgba(5, 10, 20, .92);
 }
 
-.moment-loop-exit {
-  border-color: rgba(255, 255, 255, .35);
-  color: #fff;
+.moment-reel {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(243, 179, 64, .6);
+  border-radius: 999px;
+  padding: 2px;
+  color: #f6d38f;
+  background: rgba(5, 10, 20, .78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.moment-reel button {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--amber);
+  background: transparent;
+  font-size: 15px;
+}
+
+.moment-reel button:hover,
+.moment-reel button:focus-visible {
+  background: rgba(243, 179, 64, .18);
+}
+
+.moment-reel span {
+  min-width: 42px;
+  padding: 0 2px;
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.moment-reel .moment-reel-exit {
+  margin-left: 2px;
+  border-left: 1px solid rgba(243, 179, 64, .35);
+  border-radius: 0 999px 999px 0;
 }
 
 .moment-live strong {
