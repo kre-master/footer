@@ -4074,6 +4074,10 @@ th.stat-col {
   background: linear-gradient(170deg, rgba(120, 165, 255, .07), rgba(120, 165, 255, .02));
 }
 
+.highlight-reel {
+  justify-self: start;
+}
+
 .highlight-game-head {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
@@ -4379,12 +4383,12 @@ body.stage-open .profile-section {
 
 /* Em ecra cheio: botoes a meio da direita, longe dos controlos do YouTube nos cantos */
 .video-stage.is-fullscreen .stage-fs {
-  top: calc(50% - 74px);
+  top: calc(50% - 130px);
   right: calc(14px + env(safe-area-inset-right, 0px));
 }
 
 .video-stage.is-fullscreen .stage-mark {
-  top: calc(50% - 22px);
+  top: calc(50% - 78px);
   bottom: auto;
   right: calc(10px + env(safe-area-inset-right, 0px));
 }
@@ -4398,9 +4402,36 @@ body.stage-open .profile-section {
 
 .video-stage.is-fullscreen .stage-zoom {
   display: grid;
-  top: calc(50% + 46px);
+  top: calc(50% - 10px);
   right: calc(14px + env(safe-area-inset-right, 0px));
   opacity: .75;
+}
+
+.stage-speed {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.video-stage.is-fullscreen .stage-speed {
+  display: grid;
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  opacity: .75;
+}
+
+.video-stage.is-fullscreen .stage-slow {
+  top: calc(50% + 40px);
+}
+
+.video-stage.is-fullscreen .stage-fast {
+  top: calc(50% + 90px);
+}
+
+.video-stage.is-fullscreen .stage-speed.active {
+  border-color: var(--amber);
+  color: #f6d38f;
+  opacity: 1;
 }
 
 .video-stage.is-zoomed .stage-zoom {

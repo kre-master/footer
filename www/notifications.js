@@ -8,6 +8,16 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.16.0",
+      date: "2026-10-30",
+      title: "Velocidade, zoom 5x e momentos seguidos",
+      items: [
+        "Em ecrã cheio há dois botões novos: ½× (câmara lenta) e 2×. Carrega outra vez para voltar à velocidade normal.",
+        "O zoom em ecrã cheio passa a ir até 5x (1x, 2x, 3x, 5x).",
+        "Na Galeria, em Highlights, cada jogo tem Ver os momentos seguidos: passam todos, um a seguir ao outro. Também dá no vídeo do jogo, em Todos seguidos.",
+      ],
+    },
+    {
       version: "1.15.0",
       date: "2026-10-29",
       title: "Zoom nos vídeos",

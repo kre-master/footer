@@ -6,6 +6,10 @@ Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas 
 
 ## Ideias e areas futuras
 
+### Videos e momentos
+
+- Em standby (decisao de 2026-10-30): descarregar momentos. So com o leitor de video proprio (fora do YouTube); ideia: a VM recorta o pedaco do video original guardado na NAS, a pedido, em 1080p (~10 MB por momento). Falta saber onde ficam os originais e quem pode descarregar.
+
 ### Radar e odds
 
 - Refinar odds/probabilidades com base no radar.
