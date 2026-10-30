@@ -3096,7 +3096,7 @@ function renderGalleryHighlights(items) {
           </span>
           <span class="highlight-game-count">🔖 ${moments.length}</span>
         </button>
-        ${moments.length > 1 ? `<button type="button" class="ghost-btn highlight-reel" data-gallery-reel="${escapeHtml(game.id)}">▶ Ver os ${moments.length} momentos seguidos</button>` : ""}
+        ${moments.length > 1 ? `<button type="button" class="ghost-btn highlight-reel" data-gallery-reel="${escapeHtml(game.id)}">▶ All Highlights · ${moments.length}</button>` : ""}
         <div class="highlight-moments">
           ${moments.map((item) => `
             <div class="highlight-moment-wrap">
@@ -10486,22 +10486,34 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     live.setAttribute("aria-live", "polite");
     stage.append(live);
   }
-  let loopButton = stage.querySelector("[data-moment-loop-exit]");
-  if (!loopButton) {
-    loopButton = document.createElement("button");
-    loopButton.type = "button";
-    loopButton.className = "moment-loop hidden";
-    loopButton.dataset.momentLoopExit = "";
-    loopButton.innerHTML = `<span aria-hidden="true">⟲</span> Em repeticao · <strong>Continuar o jogo ▶</strong>`;
-    stage.append(loopButton);
+  // Canto superior esquerdo: "Continuar o jogo" na repeticao; "Seguinte" e "Sair" no All Highlights.
+  let loopBar = stage.querySelector("[data-moment-loop-bar]");
+  if (!loopBar) {
+    loopBar = document.createElement("div");
+    loopBar.className = "moment-loop-bar hidden";
+    loopBar.dataset.momentLoopBar = "";
+    loopBar.innerHTML = `
+      <button type="button" class="moment-loop" data-moment-loop-next></button>
+      <button type="button" class="moment-loop moment-loop-exit hidden" data-moment-reel-exit aria-label="Sair do All Highlights">✕ Sair</button>`;
+    stage.append(loopBar);
   }
+  const loopButton = loopBar.querySelector("[data-moment-loop-next]");
+  const reelExit = loopBar.querySelector("[data-moment-reel-exit]");
+  // Sair do All Highlights: o video continua normalmente a partir dali.
+  reelExit.onclick = () => {
+    stopMomentReel(stage);
+    const frame = getFrame();
+    setMomentLoop(frame, null, null);
+    sendVideoCommand(frame, "playVideo");
+    loopBar.classList.add("hidden");
+  };
   loopButton.onclick = () => {
     const tracker = momentTrackers.get(stage);
     if (tracker?.reel) return advanceMomentReel(tracker);
     const frame = getFrame();
     setMomentLoop(frame, null, null);
     sendVideoCommand(frame, "playVideo");
-    loopButton.classList.add("hidden");
+    loopBar.classList.add("hidden");
   };
   timeline.onclick = (event) => {
     const marker = event.target.closest("[data-timeline-moment]");
@@ -10510,7 +10522,7 @@ function attachMomentTracker(stage, game, { getFrame, playClip }) {
     stopMomentReel(stage);
     playClip(item);
   };
-  momentTrackers.set(stage, { game, getFrame, playClip, timeline, live, loopButton, key: "", liveId: null, reel: null, loopLabel: "" });
+  momentTrackers.set(stage, { game, getFrame, playClip, timeline, live, loopBar, loopButton, reelExit, key: "", liveId: null, reel: null, loopLabel: "" });
   if (!momentTrackerTimer) momentTrackerTimer = setInterval(tickMomentTrackers, 250);
 }
 
@@ -10529,9 +10541,10 @@ function tickMomentTrackers() {
     const items = youtubeId ? getGameBookmarks(tracker.game.id).filter((item) => item.youtubeId === youtubeId) : [];
     const looping = tickMomentLoop(frame, now, tracker.reel ? () => advanceMomentReel(tracker) : null);
     if (!looping && tracker.reel) tracker.reel = null;
-    tracker.loopButton.classList.toggle("hidden", !looping);
+    tracker.loopBar.classList.toggle("hidden", !looping);
+    tracker.reelExit.classList.toggle("hidden", !tracker.reel);
     const loopLabel = tracker.reel
-      ? `<span aria-hidden="true">⏭</span> ${tracker.reel.index + 1} de ${tracker.reel.items.length} · <strong>Seguinte ▶</strong>`
+      ? `<span aria-hidden="true">⏭</span> All Highlights ${tracker.reel.index + 1} de ${tracker.reel.items.length} · <strong>Seguinte ▶</strong>`
       : `<span aria-hidden="true">⟲</span> Em repeticao · <strong>Continuar o jogo ▶</strong>`;
     if (loopLabel !== tracker.loopLabel) {
       tracker.loopLabel = loopLabel;
@@ -10706,7 +10719,7 @@ function renderMomentsBlock(game) {
       <div class="moments-head">
         <h4>Momentos</h4>
         <div class="moments-actions">
-          ${getGameBookmarks(game.id).length > 1 ? `<button type="button" class="ghost-btn" data-moment-reel>▶ Todos seguidos</button>` : ""}
+          ${getGameBookmarks(game.id).length > 1 ? `<button type="button" class="ghost-btn" data-moment-reel>▶ All Highlights</button>` : ""}
           <button type="button" class="ghost-btn moments-fs" data-stage-open>${STAGE_FS_ICON}<span>Ecra cheio</span></button>
           ${canMarkMoments() ? `<button type="button" class="primary-btn moments-mark" data-moment-mark>🔖 Marcar momento</button>` : `<small class="moments-hint">Entra para marcar momentos</small>`}
         </div>

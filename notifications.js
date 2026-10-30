@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.16.1",
+      date: "2026-10-30",
+      title: "All Highlights",
+      items: [
+        "Os momentos seguidos passam a chamar-se All Highlights.",
+        "No canto do vídeo há um botão Sair: o All Highlights acaba e o vídeo continua normalmente a partir dali.",
+      ],
+    },
+    {
       version: "1.16.0",
       date: "2026-10-30",
       title: "Velocidade, zoom 5x e momentos seguidos",

@@ -5336,15 +5336,21 @@ body.stage-open .profile-section {
   animation: moment-live-in .25s ease-out;
 }
 
-.moment-loop {
+.moment-loop-bar {
   position: absolute;
   top: 12px;
   left: 12px;
   z-index: 3;
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   max-width: calc(100% - 80px);
+}
+
+.moment-loop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid rgba(243, 179, 64, .6);
   border-radius: 999px;
   padding: 7px 14px;
@@ -5362,6 +5368,11 @@ body.stage-open .profile-section {
 .moment-loop:hover,
 .moment-loop:focus-visible {
   background: rgba(5, 10, 20, .92);
+}
+
+.moment-loop-exit {
+  border-color: rgba(255, 255, 255, .35);
+  color: #fff;
 }
 
 .moment-live strong {

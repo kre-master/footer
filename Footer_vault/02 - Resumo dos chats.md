@@ -186,4 +186,5 @@ Validacoes:
 - Ver um momento: no fim do pedaco o video parava e so oferecia voltar ao inicio do jogo. Agora o pedaco repete-se ate se carregar em "Continuar o jogo" (segue dali) ou saltar para outro ponto. Versao 1.14.1.
 - Zoom 2x/3x no video em ecra cheio, com arrastar para escolher a zona e toque para pausa. Versao 1.15.0.
 - 2026-10-30: zoom ate 5×; botoes ½× e 2× em ecra cheio; ver os momentos de um jogo todos seguidos (Galeria > Highlights e bloco de momentos). Versao 1.16.0. Descarregar momentos ficou em standby ate haver leitor proprio (ver [[05 - Backlog e proximos passos]]).
+- Momentos seguidos renomeados para "All Highlights" e com botao "✕ Sair" (nao havia forma clara de sair). Versao 1.16.1.
 - Pendente: o momento das 51:44 do jogo de 29/10 (amandio.torres) continua com o texto "Quarto falhanco"; deve passar a "Quinto falhanco" (o autor ou um admin, agora pela app).
