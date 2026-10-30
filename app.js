@@ -3025,6 +3025,7 @@ function renderGalleryFilter(gamesCount, highlightsCount) {
     <div class="gallery-filter" role="group" aria-label="Mostrar">
       <button type="button" class="subtab ${galleryMode === "games" ? "active" : ""}" data-gallery-mode="games" aria-pressed="${galleryMode === "games"}">Jogos <span>${gamesCount}</span></button>
       <button type="button" class="subtab ${galleryMode === "highlights" ? "active" : ""}" data-gallery-mode="highlights" aria-pressed="${galleryMode === "highlights"}">Highlights <span>${highlightsCount}</span></button>
+      ${isPlatformAdmin ? `<button type="button" class="subtab ${galleryMode === "lab" ? "active" : ""}" data-gallery-mode="lab" aria-pressed="${galleryMode === "lab"}">🧪 Testes</button>` : ""}
     </div>`;
 }
 
@@ -3123,9 +3124,14 @@ function renderGallery() {
   }
   const games = getGalleryGames();
   const highlights = getGalleryHighlights();
+  // Leitor proprio em testes: so o admin da plataforma ve o separador Testes.
+  if (galleryMode === "lab" && !isPlatformAdmin) galleryMode = "games";
+  const content = galleryMode === "lab" ? `<div data-gallery-lab></div>`
+    : galleryMode === "highlights" ? renderGalleryHighlights(highlights) : renderGalleryGames(games);
   panel.innerHTML = `
     ${renderGalleryFilter(games.length, highlights.length)}
-    ${galleryMode === "highlights" ? renderGalleryHighlights(highlights) : renderGalleryGames(games)}`;
+    ${content}`;
+  if (galleryMode === "lab") window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"));
   panel.querySelectorAll("[data-gallery-mode]").forEach((button) => on(button, "click", () => {
     galleryMode = button.dataset.galleryMode;
     renderGallery();

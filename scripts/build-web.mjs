@@ -12,6 +12,7 @@ const files = [
   "month-review.js",
   "tracking-metrics.js",
   "notifications.js",
+  "video-lab.js",
   "app-config.js",
   "manifest.webmanifest"
 ];

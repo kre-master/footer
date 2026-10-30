@@ -189,3 +189,4 @@ Validacoes:
 - Momentos seguidos renomeados para "All Highlights" e com botao "✕ Sair" (nao havia forma clara de sair). Versao 1.16.1.
 - Barra do All Highlights simplificada a pedido do utilizador: ◀ 1/29 ▶ ✕, tudo a amarelo, com voltar ao anterior. Versao 1.16.2.
 - Pendente: o momento das 51:44 do jogo de 29/10 (amandio.torres) continua com o texto "Quarto falhanco"; deve passar a "Quinto falhanco" (o autor ou um admin, agora pela app).
+- 2026-10-30: leitor de video proprio comecado em testes, sem tirar o do YouTube. Galeria > "🧪 Testes" so aparece ao admin da plataforma (`isPlatformAdmin`); por agora toca um video de exemplo. Proximo: amostra de 2-3 min do ultimo jogo em 1080p (esta no desktop, que esta ligado; da VM nao se le). Sem versao nova (os jogadores nao veem nada).

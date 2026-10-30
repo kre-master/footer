@@ -8,6 +8,7 @@ Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas 
 
 ### Videos e momentos
 
+- Em curso (2026-10-30): leitor de video proprio em Galeria > Testes (so admin da plataforma). Passos: (1) amostra de 2-3 min do ultimo jogo em 1080p, feita no desktop; (2) guardar na NAS e servir pela VM com https (`tailscale serve`); (3) testar no telemovel; (4) se fizer sentido, escolher onde alojar para todos (Bunny Stream / Cloudflare Stream, confirmar precos) e substituir o YouTube. Acesso da VM ao desktop: so a partilha de ficheiros do Windows esta aberta; falta um utilizador so para a pasta dos videos.
 - Em standby (decisao de 2026-10-30): descarregar momentos. So com o leitor de video proprio (fora do YouTube); ideia: a VM recorta o pedaco do video original guardado na NAS, a pedido, em 1080p (~10 MB por momento). Falta saber onde ficam os originais e quem pode descarregar.
 
 ### Radar e odds
