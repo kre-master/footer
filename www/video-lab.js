@@ -8,7 +8,12 @@
   const STORAGE_KEY = "footer-video-lab-src";
   // Video de exemplo (dominio publico) ate haver uma amostra de um jogo na NAS.
   const SAMPLE_SRC = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
-  const SPEEDS = [1, 0.5, 0.25, 2];
+  // Dois botoes de velocidade: um so acelera (1x, 2x, 4x), o outro so abranda (1x, 0,5x, 0,25x).
+  const FAST_RATES = [1, 2, 4];
+  const SLOW_RATES = [1, 0.5, 0.25];
+  const RATE_LABELS = { 2: "2×", 4: "4×", 0.5: "½×", 0.25: "¼×" };
+  const MOMENTS_KEY = "footer-video-lab-moments";
+  const MOMENT_BEFORE_S = 5;
   const ZOOMS = [1, 2, 3, 5];
   const MAX_ZOOM = 5;
   const FRAME_S = 1 / 30;
@@ -99,6 +104,26 @@
     }
   }
 
+  // Momentos do leitor de testes: ficam so neste telemovel, por endereco de video.
+  function readMoments(src) {
+    try {
+      const all = JSON.parse(localStorage.getItem(MOMENTS_KEY) || "{}");
+      return Array.isArray(all[src]) ? all[src] : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeMoments(src, moments) {
+    try {
+      const all = JSON.parse(localStorage.getItem(MOMENTS_KEY) || "{}");
+      all[src] = moments;
+      localStorage.setItem(MOMENTS_KEY, JSON.stringify(all));
+    } catch {
+      // Sem armazenamento: os momentos so duram ate fechar.
+    }
+  }
+
   function escapeAttr(value) {
     return String(value).replace(/[&"<>]/g, (char) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[char]);
   }
@@ -120,22 +145,37 @@
             <video class="lab-video" playsinline preload="metadata"></video>
           </div>
           <div class="lab-status" data-lab-status hidden></div>
+          <form class="lab-moment-form" data-lab-moment-form hidden>
+            <span class="lab-moment-time" data-lab-moment-time>0:00</span>
+            <input name="note" maxlength="140" placeholder="O que aconteceu?" autocomplete="off" required>
+            <button type="submit" class="lab-btn" aria-label="Guardar momento">✓</button>
+            <button type="button" class="lab-btn" data-lab-moment-cancel aria-label="Cancelar">✕</button>
+          </form>
           <div class="lab-controls">
-            <input class="lab-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Posição no vídeo" data-lab-seek>
-            <div class="lab-buttons">
+            <div class="lab-row lab-row-seek">
+              <input class="lab-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Posição no vídeo" data-lab-seek>
+              <span class="lab-time" data-lab-time>0:00 / --:--</span>
+            </div>
+            <div class="lab-row lab-row-main">
               <button type="button" class="lab-btn lab-play" data-lab-play aria-label="Tocar">${ICONS.play}</button>
               <button type="button" class="lab-btn" data-lab-skip="-10" aria-label="Recuar 10 segundos">−10</button>
               <button type="button" class="lab-btn" data-lab-skip="10" aria-label="Avançar 10 segundos">+10</button>
               <button type="button" class="lab-btn" data-lab-frame="-1" aria-label="Imagem anterior">‹</button>
               <button type="button" class="lab-btn" data-lab-frame="1" aria-label="Imagem seguinte">›</button>
-              <span class="lab-time" data-lab-time>0:00 / --:--</span>
+              <button type="button" class="lab-btn lab-fs" data-lab-fullscreen aria-label="Ecrã cheio">${ICONS.fs}</button>
+            </div>
+            <div class="lab-row lab-row-tools">
               <select class="lab-btn lab-quality" data-lab-quality aria-label="Qualidade" hidden></select>
-              <button type="button" class="lab-btn" data-lab-speed aria-label="Velocidade">1×</button>
-              <button type="button" class="lab-btn" data-lab-zoom aria-label="Zoom">🔍 1×</button>
-              <button type="button" class="lab-btn" data-lab-fullscreen aria-label="Ecrã cheio">${ICONS.fs}</button>
+              <div class="lab-corner">
+                <button type="button" class="lab-btn" data-lab-fast aria-label="Mais rápido (2x, 4x)">⏩</button>
+                <button type="button" class="lab-btn" data-lab-slow aria-label="Câmara lenta (0,5x, 0,25x)">🐢</button>
+                <button type="button" class="lab-btn lab-mark" data-lab-mark aria-label="Marcar momento">🔖</button>
+                <button type="button" class="lab-btn lab-zoom" data-lab-zoom aria-label="Zoom">🔍 1×</button>
+              </div>
             </div>
           </div>
         </div>
+        <ul class="lab-moments" data-lab-moments></ul>
         <details class="lab-diag">
           <summary>Diagnóstico</summary>
           <dl data-lab-diag></dl>
@@ -148,7 +188,14 @@
     const seek = container.querySelector("[data-lab-seek]");
     const playButton = container.querySelector("[data-lab-play]");
     const timeLabel = container.querySelector("[data-lab-time]");
-    const speedButton = container.querySelector("[data-lab-speed]");
+    const fastButton = container.querySelector("[data-lab-fast]");
+    const slowButton = container.querySelector("[data-lab-slow]");
+    const momentForm = container.querySelector("[data-lab-moment-form]");
+    const momentTime = container.querySelector("[data-lab-moment-time]");
+    const momentList = container.querySelector("[data-lab-moments]");
+    let currentSrc = src;
+    let momentAt = 0;
+    let resumeAfterMoment = false;
     const zoomButton = container.querySelector("[data-lab-zoom]");
     const fsButton = container.querySelector("[data-lab-fullscreen]");
     const status = container.querySelector("[data-lab-status]");
@@ -183,6 +230,9 @@
     };
 
     const load = (url) => {
+      currentSrc = url;
+      momentForm.hidden = true;
+      renderMoments();
       lastError = "";
       showStatus("A carregar…");
       setZoom(1);
@@ -334,11 +384,63 @@
     on(seek, "change", () => {
       seeking = false;
     });
-    on(speedButton, "click", () => {
-      const next = SPEEDS[(SPEEDS.indexOf(video.playbackRate) + 1) % SPEEDS.length] ?? 1;
-      video.playbackRate = next;
-      speedButton.textContent = `${String(next).replace(".", ",")}×`;
-      speedButton.classList.toggle("active", next !== 1);
+    const setRate = (rate) => {
+      video.playbackRate = rate;
+      fastButton.textContent = rate > 1 ? RATE_LABELS[rate] : "⏩";
+      slowButton.textContent = rate < 1 ? RATE_LABELS[rate] : "🐢";
+      fastButton.classList.toggle("active", rate > 1);
+      slowButton.classList.toggle("active", rate < 1);
+    };
+    on(fastButton, "click", () => {
+      const rate = video.playbackRate;
+      setRate(rate < 1 ? FAST_RATES[1] : FAST_RATES[(FAST_RATES.indexOf(rate) + 1) % FAST_RATES.length] ?? 1);
+    });
+    on(slowButton, "click", () => {
+      const rate = video.playbackRate;
+      setRate(rate > 1 ? SLOW_RATES[1] : SLOW_RATES[(SLOW_RATES.indexOf(rate) + 1) % SLOW_RATES.length] ?? 1);
+    });
+    // Um video novo volta a 1x; repoe os botoes a condizer.
+    video.addEventListener("loadedmetadata", () => setRate(video.playbackRate || 1));
+
+    // Marcar momento: pausa, guarda o tempo e abre uma caixa pequena e transparente no canto de cima.
+    const renderMoments = () => {
+      const moments = readMoments(currentSrc).sort((a, b) => a.t - b.t);
+      momentList.innerHTML = moments.map((item) => `
+        <li>
+          <button type="button" class="lab-moment-go" data-lab-moment-go="${item.t}">▶ ${formatClock(item.t)} <span>${escapeAttr(item.note)}</span></button>
+          <button type="button" class="lab-moment-del" data-lab-moment-del="${escapeAttr(item.id)}" aria-label="Apagar momento">×</button>
+        </li>`).join("");
+      momentList.querySelectorAll("[data-lab-moment-go]").forEach((button) => on(button, "click", () => {
+        video.currentTime = Math.max(0, Number(button.dataset.labMomentGo) - MOMENT_BEFORE_S);
+        video.play().catch(() => {});
+      }));
+      momentList.querySelectorAll("[data-lab-moment-del]").forEach((button) => on(button, "click", () => {
+        writeMoments(currentSrc, readMoments(currentSrc).filter((item) => item.id !== button.dataset.labMomentDel));
+        renderMoments();
+      }));
+    };
+    const closeMoment = () => {
+      momentForm.hidden = true;
+      if (resumeAfterMoment) video.play().catch(() => {});
+    };
+    on(container.querySelector("[data-lab-mark]"), "click", () => {
+      resumeAfterMoment = !video.paused;
+      video.pause();
+      momentAt = video.currentTime;
+      momentTime.textContent = `🔖 ${formatClock(momentAt)}`;
+      momentForm.note.value = "";
+      momentForm.hidden = false;
+      momentForm.note.focus();
+    });
+    on(container.querySelector("[data-lab-moment-cancel]"), "click", closeMoment);
+    on(momentForm, "submit", (event) => {
+      event.preventDefault();
+      const note = momentForm.note.value.trim();
+      if (!note) return;
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      writeMoments(currentSrc, [...readMoments(currentSrc), { id, t: Math.round(momentAt * 10) / 10, note }]);
+      renderMoments();
+      closeMoment();
     });
     on(zoomButton, "click", () => {
       const next = ZOOMS.find((level) => level > view.zoom + 0.05) ?? 1;
