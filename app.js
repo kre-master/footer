@@ -3136,7 +3136,9 @@ function renderGallery() {
   panel.innerHTML = `
     ${renderGalleryFilter(games.length, highlights.length)}
     ${content}`;
-  if (galleryMode === "lab") window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"), { admin: isPlatformAdmin });
+  if (galleryMode === "lab") {
+    window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"), { admin: isPlatformAdmin, games: getVideoLabGames(), moments: videoLabMoments });
+  }
   panel.querySelectorAll("[data-gallery-mode]").forEach((button) => on(button, "click", () => {
     galleryMode = button.dataset.galleryMode;
     renderGallery();
@@ -10422,6 +10424,28 @@ function canDeleteBookmark(bookmark) {
   const userId = currentSession?.user?.id || "local";
   return bookmark.createdBy === userId;
 }
+
+// Leitor novo (Galeria > Testes): jogos ja no Bunny Stream. E o mesmo video do YouTube (mesmo inicio e duracao),
+// por isso usa os mesmos momentos do grupo: marcar, editar e apagar valem para os dois leitores.
+const VIDEO_LAB_GAMES = [
+  { gameId: "game-1793226842113", label: "Jogo 28/10 completo", src: "https://vz-fdc7df5c-b0e.b-cdn.net/6b845673-2677-43b0-b6df-aa337ef85688/playlist.m3u8" },
+];
+
+function getVideoLabGames() {
+  return VIDEO_LAB_GAMES.filter((item) => state.games.some((game) => game.id === item.gameId) && getGameVideoParts(item.gameId).length);
+}
+
+const videoLabMoments = {
+  before: BOOKMARK_BEFORE_S,
+  after: BOOKMARK_AFTER_S,
+  list: (gameId) => getGameBookmarks(gameId).map((item) => ({
+    id: item.id, t: item.momentS, start: getClipStart(item), end: item.endS, note: item.note,
+    author: item.authorName || "Jogador", canEdit: canDeleteBookmark(item),
+  })),
+  add: (gameId, timing) => addVideoBookmark({ gameId, youtubeId: getGameVideoParts(gameId)[0]?.youtubeId, ...timing }),
+  update: (id, timing) => updateVideoBookmark(id, timing),
+  remove: (id) => removeVideoBookmark(id),
+};
 
 // Relogio do leitor: o YouTube envia o tempo atual por postMessage depois de um pedido "listening".
 const videoClocks = new WeakMap();

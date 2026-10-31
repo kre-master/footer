@@ -7183,14 +7183,104 @@ body.mr-open {
   top: calc(8px + env(safe-area-inset-top, 0px));
   left: calc(8px + env(safe-area-inset-left, 0px));
   z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  gap: 5px;
   width: min(calc(100% - 16px), 460px);
   border: 1px solid rgba(255, 255, 255, .18);
   border-radius: 12px;
   padding: 5px 5px 5px 10px;
   background: rgba(5, 10, 20, .3);
+}
+
+.lab-moment-line,
+.lab-moment-adjust {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lab-moment-adjust[hidden],
+.lab-moment-error[hidden] {
+  display: none;
+}
+
+.lab-moment-adjust {
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, .85);
+  font-size: 12px;
+  text-shadow: 0 1px 3px #000;
+}
+
+.lab-moment-adjust button {
+  min-width: 34px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(5, 10, 20, .3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lab-moment-window {
+  margin-left: auto;
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.lab-moment-error {
+  margin: 0;
+  color: #ffb3b8;
+  font-size: 12px;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* Pedaco a tocar: barra amarela pequena no canto de cima direito (como no All Highlights do YouTube) */
+.lab-clip {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  right: calc(8px + env(safe-area-inset-right, 0px));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  border: 1px solid rgba(243, 179, 64, .6);
+  border-radius: 999px;
+  padding: 3px;
+  color: var(--amber);
+  background: rgba(5, 10, 20, .55);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lab-clip[hidden] {
+  display: none;
+}
+
+.lab-clip span {
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.lab-clip .lab-clip-note {
+  overflow: hidden;
+  max-width: 180px;
+  color: #fff;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.lab-clip button {
+  min-width: 34px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  color: var(--amber);
+  background: rgba(243, 179, 64, .14);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .lab-moment-form[hidden] {
@@ -7228,7 +7318,27 @@ body.mr-open {
   background: rgba(5, 10, 20, .3);
 }
 
-/* Momentos marcados no leitor de testes (so neste telemovel) */
+/* Momentos do leitor novo: do grupo (num jogo) ou so neste telemovel (video de teste) */
+.lab-moments-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lab-moments-head small {
+  color: var(--muted);
+}
+
+.lab-moments-head [hidden] {
+  display: none;
+}
+
+.lab-choice-game {
+  border-color: var(--accent);
+}
+
 .lab-moments {
   display: grid;
   gap: 6px;
@@ -7262,6 +7372,22 @@ body.mr-open {
   margin-left: 6px;
   color: var(--ink);
   font-weight: 400;
+}
+
+.lab-moment-go small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.lab-moment-edit {
+  width: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 16px;
 }
 
 .lab-moment-del {

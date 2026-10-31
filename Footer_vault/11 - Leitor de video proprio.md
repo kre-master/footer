@@ -8,7 +8,7 @@ Estado a 2026-10-31. Fonte única sobre o leitor novo que vai substituir o do Yo
 - **Onde está:** Galeria > **🧪 Testes**.
 - **Quem vê:** os jogadores dos **Futeboleiros** com sessão iniciada, e o admin da plataforma (João). Os outros grupos não veem, porque o vídeo de teste é de um jogo dos Futeboleiros.
 - **O leitor do YouTube continua igual** para todos (Jogos, Highlights, All Highlights). Nada foi retirado.
-- **Vídeo de teste:** 3 minutos do jogo de 28/10 (35:38 a 38:38), em duas versões: 1080p e 4K.
+- **Vídeos:** o **jogo de 28/10 completo** (1080p, 74 min) com os **momentos do grupo**, e o trecho de 3 minutos (35:38 a 38:38) em 1080p e 4K para comparar a nitidez.
 
 ## Como os vídeos chegam aos jogadores
 
@@ -40,7 +40,9 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 | Qualidade | Auto (pela rede, mostra a que está a dar, ex. "Auto · 1440p") ou fixa |
 | Ecrã cheio | ⛶; no iPhone ocupa a página toda |
 | Marcar momento | 🔖: pausa, abre uma caixa pequena e transparente em cima; ✓ guarda e o vídeo continua |
-| Lista de momentos | Por baixo do vídeo; tocar salta para 5 s antes; × apaga |
+| Lista de momentos | Por baixo do vídeo, com autor; tocar toca o pedaço (8 s antes a 5 s depois) e repete até "Continuar o jogo ▶" |
+| All Highlights | Toca todos os momentos seguidos; barra amarela ◀ 1/29 ▶ ✕ no canto de cima |
+| Editar / apagar | ✎ e × na lista, só para quem marcou ou para admins; ao editar aparecem os ajustes do pedaço (início e fim ±5 s) |
 | Teclado (computador) | Espaço pausa, setas ±5 s, vírgula e ponto andam uma imagem |
 | Diagnóstico (só João) | Modo, resolução a tocar, rede estimada, imagens perdidas, erros |
 
@@ -96,25 +98,28 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 
 ## Limitações conhecidas
 
-- **Momentos do leitor novo ficam só no telemóvel** de quem os marca; ainda não vão para os Highlights do grupo.
+- Nos **trechos de teste** (3 min), os momentos ficam só no telemóvel. No **jogo completo** são os do grupo.
+- O jogo completo no leitor novo está ligado à mão (lista `VIDEO_LAB_GAMES` em `app.js`); falta guardar o vídeo do Bunny na base de dados para cada jogo.
 - **Aviso "Para sair do ecrã inteiro…"**: é o Chrome/Brave que o mostra sempre; não se tira num site. Alternativas: ecrã cheio "falso" (sem aviso, mas com a barra de cima do telemóvel) ou a app instalada (versão de loja).
 - **O Bunny só entrega a quem vem da app** (proteção contra cópias). A app Android/iOS vai precisar de ser autorizada também.
 - O teste via NAS + Tailscale foi lento porque a ligação passou por um servidor do Tailscale em Madrid; com o Bunny isso não acontece.
 
 ## Próximos passos
 
-1. **Jogo de 28/10 completo** no Bunny (desktop exporta 1080p sem cortes → VM envia).
-2. **Momentos partilhados:** o vídeo do YouTube de 28/10 dura 74:16, igual ao 4K. Se a duração exata bater certo, o leitor novo usa **os mesmos momentos** do grupo (29 nesse jogo): marcar, editar e apagar valem para os dois leitores.
-3. **All Highlights** e edição de momentos no leitor novo, com o estilo do ecrã cheio.
+1. ✅ **Jogo de 28/10 completo** no Bunny (export 1080p NVENC 7 min 40 s, 4,14 GiB, 8 Mbps; duração 4455,58 s = YouTube 4456 s).
+2. ✅ **Momentos partilhados:** mesmo vídeo que o YouTube, por isso o leitor novo usa os mesmos momentos do grupo; marcar, editar e apagar valem para os dois leitores.
+3. ✅ **All Highlights** e edição de momentos no leitor novo.
 4. Recolher opiniões dos jogadores e afinar o estilo.
-5. Decidir a troca: o leitor novo passa a ser o de todos e o YouTube sai.
-6. Automatizar: depois de cada jogo, o desktop prepara, a VM envia para o Bunny, e a cópia vai para o Drive.
-7. Mais tarde: descarregar momentos (recortes a pedido), ligar à app de loja, reserva de IP da VM no router.
+5. Guardar na base de dados o vídeo do Bunny de cada jogo (em vez da lista à mão) e partilhar momentos com link.
+6. Decidir a troca: o leitor novo passa a ser o de todos e o YouTube sai.
+7. Automatizar: depois de cada jogo, o desktop prepara, a VM envia para o Bunny, e a cópia vai para o Drive.
+8. Mais tarde: descarregar momentos (recortes a pedido), ligar à app de loja, reserva de IP da VM no router.
 
 ## Parte técnica
 
-- Código: `video-lab.js` (`window.FooterVideoLab.mount(container, { admin })`); integração em `app.js` (`canSeeVideoLab`, `renderGallery`); estilos `.lab-*` em `styles.css`.
+- Código: `video-lab.js` (`window.FooterVideoLab.mount(container, { admin, games, moments })`); integração em `app.js` (`canSeeVideoLab`, `renderGallery`, `VIDEO_LAB_GAMES`, `videoLabMoments` que usa `getGameBookmarks` / `addVideoBookmark` / `updateVideoBookmark` / `removeVideoBookmark` / `canDeleteBookmark`); estilos `.lab-*` em `styles.css`.
+- Envio para o Bunny a partir da VM: usar `curl -T ficheiro` (lê aos bocados). `--data-binary @ficheiro` carrega o ficheiro todo para a memória e a VM só tem 4 GB.
 - HLS: hls.js 1.5.20 (versão light), carregado só quando o endereço é `.m3u8`; no iPhone antigo usa o HLS do Safari.
 - Bunny: biblioteca `footer-teste` (Frankfurt), CDN `vz-fdc7df5c-b0e.b-cdn.net`, só serve com o Referer da app. Chave em `~/.config/bunny/stream.env` na VM. Lista dos vídeos enviados: `~/maestro/bunny/videos.txt`.
 - Vídeos de teste locais: `~/videos-teste` na VM (servidos só no Tailscale em `https://maestro.tail85c4b5.ts.net/videos/`).
-- Commits: `a135889` separador Testes · `d3fd7f3` HLS + qualidade · `bf4aa3d` barra que se esbate · `7ea2ea9` "L", duas velocidades, momentos · `b845373` aberto aos Futeboleiros.
+- Commits: `a135889` separador Testes · `d3fd7f3` HLS + qualidade · `bf4aa3d` barra que se esbate · `7ea2ea9` "L", duas velocidades, momentos · `b845373` aberto aos Futeboleiros · (videolab6) jogo completo com momentos do grupo, All Highlights e edição.
