@@ -208,6 +208,12 @@
           qualitySelect.value = "-1";
           qualitySelect.hidden = false;
         });
+        // Em Auto, o botao mostra a qualidade que esta mesmo a dar (ex.: "Auto · 1440p").
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+          const auto = qualitySelect.querySelector('option[value="-1"]');
+          const height = hls.levels[data.level]?.height;
+          if (auto) auto.textContent = height ? `Auto · ${height}p` : "Auto";
+        });
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return;
           lastError = `${data.type}: ${data.details}`;
@@ -396,10 +402,25 @@
       setZoom(view.zoom * (event.deltaY < 0 ? 1.2 : 1 / 1.2), point.x, point.y);
     }, { passive: false });
 
+    // Ecra cheio: sem mexer durante 5 s (com o video a dar), a barra fica quase invisivel,
+    // so com o contorno dos botoes; qualquer toque ou movimento volta a mostra-la.
+    let idleTimer = null;
+    const wake = () => {
+      stage.classList.remove("is-idle");
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (stage.classList.contains("is-fullscreen") && !video.paused) stage.classList.add("is-idle");
+      }, 5000);
+    };
+    ["pointerdown", "pointermove", "keydown"].forEach((type) => on(stage, type, wake));
+    video.addEventListener("play", wake);
+    video.addEventListener("pause", wake);
+
     const setFsUi = (active) => {
       stage.classList.toggle("is-fullscreen", active);
       fsButton.innerHTML = active ? ICONS.exit : ICONS.fs;
       fsButton.setAttribute("aria-label", active ? "Sair do ecrã cheio" : "Ecrã cheio");
+      wake();
       requestAnimationFrame(() => setZoom(1));
     };
     on(fsButton, "click", async () => {
@@ -453,6 +474,7 @@
       video.removeAttribute("src");
       video.load();
       document.removeEventListener("keydown", onKey);
+      clearTimeout(idleTimer);
       document.removeEventListener("fullscreenchange", onFsChange);
       document.removeEventListener("webkitfullscreenchange", onFsChange);
       if (stage.classList.contains("pseudo-fullscreen")) document.body.classList.remove("stage-open");

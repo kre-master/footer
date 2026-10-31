@@ -7111,6 +7111,11 @@ body.mr-open {
   color: #fff;
   background: rgba(255, 255, 255, .06);
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.lab-btn[hidden] {
+  display: none;
 }
 
 .lab-btn.active {
@@ -7154,8 +7159,83 @@ body.mr-open {
   aspect-ratio: auto;
 }
 
+/* Ecra cheio: barra fina numa so linha, por cima do video, com a barra de posicao ao meio */
 .lab-stage.is-fullscreen .lab-controls {
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 18px calc(12px + env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  background: linear-gradient(transparent, rgba(0, 0, 0, .6));
+  transition: background .8s ease;
+}
+
+.lab-stage.is-fullscreen .lab-buttons {
+  display: contents;
+}
+
+.lab-stage.is-fullscreen .lab-seek {
+  flex: 1 1 auto;
+  order: 1;
+  min-width: 60px;
+}
+
+.lab-stage.is-fullscreen .lab-time,
+.lab-stage.is-fullscreen .lab-quality,
+.lab-stage.is-fullscreen [data-lab-speed],
+.lab-stage.is-fullscreen [data-lab-zoom],
+.lab-stage.is-fullscreen [data-lab-fullscreen] {
+  order: 2;
+}
+
+.lab-stage.is-fullscreen .lab-time {
+  flex: 0 0 auto;
+  min-width: 0;
+  color: rgba(255, 255, 255, .8);
+}
+
+.lab-stage.is-fullscreen .lab-btn {
+  min-width: 36px;
+  height: 34px;
+  border-radius: 9px;
+  padding: 0 7px;
+  background: rgba(5, 10, 20, .35);
+  font-size: 14px;
+  transition: color .8s ease, background .8s ease, border-color .8s ease;
+}
+
+.lab-stage.is-fullscreen .lab-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.lab-stage.is-fullscreen .lab-seek,
+.lab-stage.is-fullscreen .lab-time {
+  transition: opacity .8s ease;
+}
+
+/* 5 s sem mexer: so ficam as silhuetas dos botoes, muito tenues */
+.lab-stage.is-fullscreen.is-idle {
+  cursor: none;
+}
+
+.lab-stage.is-fullscreen.is-idle .lab-controls {
+  background: transparent;
+}
+
+.lab-stage.is-fullscreen.is-idle .lab-btn {
+  border-color: rgba(255, 255, 255, .14);
+  color: rgba(255, 255, 255, .18);
+  background: transparent;
+}
+
+.lab-stage.is-fullscreen.is-idle .lab-seek,
+.lab-stage.is-fullscreen.is-idle .lab-time {
+  opacity: .15;
 }
 
 .lab-stage.pseudo-fullscreen {
