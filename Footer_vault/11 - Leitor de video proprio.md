@@ -7,7 +7,8 @@ Estado a 2026-10-31. Fonte única sobre o leitor novo que vai substituir o do Yo
 - **O que é:** um leitor de vídeo feito por nós, fora do YouTube, com zoom, câmara lenta, imagem a imagem e marcação de momentos ao alcance do polegar.
 - **Onde está:** Galeria > **🧪 Testes**.
 - **Quem vê:** os jogadores dos **Futeboleiros** com sessão iniciada, e o admin da plataforma (João). Os outros grupos não veem, porque o vídeo de teste é de um jogo dos Futeboleiros.
-- **O leitor do YouTube continua igual** para todos (Jogos, Highlights, All Highlights). Nada foi retirado.
+- **O jogo de 28/10 já usa o leitor novo em toda a app** (desde 2026-10-31): Galeria (Jogos, Highlights, All Highlights), página do jogo no Histórico (incluindo os tempos ▶ da análise), links partilhados de momentos, "Ver o momento" das estatísticas e vídeos do perfil.
+- **Os outros jogos continuam no leitor do YouTube.** O vídeo do YouTube de 28/10 não foi apagado (continua a dar as miniaturas).
 - **Vídeos:** o **jogo de 28/10 completo** (1080p, 74 min) com os **momentos do grupo**, e o trecho de 3 minutos (35:38 a 38:38) em 1080p e 4K para comparar a nitidez.
 
 ## Como os vídeos chegam aos jogadores
@@ -94,6 +95,7 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 - 2026-10-31: **Bunny Stream** para os jogadores verem; **NAS** cópia local; **Google Drive** arquivo dos 4K; **desktop** prepara os vídeos.
 - 2026-10-31: enviar **1080p feito no desktop** (não o 4K original): envio ~10× mais rápido e ~3× mais barato.
 - 2026-10-31: separador Testes aberto a **todos os jogadores dos Futeboleiros** para recolher opiniões.
+- 2026-10-31: o **jogo de 28/10 passa a usar só o leitor novo** em toda a app; os restantes jogos ficam no YouTube.
 - Sugerido (falta o João confirmar no Bunny): desligar **"Keep original files"**, porque o original já fica na NAS e no Drive.
 
 ## Limitações conhecidas
@@ -117,7 +119,7 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 
 ## Parte técnica
 
-- Código: `video-lab.js` (`window.FooterVideoLab.mount(container, { admin, games, moments })`); integração em `app.js` (`canSeeVideoLab`, `renderGallery`, `VIDEO_LAB_GAMES`, `videoLabMoments` que usa `getGameBookmarks` / `addVideoBookmark` / `updateVideoBookmark` / `removeVideoBookmark` / `canDeleteBookmark`); estilos `.lab-*` em `styles.css`.
+- Código: `video-lab.js` (`window.FooterVideoLab.mount(container, { admin, games, moments, embedded })`, devolve `{ playClip, playReel, seek }`); jogos no leitor novo: `getBunnyGame` / `mountGamePlayer` / `openBunnyLightbox` em `app.js` (janela da Galeria e `renderGameVideoSection` / `bindGameVideoSection` / `seekGameVideo` no Histórico); integração em `app.js` (`canSeeVideoLab`, `renderGallery`, `VIDEO_LAB_GAMES`, `videoLabMoments` que usa `getGameBookmarks` / `addVideoBookmark` / `updateVideoBookmark` / `removeVideoBookmark` / `canDeleteBookmark`); estilos `.lab-*` em `styles.css`.
 - Envio para o Bunny a partir da VM: usar `curl -T ficheiro` (lê aos bocados). `--data-binary @ficheiro` carrega o ficheiro todo para a memória e a VM só tem 4 GB.
 - HLS: hls.js 1.5.20 (versão light), carregado só quando o endereço é `.m3u8`; no iPhone antigo usa o HLS do Safari.
 - Bunny: biblioteca `footer-teste` (Frankfurt), CDN `vz-fdc7df5c-b0e.b-cdn.net`, só serve com o Referer da app. Chave em `~/.config/bunny/stream.env` na VM. Lista dos vídeos enviados: `~/maestro/bunny/videos.txt`.

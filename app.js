@@ -3189,6 +3189,12 @@ function openVideoLightbox(gameId, options = {}) {
   const modal = document.querySelector("#video-lightbox");
   if (!game || !parts.length || !modal) return;
   galleryGameId = game.id;
+  const bunny = getBunnyGame(game.id);
+  document.querySelector("#video-lightbox-stage")?.classList.toggle("hidden", Boolean(bunny));
+  if (bunny) {
+    openBunnyLightbox(game, bunny, options, modal);
+    return;
+  }
   const reelItems = options.reel ? getMomentReelItems(game.id) : [];
   if (reelItems.length) options = { ...options, clip: reelItems[0] };
   document.querySelector("#video-lightbox-eyebrow").textContent = `${formatDate(game.date)} · ${getGameTitle(game)}`;
@@ -3226,9 +3232,30 @@ function openVideoLightbox(gameId, options = {}) {
   document.body.classList.add("mvp-gate-open");
 }
 
+// Jogo no leitor novo: a janela mostra so esse leitor (com os momentos do grupo por baixo).
+function openBunnyLightbox(game, bunny, options, modal) {
+  document.querySelector("#video-lightbox-eyebrow").textContent = `${formatDate(game.date)} · ${getGameTitle(game)}`;
+  document.querySelector("#video-lightbox-title").textContent = options.clip ? options.clip.note : getGameResultText(game);
+  const partsNav = document.querySelector("#video-lightbox-parts");
+  partsNav.classList.add("hidden");
+  partsNav.innerHTML = "";
+  document.querySelector("#video-lightbox-frame").innerHTML = "";
+  document.querySelector("#video-lightbox-stage-controls").innerHTML = "";
+  const player = mountGamePlayer(document.querySelector("#video-lightbox-moments"), bunny);
+  if (options.reel) player?.playReel();
+  else if (options.clip) player?.playClip(toPlayerClip(options.clip));
+  modal.classList.remove("hidden");
+  document.body.classList.add("mvp-gate-open");
+}
+
 function closeVideoLightbox() {
   const modal = document.querySelector("#video-lightbox");
   if (!modal || modal.classList.contains("hidden")) return;
+  // Leitor novo: para o video e sai do ecra cheio antes de fechar.
+  modal.querySelectorAll(".lab-video").forEach((video) => video.pause());
+  if (document.fullscreenElement && modal.contains(document.fullscreenElement)) document.exitFullscreen?.().catch(() => {});
+  const labHost = document.querySelector("#video-lightbox-moments");
+  if (labHost?.querySelector(".lab")) labHost.innerHTML = "";
   exitStageFullscreen(document.querySelector("#video-lightbox-stage"));
   modal.classList.add("hidden");
   document.body.classList.remove("mvp-gate-open");
@@ -10431,6 +10458,19 @@ const VIDEO_LAB_GAMES = [
   { gameId: "game-1793226842113", label: "Jogo 28/10 completo", src: "https://vz-fdc7df5c-b0e.b-cdn.net/6b845673-2677-43b0-b6df-aa337ef85688/playlist.m3u8" },
 ];
 
+// O leitor novo substitui o do YouTube so nos jogos desta lista (Galeria, Historico, links de momentos).
+function getBunnyGame(gameId) {
+  return VIDEO_LAB_GAMES.find((item) => item.gameId === gameId) || null;
+}
+
+function mountGamePlayer(container, bunny) {
+  return window.FooterVideoLab?.mount(container, { embedded: true, games: [bunny], moments: videoLabMoments }) || null;
+}
+
+function toPlayerClip(item) {
+  return { start: getClipStart(item), end: item.endS, note: item.note };
+}
+
 function getVideoLabGames() {
   return VIDEO_LAB_GAMES.filter((item) => state.games.some((game) => game.id === item.gameId) && getGameVideoParts(item.gameId).length);
 }
@@ -11134,6 +11174,9 @@ function renderGameVideoSection(game) {
           <div class="tracking-pitch-tabs game-video-parts" role="group" aria-label="Parte do vídeo">
             ${parts.map((v, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-video-part="${escapeHtml(v.youtubeId)}" aria-pressed="${i === 0}">${escapeHtml(v.label || `Parte ${i + 1}`)}</button>`).join("")}
           </div>` : ""}
+        ${getBunnyGame(game.id) ? `
+        <div data-bunny-player></div>
+        <p class="tracking-fineprint">Leitor de vídeo novo.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>` : `
         <div class="video-stage" data-video-stage>
           <div class="game-video-frame">
             <iframe data-game-video data-youtube-id="${escapeHtml(first.youtubeId)}" src="${gameVideoEmbedUrl(first.youtubeId, first.videoStartS)}"
@@ -11143,7 +11186,7 @@ function renderGameVideoSection(game) {
           ${renderStageControls()}
         </div>
         <p class="tracking-fineprint">Vídeo não listado no YouTube: só quem tem a ligação o encontra.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
-        ${renderMomentsBlock(game)}` : `
+        ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
@@ -11173,6 +11216,11 @@ function renderGameVideoSection(game) {
 
 function seekGameVideo(container, game, seconds) {
   const target = window.FooterTracking.videoSeekTarget(getGameVideoParts(game.id), seconds);
+  const player = container.querySelector("[data-game-video-section]")?.gamePlayer;
+  if (player && getBunnyGame(game.id)) {
+    if (target) player.seek(target.seconds);
+    return;
+  }
   const frame = container.querySelector("[data-game-video]");
   if (!target || !frame) return;
   setMomentLoop(frame, null, null);
@@ -11202,27 +11250,31 @@ function bindGameVideoSection(game, container) {
   const section = container?.querySelector("[data-game-video-section]");
   if (!section) return;
   const frame = section.querySelector("[data-game-video]");
-  frame?.addEventListener("load", () => { frame.dataset.ready = "1"; });
-  listenToVideoClock(frame);
-  bindVideoStage(section.querySelector("[data-video-stage]"));
-  const playSectionClip = (item) => {
-    if (!frame) return;
-    showGameVideoPart(section, item.youtubeId);
-    frame.dataset.ready = "0";
-    frame.dataset.youtubeId = item.youtubeId;
-    if (frame.dataset.youtubeId === item.youtubeId && frame.dataset.ready === "1") {
-      sendVideoCommand(frame, "seekTo", [getClipStart(item), true]);
-      sendVideoCommand(frame, "playVideo");
-    } else {
+  const bunny = getBunnyGame(game.id);
+  if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
+  else {
+    frame?.addEventListener("load", () => { frame.dataset.ready = "1"; });
+    listenToVideoClock(frame);
+    bindVideoStage(section.querySelector("[data-video-stage]"));
+    const playSectionClip = (item) => {
+      if (!frame) return;
+      showGameVideoPart(section, item.youtubeId);
       frame.dataset.ready = "0";
       frame.dataset.youtubeId = item.youtubeId;
-      frame.src = gameVideoEmbedUrl(item.youtubeId, getClipStart(item), true);
-    }
-    setMomentLoop(frame, getClipStart(item), item.endS);
-    frame.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-  bindMomentsBlock(section, game, { getFrame: () => frame, playClip: playSectionClip });
-  attachMomentTracker(section.querySelector("[data-video-stage]"), game, { getFrame: () => frame, playClip: playSectionClip });
+      if (frame.dataset.youtubeId === item.youtubeId && frame.dataset.ready === "1") {
+        sendVideoCommand(frame, "seekTo", [getClipStart(item), true]);
+        sendVideoCommand(frame, "playVideo");
+      } else {
+        frame.dataset.ready = "0";
+        frame.dataset.youtubeId = item.youtubeId;
+        frame.src = gameVideoEmbedUrl(item.youtubeId, getClipStart(item), true);
+      }
+      setMomentLoop(frame, getClipStart(item), item.endS);
+      frame.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    bindMomentsBlock(section, game, { getFrame: () => frame, playClip: playSectionClip });
+    attachMomentTracker(section.querySelector("[data-video-stage]"), game, { getFrame: () => frame, playClip: playSectionClip });
+  }
   // Time links live in the tracking sections below, so listen on the whole game page. The page element
   // outlives each render, so the listener is added once and reads the game shown at click time.
   if (container.dataset.videoSeekBound !== "1") {

@@ -132,18 +132,20 @@
   // admin: ve tambem o endereco do video, o exemplo e o diagnostico; os jogadores so os videos.
   // games: jogos ja no Bunny ({ gameId, label, src }); moments: ponte para os momentos do grupo na app
   // ({ before, after, list, add, update, remove }). Sem jogo, os momentos ficam so neste telemovel.
-  function mount(container, { admin = false, games = [], moments = null } = {}) {
-    if (!container) return;
+  // embedded: leitor de um jogo dentro da app (Galeria, Historico): so o video e os momentos desse jogo.
+  // Devolve { playClip({ start, end, note }), playReel(), seek(segundos) } para a app o comandar.
+  function mount(container, { admin = false, games = [], moments = null, embedded = false } = {}) {
+    if (!container) return null;
     const choices = [...games, ...PRESETS];
     const stored = readStoredSrc();
     const fallback = (games[0] || PRESETS[1]).src;
-    const src = admin ? stored || fallback : choices.some((choice) => choice.src === stored) ? stored : fallback;
+    const src = embedded ? fallback : admin ? stored || fallback : choices.some((choice) => choice.src === stored) ? stored : fallback;
     const beforeS = moments?.before ?? MOMENT_BEFORE_S;
     const afterS = moments?.after ?? MOMENT_AFTER_S;
     container.innerHTML = `
-      <div class="lab">
-        <p class="lab-note">🧪 Leitor de vídeo novo, em testes. Experimenta o zoom, a câmara lenta, o ecrã cheio e os momentos e diz ao João o que achas.</p>
-        <form class="lab-source ${admin ? "" : "lab-source-players"}" data-lab-source>
+      <div class="lab ${embedded ? "lab-embedded" : ""}">
+        <p class="lab-note" ${embedded ? "hidden" : ""}>🧪 Leitor de vídeo novo, em testes. Experimenta o zoom, a câmara lenta, o ecrã cheio e os momentos e diz ao João o que achas.</p>
+        <form class="lab-source ${admin ? "" : "lab-source-players"}" data-lab-source ${embedded ? "hidden" : ""}>
           <input type="url" name="src" value="${escapeAttr(src)}" placeholder="Endereço do vídeo (.mp4)" autocomplete="off" required ${admin ? "" : "hidden"}>
           ${admin ? `<button type="submit" class="primary-btn">Carregar</button>
           <button type="button" class="ghost-btn" data-lab-sample>Exemplo</button>` : ""}
@@ -151,7 +153,7 @@
         </form>
         <div class="lab-stage" data-lab-stage>
           <div class="lab-viewport" data-lab-viewport>
-            <video class="lab-video" playsinline preload="metadata"></video>
+            <video class="lab-video" playsinline muted preload="metadata"></video>
           </div>
           <div class="lab-status" data-lab-status hidden></div>
           <div class="lab-clip" data-lab-clip hidden></div>
@@ -198,7 +200,7 @@
           <button type="button" class="ghost-btn" data-lab-reel hidden>▶ All Highlights</button>
         </div>
         <ul class="lab-moments" data-lab-moments></ul>
-        <details class="lab-diag" ${admin ? "" : "hidden"}>
+        <details class="lab-diag" ${admin && !embedded ? "" : "hidden"}>
           <summary>Diagnóstico</summary>
           <dl data-lab-diag></dl>
         </details>
@@ -478,11 +480,18 @@
         : `<span class="lab-clip-note">🔖 ${escapeAttr(clip.note)}</span>
            <button type="button" data-lab-clip-go="exit">Continuar o jogo ▶</button>`;
     }
+    // O video (HLS) pode ainda estar a carregar quando a app pede um momento: espera pelos metadados.
+    const whenReady = (fn) => {
+      if (video.readyState >= 1) fn();
+      else video.addEventListener("loadedmetadata", fn, { once: true });
+    };
     const playClip = (item, reel = null, index = 0) => {
       clip = { start: item.start, end: item.end, note: item.note, reel, index };
-      video.currentTime = item.start;
-      video.play().catch(() => {});
       renderClipBar();
+      whenReady(() => {
+        video.currentTime = item.start;
+        video.play().catch(() => {});
+      });
     };
     // Sair do pedaco: o video continua normalmente a partir dali.
     function leaveClip() {
@@ -519,7 +528,7 @@
 
     const renderMoments = () => {
       const items = listMoments();
-      momentsWhere.textContent = currentGame && moments
+      momentsWhere.textContent = embedded ? `Momentos · ${items.length}` : currentGame && moments
         ? `Momentos do grupo · ${items.length} (os mesmos do leitor do YouTube)`
         : items.length ? "Momentos só neste telemóvel (vídeo de teste)" : "";
       reelButton.hidden = items.length < 2;
@@ -754,6 +763,18 @@
     }, 1000);
 
     load(src);
+    return {
+      playClip: (item) => playClip(item),
+      playReel: () => reelButton.click(),
+      seek(seconds) {
+        leaveClip();
+        whenReady(() => {
+          video.currentTime = Math.max(0, seconds);
+          video.play().catch(() => {});
+        });
+        stage.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+    };
   }
 
   function on(element, type, handler, options) {
