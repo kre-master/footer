@@ -3020,12 +3020,17 @@ function getGalleryHighlights() {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
+// Leitor novo em testes: o admin da plataforma e os jogadores dos Futeboleiros (o video de teste e de um jogo deles).
+function canSeeVideoLab() {
+  return isPlatformAdmin || (Boolean(currentSession?.user) && getActiveGroup()?.slug === LEGACY_GROUP_SLUG);
+}
+
 function renderGalleryFilter(gamesCount, highlightsCount) {
   return `
     <div class="gallery-filter" role="group" aria-label="Mostrar">
       <button type="button" class="subtab ${galleryMode === "games" ? "active" : ""}" data-gallery-mode="games" aria-pressed="${galleryMode === "games"}">Jogos <span>${gamesCount}</span></button>
       <button type="button" class="subtab ${galleryMode === "highlights" ? "active" : ""}" data-gallery-mode="highlights" aria-pressed="${galleryMode === "highlights"}">Highlights <span>${highlightsCount}</span></button>
-      ${isPlatformAdmin ? `<button type="button" class="subtab ${galleryMode === "lab" ? "active" : ""}" data-gallery-mode="lab" aria-pressed="${galleryMode === "lab"}">🧪 Testes</button>` : ""}
+      ${canSeeVideoLab() ? `<button type="button" class="subtab ${galleryMode === "lab" ? "active" : ""}" data-gallery-mode="lab" aria-pressed="${galleryMode === "lab"}">🧪 Testes</button>` : ""}
     </div>`;
 }
 
@@ -3125,13 +3130,13 @@ function renderGallery() {
   const games = getGalleryGames();
   const highlights = getGalleryHighlights();
   // Leitor proprio em testes: so o admin da plataforma ve o separador Testes.
-  if (galleryMode === "lab" && !isPlatformAdmin) galleryMode = "games";
+  if (galleryMode === "lab" && !canSeeVideoLab()) galleryMode = "games";
   const content = galleryMode === "lab" ? `<div data-gallery-lab></div>`
     : galleryMode === "highlights" ? renderGalleryHighlights(highlights) : renderGalleryGames(games);
   panel.innerHTML = `
     ${renderGalleryFilter(games.length, highlights.length)}
     ${content}`;
-  if (galleryMode === "lab") window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"));
+  if (galleryMode === "lab") window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"), { admin: isPlatformAdmin });
   panel.querySelectorAll("[data-gallery-mode]").forEach((button) => on(button, "click", () => {
     galleryMode = button.dataset.galleryMode;
     renderGallery();

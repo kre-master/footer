@@ -128,16 +128,18 @@
     return String(value).replace(/[&"<>]/g, (char) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[char]);
   }
 
-  function mount(container) {
+  // admin: ve tambem o endereco do video, o exemplo e o diagnostico; os jogadores so os videos do jogo.
+  function mount(container, { admin = false } = {}) {
     if (!container) return;
-    const src = readStoredSrc() || SAMPLE_SRC;
+    const stored = readStoredSrc();
+    const src = admin ? stored || PRESETS[1].src : PRESETS.some((preset) => preset.src === stored) ? stored : PRESETS[1].src;
     container.innerHTML = `
       <div class="lab">
-        <p class="lab-note">🧪 Só tu vês isto. Leitor próprio em testes: o vídeo vem de um endereço direto (NAS ou serviço de vídeo), não do YouTube.</p>
-        <form class="lab-source" data-lab-source>
-          <input type="url" name="src" value="${escapeAttr(src)}" placeholder="Endereço do vídeo (.mp4)" autocomplete="off" required>
-          <button type="submit" class="primary-btn">Carregar</button>
-          <button type="button" class="ghost-btn" data-lab-sample>Exemplo</button>
+        <p class="lab-note">🧪 Leitor de vídeo novo, em testes, com 3 minutos do jogo de 28/10. Experimenta o zoom, a câmara lenta e o ecrã cheio e diz ao João o que achas. Os momentos que marcares aqui ficam só no teu telemóvel.</p>
+        <form class="lab-source ${admin ? "" : "lab-source-players"}" data-lab-source>
+          <input type="url" name="src" value="${escapeAttr(src)}" placeholder="Endereço do vídeo (.mp4)" autocomplete="off" required ${admin ? "" : "hidden"}>
+          ${admin ? `<button type="submit" class="primary-btn">Carregar</button>
+          <button type="button" class="ghost-btn" data-lab-sample>Exemplo</button>` : ""}
           ${PRESETS.map((preset, index) => `<button type="button" class="ghost-btn" data-lab-preset="${index}">${preset.label}</button>`).join("")}
         </form>
         <div class="lab-stage" data-lab-stage>
@@ -176,7 +178,7 @@
           </div>
         </div>
         <ul class="lab-moments" data-lab-moments></ul>
-        <details class="lab-diag">
+        <details class="lab-diag" ${admin ? "" : "hidden"}>
           <summary>Diagnóstico</summary>
           <dl data-lab-diag></dl>
         </details>
