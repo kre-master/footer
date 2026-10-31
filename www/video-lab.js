@@ -12,6 +12,36 @@
   const ZOOMS = [1, 2, 3, 5];
   const MAX_ZOOM = 5;
   const FRAME_S = 1 / 30;
+  // Videos de teste no Bunny Stream (HLS: varias qualidades, o leitor escolhe pela rede).
+  const BUNNY_CDN = "https://vz-fdc7df5c-b0e.b-cdn.net";
+  const PRESETS = [
+    { label: "Jogo 1080p", src: `${BUNNY_CDN}/552e75e1-463b-435d-a5d9-54bfd15a73c2/playlist.m3u8` },
+    { label: "Jogo 4K", src: `${BUNNY_CDN}/03dc1f2d-cbe0-4609-a8ce-3455236951ce/playlist.m3u8` },
+  ];
+  // hls.js so e carregado quando se abre um video HLS (o resto da app nao precisa dele).
+  const HLS_JS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.light.min.js";
+  let hlsScript = null;
+
+  function loadHlsJs() {
+    if (globalThis.Hls) return Promise.resolve(globalThis.Hls);
+    if (!hlsScript) {
+      hlsScript = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = HLS_JS_SRC;
+        script.onload = () => resolve(globalThis.Hls);
+        script.onerror = () => {
+          hlsScript = null;
+          reject(new Error("não consegui carregar o hls.js"));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return hlsScript;
+  }
+
+  function isHlsSrc(src) {
+    return /\.m3u8(\?|$)/i.test(src);
+  }
 
   const ICONS = {
     play: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>`,
@@ -83,6 +113,7 @@
           <input type="url" name="src" value="${escapeAttr(src)}" placeholder="Endereço do vídeo (.mp4)" autocomplete="off" required>
           <button type="submit" class="primary-btn">Carregar</button>
           <button type="button" class="ghost-btn" data-lab-sample>Exemplo</button>
+          ${PRESETS.map((preset, index) => `<button type="button" class="ghost-btn" data-lab-preset="${index}">${preset.label}</button>`).join("")}
         </form>
         <div class="lab-stage" data-lab-stage>
           <div class="lab-viewport" data-lab-viewport>
@@ -98,6 +129,7 @@
               <button type="button" class="lab-btn" data-lab-frame="-1" aria-label="Imagem anterior">‹</button>
               <button type="button" class="lab-btn" data-lab-frame="1" aria-label="Imagem seguinte">›</button>
               <span class="lab-time" data-lab-time>0:00 / --:--</span>
+              <select class="lab-btn lab-quality" data-lab-quality aria-label="Qualidade" hidden></select>
               <button type="button" class="lab-btn" data-lab-speed aria-label="Velocidade">1×</button>
               <button type="button" class="lab-btn" data-lab-zoom aria-label="Zoom">🔍 1×</button>
               <button type="button" class="lab-btn" data-lab-fullscreen aria-label="Ecrã cheio">${ICONS.fs}</button>
@@ -124,7 +156,10 @@
     const form = container.querySelector("[data-lab-source]");
     const view = { zoom: 1, x: 0, y: 0, width: 1, height: 1 };
     let seeking = false;
+    const qualitySelect = container.querySelector("[data-lab-quality]");
     let lastError = "";
+    let hls = null;
+    let mode = "MP4 direto";
 
     const showStatus = (text) => {
       status.textContent = text;
@@ -151,8 +186,47 @@
       lastError = "";
       showStatus("A carregar…");
       setZoom(1);
-      video.src = url;
-      video.load();
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+      qualitySelect.hidden = true;
+      if (!isHlsSrc(url)) {
+        mode = "MP4 direto";
+        video.src = url;
+        video.load();
+        return;
+      }
+      loadHlsJs().then((Hls) => {
+        if (!stage.isConnected || form.src.value.trim() !== url) return;
+        if (!Hls?.isSupported()) throw new Error("sem hls.js");
+        mode = "HLS (hls.js)";
+        hls = new Hls({ capLevelToPlayerSize: false });
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+          // Qualidade: Auto (pela rede) ou fixa, para comparar a nitidez com zoom.
+          qualitySelect.innerHTML = `<option value="-1">Auto</option>${data.levels.map((level, index) => `<option value="${index}">${level.height}p</option>`).join("")}`;
+          qualitySelect.value = "-1";
+          qualitySelect.hidden = false;
+        });
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (!data.fatal) return;
+          lastError = `${data.type}: ${data.details}`;
+          showStatus(`Erro: ${lastError}`);
+          updateDiag();
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+      }).catch(() => {
+        // iPhone antigo ou sem hls.js: o Safari toca HLS sozinho (sem escolher a qualidade).
+        if (!video.canPlayType("application/vnd.apple.mpegurl")) {
+          lastError = "este navegador não toca HLS";
+          showStatus(`Erro: ${lastError}.`);
+          return;
+        }
+        mode = "HLS nativo";
+        video.src = url;
+        video.load();
+      });
     };
 
     const togglePlay = () => {
@@ -184,7 +258,9 @@
       const quality = video.getVideoPlaybackQuality?.();
       const rows = [
         ["Endereço", video.currentSrc || "—"],
-        ["Resolução", video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : "—"],
+        ["Modo", mode],
+        ["Resolução a tocar", video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : "—"],
+        ["Rede estimada", hls?.bandwidthEstimate ? `${(hls.bandwidthEstimate / 1e6).toFixed(1)} Mbps` : "—"],
         ["Duração", formatClock(video.duration)],
         ["Já carregado à frente", `${ahead.toFixed(1)} s`],
         ["Estado", ["sem dados", "metadados", "imagem atual", "pode avançar", "pronto"][video.readyState] || "—"],
@@ -220,6 +296,15 @@
       const url = form.src.value.trim();
       storeSrc(url === SAMPLE_SRC ? "" : url);
       load(url);
+    });
+    container.querySelectorAll("[data-lab-preset]").forEach((button) => on(button, "click", () => {
+      const { src: presetSrc } = PRESETS[Number(button.dataset.labPreset)];
+      form.src.value = presetSrc;
+      storeSrc(presetSrc);
+      load(presetSrc);
+    }));
+    on(qualitySelect, "change", () => {
+      if (hls) hls.currentLevel = Number(qualitySelect.value);
     });
     on(container.querySelector("[data-lab-sample]"), "click", () => {
       form.src.value = SAMPLE_SRC;
@@ -363,6 +448,7 @@
         return;
       }
       clearInterval(timer);
+      hls?.destroy();
       video.pause();
       video.removeAttribute("src");
       video.load();
@@ -379,5 +465,5 @@
     if (element) element.addEventListener(type, handler, options);
   }
 
-  return { mount, formatClock, clampPan, zoomAround, SAMPLE_SRC };
+  return { mount, formatClock, clampPan, zoomAround, isHlsSrc, SAMPLE_SRC, PRESETS };
 });

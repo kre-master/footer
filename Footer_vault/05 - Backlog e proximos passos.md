@@ -84,3 +84,16 @@ Depois de alterar:
 - Estrategia, fases e proximos 90 dias em [[10 - Mapa de futuro e estrategia]] (PDF gerado a pedido; nao fica no Git).
 - Proximos passos da fase 3: 3.4 piloto, 3.5 convidado ve o jogo e as equipas, 3.6 idiomas/fuso/moeda, 3.7 lojas e push; fecho = Footer 2.0.
 - Decisoes em aberto listadas na folha 14 da nota 10; registar la as respostas.
+
+## Placard fisico (ideia, 2026-10-30)
+
+- Plano do Claude em `~/maestro/placard/` (fora do Git): `plano.md`, CSVs, exemplo de dados e o plano original do Codex em `codex-original/`. Pagina visual privada: https://claude.ai/artifact/PvSfF34HaYq77vosMUN2jZ
+- Resumo: mala que dobra ao meio (numeros para dentro), telemovel por cima junto a dobra, 3 botoes por equipa por baixo dos seus numeros, sons programaveis (2 colunas), ligacao a Footer por Bluetooth (`@capacitor-community/bluetooth-le`) e eventos numa tabela nova `game_scoreboard_events`.
+- Decisoes em aberto (seccao 10 do plano): telemovel dedicado ou pessoal; numeros de 25 ou 20 cm; botoes; cores das equipas; ficha AUX; quem faz a caixa.
+- Nada alterado no codigo nem na base de dados.
+- Decidido a 2026-10-30: telemovel fica sempre no placard; numeros de 25 cm; golo arcade 30 mm, resto arcade 24 mm; destaque so um; cerebro = Raspberry Pi Zero 2 W (em vez do ESP32-S3). Ver seccao 11 do plano.
+- 2026-10-30 (3.a ronda): sem telemovel no placard; relogio LED h:mm:ss e aviso de trocas a cada 5 min; envio para a Footer pelo Wi-Fi do Raspberry Pi. Ver seccao 12 do plano.
+- 2026-10-30 (4.a ronda): relogio mm:ss ate 99:59 com numeros de ~5 cm; uma so coluna, do lado direito.
+- 2026-10-30: a caixa e feita pelo utilizador na carpintaria do avo.
+- 2026-10-30 (5.a ronda): cores fixas com troca de lado; sem AUX; lista de cortes e molde 1:1 em PDF na pasta do plano.
+- 2026-10-31: relogio em 3 matrizes 8x8 WS2812 (19,5 x 6,5 cm), com mensagens (GOLO, TROCA, FIM).

@@ -7187,3 +7187,15 @@ body.mr-open {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.lab-quality {
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: center;
+  cursor: pointer;
+}
+
+.lab-quality option {
+  color: #fff;
+  background: var(--surface-opaque);
+}

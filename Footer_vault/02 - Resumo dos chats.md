@@ -190,3 +190,9 @@ Validacoes:
 - Barra do All Highlights simplificada a pedido do utilizador: ◀ 1/29 ▶ ✕, tudo a amarelo, com voltar ao anterior. Versao 1.16.2.
 - Pendente: o momento das 51:44 do jogo de 29/10 (amandio.torres) continua com o texto "Quarto falhanco"; deve passar a "Quinto falhanco" (o autor ou um admin, agora pela app).
 - 2026-10-30: leitor de video proprio comecado em testes, sem tirar o do YouTube. Galeria > "🧪 Testes" so aparece ao admin da plataforma (`isPlatformAdmin`); por agora toca um video de exemplo. Proximo: amostra de 2-3 min do ultimo jogo em 1080p (esta no desktop, que esta ligado; da VM nao se le). Sem versao nova (os jogadores nao veem nada).
+
+## 2026-10-30 - Placard fisico (plano)
+
+- O utilizador trouxe um plano do Codex para um placard DIY (ESP32, 4 digitos LED, botoes, ligacao a Footer) e pediu revisao e um plano proprio: botoes de cada equipa por baixo dos seus numeros, telemovel por cima, placard que dobra ao meio, sons programaveis em todos os botoes.
+- Plano feito em `~/maestro/placard/` com pagina visual privada. Ver [[05 - Backlog e proximos passos]] (Placard fisico).
+- 2026-10-31: escolhido Bunny Stream (videos para os jogadores) + NAS (copia local) + Google Drive (arquivo dos 4K) + desktop (preparacao). Teste no Bunny com 1080p e 4K do mesmo trecho; leitor de testes passa a tocar HLS com escolha de qualidade. A VM mudou de IP para 192.168.1.86 (falta reserva no router). Claude e Codex abrem no arranque do desktop; Windows continua sem entrada automatica (decisao do utilizador).
