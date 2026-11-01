@@ -236,6 +236,25 @@
     return seconds;
   }
 
+  // Forma de um batimento tipo ECG (ilustracao): onda P, complexo QRS e onda T. `phase` vai de 0 a 1 ao longo de
+  // um batimento; devolve de -0.3 a 1 (1 = pico R). Nao e o ECG real: o relogio so da um valor a cada 1-3 s.
+  const ECG_SHAPE = [
+    [0, 0], [0.08, 0], [0.14, 0.12], [0.2, 0], [0.26, 0], [0.285, -0.12], [0.32, 1], [0.355, -0.3],
+    [0.39, 0], [0.5, 0], [0.58, 0.25], [0.68, 0], [1, 0],
+  ];
+
+  function ecgWave(phase) {
+    const value = ((phase % 1) + 1) % 1;
+    for (let i = 1; i < ECG_SHAPE.length; i += 1) {
+      if (value <= ECG_SHAPE[i][0]) {
+        const [x0, y0] = ECG_SHAPE[i - 1];
+        const [x1, y1] = ECG_SHAPE[i];
+        return y0 + ((y1 - y0) * (value - x0)) / (x1 - x0);
+      }
+    }
+    return 0;
+  }
+
   // Um valor a cada stepS segundos (media do intervalo): serie curta para guardar e desenhar.
   function downsample(samples, stepS = 5) {
     const buckets = new Map();
@@ -249,5 +268,5 @@
     return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([key, bucket]) => ({ t: key * stepS, hr: Math.round(bucket.sum / bucket.count) }));
   }
 
-  return { parseWorkout, sliceForWindow, summarize, heartRateAt, downsample, zoneFor, zoneSeconds, ZONES, MAX_GAP_S };
+  return { parseWorkout, sliceForWindow, summarize, heartRateAt, downsample, zoneFor, zoneSeconds, ZONES, ecgWave, MAX_GAP_S };
 });

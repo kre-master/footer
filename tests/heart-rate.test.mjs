@@ -179,3 +179,17 @@ test("zoneSeconds: tempo em cada zona, sem contar falhas longas", () => {
   const samples = [{ t: 0, hr: 100 }, { t: 10, hr: 150 }, { t: 20, hr: 190 }, { t: 400, hr: 190 }];
   assert.deepEqual(heartRate.zoneSeconds(samples, 200), [10, 0, 10, 0, 15]);
 });
+
+test("ecgWave: pico R, baseline, periodica e dentro dos limites", () => {
+  assert.ok(Math.abs(heartRate.ecgWave(0.32) - 1) < 1e-9);
+  assert.equal(heartRate.ecgWave(0), 0);
+  assert.equal(heartRate.ecgWave(0.45), 0);
+  assert.ok(heartRate.ecgWave(0.355) < 0);
+  assert.ok(heartRate.ecgWave(0.58) > 0);
+  assert.ok(Math.abs(heartRate.ecgWave(1.32) - 1) < 0.01);
+  assert.ok(Math.abs(heartRate.ecgWave(-0.68) - 1) < 0.01);
+  for (let i = 0; i < 200; i += 1) {
+    const value = heartRate.ecgWave(i / 200);
+    assert.ok(value >= -0.3 - 1e-9 && value <= 1 + 1e-9);
+  }
+});

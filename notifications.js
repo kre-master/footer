@@ -8,6 +8,23 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.19.1",
+      date: "2026-11-02",
+      title: "Batimento em movimento",
+      items: [
+        "Ao lado do número, em cima do vídeo, há um pequeno traço tipo ECG com os últimos 2,5 segundos, a esbater-se para trás. Acompanha o ritmo dos teus batimentos e pára quando pões o vídeo em pausa.",
+      ],
+    },
+    {
+      version: "1.19.0",
+      date: "2026-11-02",
+      title: "Batimentos sobre o movimento",
+      items: [
+        "No gráfico Ao longo do jogo (o das barras e dos sprints), a tua linha de batimentos aparece por cima, com a cor da zona de esforço.",
+        "Assim vês logo se o coração sobe nos sprints e acertas o registo com o vídeo: ◀ Atrasar e Adiantar ▶ por baixo do gráfico.",
+      ],
+    },
+    {
       version: "1.18.1",
       date: "2026-11-02",
       title: "Batimentos mais discretos",

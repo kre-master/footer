@@ -9833,7 +9833,25 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   });
   let ticks = "";
   for (let m = 0; m <= n; m += 5) ticks += `<text x="${m * 4}" y="39" font-size="3" text-anchor="middle" fill="var(--muted)">${m}′</text>`;
-  const chart = `<svg class="tracking-rhythm" viewBox="-2 0 ${n * 4 + 4} 40" role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints">${bars}${ticks}</svg>`;
+  // Batimentos do relogio por cima (so no jogador do proprio utilizador, que tem o treino carregado para este jogo).
+  const hrGame = videoGameId ? state.games.find((item) => item.id === videoGameId) : null;
+  const hrEntry = hrGame ? heartRateEntries[hrGame.id] : null;
+  const ownId = getLinkedPlayer()?.id;
+  const hrOwn = Boolean(hrEntry && ownId && entry.mapping?.[p.label] === ownId);
+  const hrAttrs = hrOwn ? ` data-hr-timeline data-hr-game="${escapeHtml(hrGame.id)}" data-hr-minutes="${n}"` : "";
+  const hrLine = hrOwn ? `<g data-hr-line>${renderHeartRateTimelineLine(hrGame, hrEntry, n)}</g>` : "";
+  const chart = `<svg class="tracking-rhythm" viewBox="-2 0 ${n * 4 + 4} 40"${hrAttrs} role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints${hrOwn ? "; a linha de cor são os teus batimentos" : ""}">${bars}${hrLine}${ticks}</svg>`;
+  const hrControls = hrOwn ? `
+      <div class="hr-adjust hr-tl-adjust">
+        <span class="hr-adjust-title">♥ Os teus batimentos sobre o movimento</span>
+        <p class="tracking-fineprint">A linha de cor são os teus batimentos (a cor é a zona de esforço). Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
+        <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">${renderHeartRateStepButtons()}</div>
+        <div class="hr-adjust-move">
+          <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(hrGame.id)}">◀ Atrasar</button>
+          <output data-hr-label data-hr-game="${escapeHtml(hrGame.id)}">${escapeHtml(formatHeartRateAdjust(hrEntry.adjustS))}</output>
+          <button type="button" class="ghost-btn" data-hr-move="1" data-hr-game="${escapeHtml(hrGame.id)}">Adiantar ▶</button>
+        </div>
+      </div>` : "";
   const variants = periods.map((q) => {
     const st = tracking.periodStats(p, q.from, q.to, entry.result.durationS ?? Infinity);
     return `
@@ -9854,6 +9872,7 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
         ${chart}
         ${variants}
       </div>
+      ${hrControls}
       <p class="tracking-fineprint">Barras: metros por minuto visto pela câmara (barras rasas = minuto pouco visto). Pontos laranja: sprints. No campo, o percurso com os sprints a laranja.${hasVideo ? " Carrega numa barra ou num sprint para o ver no vídeo." : ""}</p>
     </div>
   `;
@@ -11242,6 +11261,8 @@ let heartRateRemote = false;
 const heartRatePanels = new Map();
 let heartRateTimer = null;
 let heartRateSaveTimers = {};
+// Aviso depois de carregar (ex.: treino de outra hora); fica guardado porque a pagina pode redesenhar-se.
+const heartRateNotices = {};
 
 function heartRateStorageKey() {
   return `${HEART_RATE_KEY}:${currentSession?.user?.id || "local"}`;
@@ -11360,14 +11381,17 @@ function getHeartRateOffset(game, entry) {
 function readHeartRateClock(game, section) {
   const lab = section.querySelector(".lab-video");
   if (lab) {
-    return Number.isFinite(lab.currentTime) ? { gameS: lab.currentTime, durationS: lab.duration > 0 ? lab.duration : null } : null;
+    return Number.isFinite(lab.currentTime)
+      ? { gameS: lab.currentTime, durationS: lab.duration > 0 ? lab.duration : null, rate: lab.paused || lab.ended ? 0 : lab.playbackRate || 1 }
+      : null;
   }
   const frame = section.querySelector("[data-game-video]");
   const seconds = getVideoCurrentTime(frame);
   if (seconds == null) return null;
   const parts = getGameVideoParts(game.id);
   const part = parts.find((item) => item.youtubeId === frame.dataset.youtubeId) || parts[0];
-  return { gameS: (part?.gameStartS || 0) + seconds - (part?.videoStartS || 0), durationS: null };
+  const clock = frame.contentWindow ? videoClocks.get(frame.contentWindow) : null;
+  return { gameS: (part?.gameStartS || 0) + seconds - (part?.videoStartS || 0), durationS: null, rate: clock?.playing ? clock.rate || 1 : 0 };
 }
 
 function formatHeartRateAdjust(seconds) {
@@ -11375,6 +11399,86 @@ function formatHeartRateAdjust(seconds) {
   const abs = Math.abs(seconds);
   const text = abs >= 60 ? `${Math.floor(abs / 60)} min${abs % 60 ? ` ${abs % 60} s` : ""}` : `${abs} s`;
   return `Registo ${seconds > 0 ? "adiantado" : "atrasado"} ${text}`;
+}
+
+// Acertar o registo com o video: os mesmos botoes aparecem no painel e por baixo do grafico de movimento,
+// por isso o ajuste e os desenhos sao partilhados (um clique muda tudo o que esteja no ecra).
+let heartRateStep = 10;
+
+function setHeartRateAdjust(game, entry, adjustS) {
+  entry.adjustS = Math.max(-86400, Math.min(86400, adjustS));
+  clearTimeout(heartRateSaveTimers[entry.gameId]);
+  heartRateSaveTimers[entry.gameId] = setTimeout(() => saveHeartRateEntry(entry).catch((error) => {
+    heartRatePanels.forEach((panelState) => { if (panelState.game.id === entry.gameId) panelState.showError?.(error.message); });
+  }), 700);
+  syncHeartRateViews(game, entry);
+}
+
+function syncHeartRateViews(game, entry) {
+  const label = formatHeartRateAdjust(entry.adjustS);
+  document.querySelectorAll("[data-hr-label]").forEach((output) => {
+    if (output.dataset.hrGame === game.id) output.textContent = label;
+  });
+  heartRatePanels.forEach((panelState) => { if (panelState.game.id === game.id) panelState.refreshChart?.(); });
+  document.querySelectorAll("svg[data-hr-timeline]").forEach((svg) => {
+    if (svg.dataset.hrGame !== game.id) return;
+    const group = svg.querySelector("[data-hr-line]");
+    if (group) group.innerHTML = renderHeartRateTimelineLine(game, entry, Number(svg.dataset.hrMinutes) || 0);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  const move = event.target.closest?.("[data-hr-move]");
+  const step = event.target.closest?.("[data-hr-step]");
+  const reset = event.target.closest?.("[data-hr-reset]");
+  const target = move || step || reset;
+  if (!target) return;
+  if (step) {
+    heartRateStep = Number(step.dataset.hrStep) || 10;
+    document.querySelectorAll("[data-hr-step]").forEach((button) => {
+      const active = Number(button.dataset.hrStep) === heartRateStep;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    return;
+  }
+  const game = state.games.find((item) => item.id === target.dataset.hrGame);
+  const entry = game && heartRateEntries[game.id];
+  if (!entry) return;
+  setHeartRateAdjust(game, entry, move ? (entry.adjustS || 0) + Number(move.dataset.hrMove) * heartRateStep : 0);
+});
+
+// Linha dos batimentos por cima do grafico "Ao longo do jogo" (mesmo eixo: minutos da analise, 4 unidades por
+// minuto). Uma leitura a cada 6 s; onde o relogio nao tem leitura a linha parte-se.
+function renderHeartRateTimelineLine(game, entry, minutes) {
+  const api = window.FooterHeartRate;
+  const samples = getHeartRateSamples(entry);
+  const offset = getHeartRateOffset(game, entry);
+  const maxHr = getHeartRateMax(entry);
+  const points = [];
+  for (let g = 0; g <= minutes * 60; g += 6) points.push({ g, hr: api.heartRateAt(samples, g, offset) });
+  const values = points.map((point) => point.hr).filter((hr) => hr != null);
+  if (!values.length) return "";
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const runs = [];
+  let run = null;
+  points.forEach((point) => {
+    if (point.hr == null) {
+      run = null;
+      return;
+    }
+    const zone = api.zoneFor(point.hr, maxHr);
+    const coordinate = `${((point.g / 60) * 4).toFixed(2)},${(33 - ((point.hr - low) / (high - low || 1)) * 27).toFixed(2)}`;
+    if (!run || run.zone !== zone.zone) {
+      const previous = run;
+      run = { zone: zone.zone, color: zone.color, points: previous ? [previous.points[previous.points.length - 1]] : [] };
+      runs.push(run);
+    }
+    run.points.push(coordinate);
+  });
+  const shape = (extra) => runs.map((item) => `<polyline fill="none" stroke-linejoin="round" stroke-linecap="round" ${extra(item)} points="${item.points.join(" ")}"/>`).join("");
+  return `<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="2.4"')}${shape((item) => `stroke="${item.color}" stroke-width="1.2"`)}</g>`;
 }
 
 function renderHeartRateChart(game, entry) {
@@ -11416,6 +11520,10 @@ function renderHeartRateChart(game, entry) {
     </svg>`;
 }
 
+function renderHeartRateStepButtons() {
+  return HEART_RATE_ADJUST_STEPS.map((step) => `<button type="button" class="${step === heartRateStep ? "active" : ""}" data-hr-step="${step}" aria-pressed="${step === heartRateStep}">${step >= 60 ? `${step / 60} min` : `${step} s`}</button>`).join("");
+}
+
 function renderHeartRateBody(game) {
   const entry = heartRateEntries[game.id];
   if (remoteEnabled && !currentSession?.user) return `<p class="tracking-note">Entra na tua conta para carregares o treino do teu relogio.</p>`;
@@ -11425,7 +11533,7 @@ function renderHeartRateBody(game) {
     return `
       <p class="tracking-note">Tens relogio? Carrega o treino deste jogo (.fit, .tcx ou .gpx) e ve os teus batimentos ao lado do video. So tu ves.</p>
       ${fileInput("♥ Carregar o meu treino")}
-      <p class="tracking-error" data-hr-error hidden></p>
+      <p class="tracking-error" data-hr-error ${heartRateNotices[game.id] ? "" : "hidden"}>${escapeHtml(heartRateNotices[game.id] || "")}</p>
       <details class="hr-help">
         <summary>Como tirar o ficheiro do relogio</summary>
         <ul>
@@ -11453,20 +11561,20 @@ function renderHeartRateBody(game) {
     <div class="hr-adjust" role="group" aria-label="Acertar o registo com o video">
       <span class="hr-adjust-title">Acertar com o vídeo</span>
       <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">
-        ${HEART_RATE_ADJUST_STEPS.map((step, index) => `<button type="button" class="${index === 1 ? "active" : ""}" data-hr-step="${step}" aria-pressed="${index === 1}">${step >= 60 ? `${step / 60} min` : `${step} s`}</button>`).join("")}
+        ${renderHeartRateStepButtons()}
       </div>
       <div class="hr-adjust-move">
-        <button type="button" class="ghost-btn" data-hr-move="-1">◀ Atrasar</button>
-        <output data-hr-adjust-label>${escapeHtml(formatHeartRateAdjust(entry.adjustS))}</output>
-        <button type="button" class="ghost-btn" data-hr-move="1">Adiantar ▶</button>
+        <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(game.id)}">◀ Atrasar</button>
+        <output data-hr-label data-hr-game="${escapeHtml(game.id)}">${escapeHtml(formatHeartRateAdjust(entry.adjustS))}</output>
+        <button type="button" class="ghost-btn" data-hr-move="1" data-hr-game="${escapeHtml(game.id)}">Adiantar ▶</button>
       </div>
       <p class="tracking-fineprint">Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar.</p>
     </div>
-    <p class="tracking-error" data-hr-error hidden></p>
+    <p class="tracking-error" data-hr-error ${heartRateNotices[game.id] ? "" : "hidden"}>${escapeHtml(heartRateNotices[game.id] || "")}</p>
     <div class="hr-footer">
       <small>${escapeHtml(entry.fileName || "Treino")} · ${escapeHtml(String(entry.format).toUpperCase())}</small>
       <span>
-        <button type="button" class="link-btn" data-hr-reset>Repor</button>
+        <button type="button" class="link-btn" data-hr-reset data-hr-game="${escapeHtml(game.id)}">Repor</button>
         ${fileInput("Trocar ficheiro")}
         <button type="button" class="link-btn hr-remove" data-hr-remove>Remover</button>
       </span>
@@ -11497,12 +11605,16 @@ function bindHeartRatePanel(game, section) {
   const panel = section?.querySelector("[data-hr-panel]");
   if (!panel) return;
   const body = panel.querySelector("[data-hr-body]");
-  let step = 10;
-  const rerender = (notice = "") => {
+  // O grafico de movimento (outra seccao) tambem leva os batimentos: depois de carregar ou remover o treino
+  // a pagina do jogo redesenha-se para o mostrar ou tirar.
+  const rerender = () => {
     panelState.scopeKey = "";
+    if (document.querySelector("svg.tracking-rhythm") && currentHistoryGameId === game.id) {
+      renderHistoryGameDetail();
+      return;
+    }
     body.innerHTML = renderHeartRateBody(game);
     bind();
-    if (notice) showError(notice);
   };
   const showError = (message) => {
     const box = body.querySelector("[data-hr-error]");
@@ -11510,10 +11622,6 @@ function bindHeartRatePanel(game, section) {
       box.textContent = message;
       box.hidden = !message;
     }
-  };
-  const scheduleSave = (entry) => {
-    clearTimeout(heartRateSaveTimers[entry.gameId]);
-    heartRateSaveTimers[entry.gameId] = setTimeout(() => saveHeartRateEntry(entry).catch((error) => showError(error.message)), 700);
   };
   function bind() {
     const entry = heartRateEntries[game.id];
@@ -11523,25 +11631,13 @@ function bindHeartRatePanel(game, section) {
       if (!file) return;
       try {
         const result = await importHeartRateFile(game, file);
-        rerender(result === "warn" ? `Este treino nao coincide com a hora do jogo (${formatDate(game.date)}). Confirma se e o ficheiro certo; podes acertar abaixo.` : "");
+        heartRateNotices[game.id] = result === "warn" ? `Este treino nao coincide com a hora do jogo (${formatDate(game.date)}). Confirma se e o ficheiro certo; podes acertar abaixo.` : "";
+        rerender();
       } catch (error) {
         showError(error.message || "Nao foi possivel ler o ficheiro.");
       }
     }));
     if (!entry) return;
-    body.querySelectorAll("[data-hr-step]").forEach((button) => on(button, "click", () => {
-      step = Number(button.dataset.hrStep);
-      body.querySelectorAll("[data-hr-step]").forEach((other) => {
-        other.classList.toggle("active", other === button);
-        other.setAttribute("aria-pressed", String(other === button));
-      });
-    }));
-    body.querySelectorAll("[data-hr-move]").forEach((button) => on(button, "click", () => {
-      entry.adjustS = Math.max(-86400, Math.min(86400, (entry.adjustS || 0) + Number(button.dataset.hrMove) * step));
-      body.querySelector("[data-hr-adjust-label]").textContent = formatHeartRateAdjust(entry.adjustS);
-      refreshChart();
-      scheduleSave(entry);
-    }));
     on(body.querySelector("[data-hr-maxhr]"), "change", (event) => {
       const value = Math.round(Number(event.currentTarget.value));
       saveHeartRateSetting("max", value >= 100 && value <= 230 ? value : "");
@@ -11550,12 +11646,6 @@ function bindHeartRatePanel(game, section) {
     });
     on(body.querySelector("[data-hr-overlay-toggle]"), "change", (event) => {
       saveHeartRateSetting("overlay", event.currentTarget.checked ? "on" : "off");
-    });
-    on(body.querySelector("[data-hr-reset]"), "click", () => {
-      entry.adjustS = 0;
-      body.querySelector("[data-hr-adjust-label]").textContent = formatHeartRateAdjust(0);
-      refreshChart();
-      scheduleSave(entry);
     });
     on(body.querySelector("[data-hr-remove]"), "click", async (event) => {
       const button = event.currentTarget;
@@ -11566,6 +11656,7 @@ function bindHeartRatePanel(game, section) {
       }
       try {
         await removeHeartRateEntry(game.id);
+        heartRateNotices[game.id] = "";
         rerender();
       } catch (error) {
         showError(error.message);
@@ -11581,7 +11672,7 @@ function bindHeartRatePanel(game, section) {
       panelState.scopeKey = "";
     }
   };
-  const panelState = { game, section, body, scopeKey: "" };
+  const panelState = { game, section, body, scopeKey: "", refreshChart, showError };
   heartRatePanels.set(panel, panelState);
   if (!heartRateTimer) heartRateTimer = setInterval(tickHeartRatePanels, 400);
   bind();
@@ -11597,19 +11688,114 @@ function ensureHeartRateOverlay(section) {
     overlay.className = "hr-overlay hidden";
     overlay.dataset.hrOverlay = "";
     overlay.setAttribute("aria-hidden", "true");
-    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong>`;
+    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><canvas class="hr-ecg"></canvas>`;
     stage.append(overlay);
   }
   return overlay;
 }
 
+// Traco tipo ECG com os ultimos 2,5 s: um batimento com a forma P-QRS-T ao ritmo dos bpm (e da velocidade do
+// video), a ponta a liderar a direita e a cauda a esbater-se. E uma ilustracao: o relogio so da uma leitura a
+// cada 1-3 s, nao ha curva real de 2,5 s. Parado o video, o traco congela.
+const HEART_RATE_ECG_WINDOW_S = 2.5;
+const HEART_RATE_ECG_SIZE = { width: 56, height: 20 };
+const heartRateEcgs = new Map();
+let heartRateEcgFrame = 0;
+let heartRateEcgLast = 0;
+
+function getHeartRateEcg(overlay) {
+  let ecg = heartRateEcgs.get(overlay);
+  if (!ecg) {
+    const canvas = overlay.querySelector(".hr-ecg");
+    const ratio = Math.min(3, window.devicePixelRatio || 1);
+    canvas.width = Math.round(HEART_RATE_ECG_SIZE.width * ratio);
+    canvas.height = Math.round(HEART_RATE_ECG_SIZE.height * ratio);
+    canvas.style.width = `${HEART_RATE_ECG_SIZE.width}px`;
+    canvas.style.height = `${HEART_RATE_ECG_SIZE.height}px`;
+    ecg = { canvas, ctx: canvas.getContext("2d"), ratio, phase: 0, bpm: 0, rate: 0, color: "#fff", active: false, drawn: false };
+    heartRateEcgs.set(overlay, ecg);
+  }
+  return ecg;
+}
+
+function drawHeartRateEcg(ecg) {
+  const { ctx, canvas, ratio } = ecg;
+  const width = canvas.width;
+  const height = canvas.height;
+  const speed = (ecg.bpm / 60) * (ecg.rate || 1);
+  const base = height * 0.72;
+  const amplitude = height * 0.62;
+  const [red, green, blue] = [1, 3, 5].map((index) => parseInt(ecg.color.slice(index, index + 2), 16) || 255);
+  const fade = ctx.createLinearGradient(0, 0, width, 0);
+  fade.addColorStop(0, `rgba(${red},${green},${blue},0)`);
+  fade.addColorStop(0.5, `rgba(${red},${green},${blue},.3)`);
+  fade.addColorStop(1, `rgba(${red},${green},${blue},1)`);
+  ctx.clearRect(0, 0, width, height);
+  ctx.beginPath();
+  let lastY = base;
+  for (let x = 0; x < width; x += 1) {
+    const secondsAgo = HEART_RATE_ECG_WINDOW_S * (1 - x / (width - 1));
+    lastY = base - window.FooterHeartRate.ecgWave(ecg.phase - speed * secondsAgo) * amplitude;
+    if (x) ctx.lineTo(x, lastY); else ctx.moveTo(x, lastY);
+  }
+  ctx.strokeStyle = fade;
+  ctx.lineWidth = 1.5 * ratio;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(width - 2 * ratio, lastY, 1.8 * ratio, 0, Math.PI * 2);
+  ctx.fillStyle = ecg.color;
+  ctx.shadowColor = ecg.color;
+  ctx.shadowBlur = 5 * ratio;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ecg.drawn = true;
+}
+
+function stepHeartRateEcg(now) {
+  heartRateEcgFrame = 0;
+  const seconds = Math.min(0.1, (now - heartRateEcgLast) / 1000);
+  heartRateEcgLast = now;
+  const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  let running = false;
+  heartRateEcgs.forEach((ecg, overlay) => {
+    if (!overlay.isConnected) {
+      heartRateEcgs.delete(overlay);
+      return;
+    }
+    if (!ecg.active) return;
+    running = true;
+    if (ecg.drawn && (ecg.rate <= 0 || calm)) return;
+    ecg.phase = (ecg.phase + (ecg.bpm / 60) * ecg.rate * seconds) % 1;
+    drawHeartRateEcg(ecg);
+  });
+  if (running) heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+}
+
+function startHeartRateEcg() {
+  if (heartRateEcgFrame) return;
+  heartRateEcgLast = performance.now();
+  heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+}
+
 // Sem leitura neste momento (fora do registo): coracao e "-" a cinzento. `visible` falso esconde tudo.
-function updateHeartRateOverlay(section, bpm, zone, visible) {
+function updateHeartRateOverlay(section, bpm, zone, visible, rate = 0) {
   const overlay = ensureHeartRateOverlay(section);
   if (!overlay) return;
   overlay.classList.toggle("hidden", !visible);
-  if (!visible) return;
   const empty = bpm == null || !zone;
+  const ecg = getHeartRateEcg(overlay);
+  ecg.active = Boolean(visible && !empty);
+  if (ecg.active) {
+    ecg.bpm = bpm;
+    ecg.rate = rate;
+    if (ecg.color !== zone.color) {
+      ecg.color = zone.color;
+      ecg.drawn = false;
+    }
+    startHeartRateEcg();
+  }
+  if (!visible) return;
   const key = empty ? "empty" : `${bpm}|${zone.zone}`;
   if (overlay.dataset.key === key) return;
   overlay.dataset.key = key;
@@ -11654,7 +11840,7 @@ function tickHeartRatePanels() {
     const zone = bpm == null ? null : api.zoneFor(bpm, maxHr);
     now.textContent = bpm == null ? "--" : String(bpm);
     now.style.color = zone ? zone.color : "";
-    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off");
+    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0);
     const head = state.body.querySelector("[data-hr-head]");
     if (head && clock) {
       const total = samples[samples.length - 1].t || 1;

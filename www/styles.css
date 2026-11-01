@@ -7869,6 +7869,15 @@ body.mr-open {
   font-variant-numeric: tabular-nums;
 }
 
+.hr-ecg {
+  display: block;
+  margin-left: 2px;
+}
+
+.hr-overlay-empty .hr-ecg {
+  display: none;
+}
+
 .hr-overlay-empty {
   box-shadow: none;
 }
@@ -7884,4 +7893,9 @@ body.mr-open {
 
 @media (prefers-reduced-motion: reduce) {
   .hr-overlay-heart { animation: none; }
+}
+
+/* Batimentos por baixo do grafico "Ao longo do jogo" (so o proprio jogador): mesmos botoes de acerto do painel. */
+.hr-tl-adjust {
+  padding-top: 4px;
 }
