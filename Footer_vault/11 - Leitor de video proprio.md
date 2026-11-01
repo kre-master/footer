@@ -67,6 +67,16 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 [Auto · 1080p]                  [⏩] [🐢] [🔖] [🔍 1×]
 ```
 
+## Testes 2: vídeo servido de casa (NAS), sem Bunny
+
+- Separador **🏠 Testes 2** (mesmos jogadores que o Testes): o jogo de 28/10 em 1080p (MP4, 8 Mbps), com os momentos do grupo.
+- Caminho: telemóvel → **Tailscale Funnel** (endereço público https, porta 8443) → **NGINX na VM** (só escuta dentro da VM, `127.0.0.1:8088`) → `/srv/videos-publicos`. **Nenhuma porta aberta no router**; os jogadores não instalam nada.
+- O NGINX só entrega a quem vem da app (Referer), como o Bunny. Não é controlo de acesso forte: o código da app é público. Para uso a sério: links temporários por jogador/grupo (NGINX `secure_link` + função no Supabase).
+- Medido a 2026-11-01 (a partir da própria VM, passando duas vezes pela ligação de casa): arranque ~0,36 s; ~18–21 Mbps. Dá ~2 jogadores em simultâneo a 1080p, ou ~5 a 720p. O teste real é com os jogadores.
+- Ligar/desligar: `sudo tailscale funnel --bg --https=8443 http://127.0.0.1:8088` / `sudo tailscale funnel --https=8443 off` (autorizados em `/home/joao/maestro/.claude/settings.local.json`). Configuração NGINX: `/etc/nginx/sites-available/footer-videos`.
+- Ao ligar o Funnel pela primeira vez, o endereço público demorou ~2 min a responder (DNS e certificado).
+- Cloudflare Tunnel posto de lado (as regras da Cloudflare não permitem servir vídeo por lá); abrir portas no router também (regra do projeto).
+
 ## Medições do teste (trecho de 3 min)
 
 | | Enviado | Envio para o Bunny | Espaço no Bunny |

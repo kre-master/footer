@@ -134,17 +134,19 @@
   // ({ before, after, list, add, update, remove }). Sem jogo, os momentos ficam so neste telemovel.
   // embedded: leitor de um jogo dentro da app (Galeria, Historico): so o video e os momentos desse jogo.
   // Devolve { playClip({ start, end, note }), playReel(), seek(segundos) } para a app o comandar.
-  function mount(container, { admin = false, games = [], moments = null, embedded = false } = {}) {
+  // presets/note: outros videos para escolher e o texto do topo (por defeito, os trechos do Bunny).
+  function mount(container, { admin = false, games = [], moments = null, embedded = false, presets = PRESETS, note = "" } = {}) {
     if (!container) return null;
-    const choices = [...games, ...PRESETS];
+    const choices = [...games, ...presets];
     const stored = readStoredSrc();
-    const fallback = (games[0] || PRESETS[1]).src;
-    const src = embedded ? fallback : admin ? stored || fallback : choices.some((choice) => choice.src === stored) ? stored : fallback;
+    const fallback = (games[0] || presets[1] || presets[0] || PRESETS[1]).src;
+    const known = choices.some((choice) => choice.src === stored);
+    const src = embedded ? fallback : admin && presets === PRESETS ? stored || fallback : known ? stored : fallback;
     const beforeS = moments?.before ?? MOMENT_BEFORE_S;
     const afterS = moments?.after ?? MOMENT_AFTER_S;
     container.innerHTML = `
       <div class="lab ${embedded ? "lab-embedded" : ""}">
-        <p class="lab-note" ${embedded ? "hidden" : ""}>🧪 Leitor de vídeo novo, em testes. Experimenta o zoom, a câmara lenta, o ecrã cheio e os momentos e diz ao João o que achas.</p>
+        <p class="lab-note" ${embedded ? "hidden" : ""}>${escapeAttr(note || "🧪 Leitor de vídeo novo, em testes. Experimenta o zoom, a câmara lenta, o ecrã cheio e os momentos e diz ao João o que achas.")}</p>
         <form class="lab-source ${admin ? "" : "lab-source-players"}" data-lab-source ${embedded ? "hidden" : ""}>
           <input type="url" name="src" value="${escapeAttr(src)}" placeholder="Endereço do vídeo (.mp4)" autocomplete="off" required ${admin ? "" : "hidden"}>
           ${admin ? `<button type="submit" class="primary-btn">Carregar</button>

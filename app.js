@@ -3030,7 +3030,8 @@ function renderGalleryFilter(gamesCount, highlightsCount) {
     <div class="gallery-filter" role="group" aria-label="Mostrar">
       <button type="button" class="subtab ${galleryMode === "games" ? "active" : ""}" data-gallery-mode="games" aria-pressed="${galleryMode === "games"}">Jogos <span>${gamesCount}</span></button>
       <button type="button" class="subtab ${galleryMode === "highlights" ? "active" : ""}" data-gallery-mode="highlights" aria-pressed="${galleryMode === "highlights"}">Highlights <span>${highlightsCount}</span></button>
-      ${canSeeVideoLab() ? `<button type="button" class="subtab ${galleryMode === "lab" ? "active" : ""}" data-gallery-mode="lab" aria-pressed="${galleryMode === "lab"}">🧪 Testes</button>` : ""}
+      ${canSeeVideoLab() ? `<button type="button" class="subtab ${galleryMode === "lab" ? "active" : ""}" data-gallery-mode="lab" aria-pressed="${galleryMode === "lab"}">🧪 Testes</button>
+      <button type="button" class="subtab ${galleryMode === "lab2" ? "active" : ""}" data-gallery-mode="lab2" aria-pressed="${galleryMode === "lab2"}">🏠 Testes 2</button>` : ""}
     </div>`;
 }
 
@@ -3130,14 +3131,20 @@ function renderGallery() {
   const games = getGalleryGames();
   const highlights = getGalleryHighlights();
   // Leitor proprio em testes: so o admin da plataforma ve o separador Testes.
-  if (galleryMode === "lab" && !canSeeVideoLab()) galleryMode = "games";
-  const content = galleryMode === "lab" ? `<div data-gallery-lab></div>`
+  if ((galleryMode === "lab" || galleryMode === "lab2") && !canSeeVideoLab()) galleryMode = "games";
+  const content = galleryMode === "lab" || galleryMode === "lab2" ? `<div data-gallery-lab></div>`
     : galleryMode === "highlights" ? renderGalleryHighlights(highlights) : renderGalleryGames(games);
   panel.innerHTML = `
     ${renderGalleryFilter(games.length, highlights.length)}
     ${content}`;
   if (galleryMode === "lab") {
     window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"), { admin: isPlatformAdmin, games: getVideoLabGames(), moments: videoLabMoments });
+  }
+  if (galleryMode === "lab2") {
+    window.FooterVideoLab?.mount(panel.querySelector("[data-gallery-lab]"), {
+      admin: isPlatformAdmin, games: getHomeVideoGames(), moments: videoLabMoments, presets: [],
+      note: "🏠 Teste 2: o mesmo jogo de 28/10, mas servido a partir de casa (NAS) em vez do Bunny, em 1080p. Compara se arranca e salta tão depressa como no Testes e diz ao João.",
+    });
   }
   panel.querySelectorAll("[data-gallery-mode]").forEach((button) => on(button, "click", () => {
     galleryMode = button.dataset.galleryMode;
@@ -10457,6 +10464,15 @@ function canDeleteBookmark(bookmark) {
 const VIDEO_LAB_GAMES = [
   { gameId: "game-1793226842113", label: "Jogo 28/10 completo", src: "https://vz-fdc7df5c-b0e.b-cdn.net/6b845673-2677-43b0-b6df-aa337ef85688/playlist.m3u8" },
 ];
+
+// Testes 2: o mesmo jogo servido de casa (NGINX na VM da NAS, publico pelo Tailscale Funnel, sem portas no router).
+const HOME_VIDEO_GAMES = [
+  { gameId: "game-1793226842113", label: "Jogo 28/10 · de casa (1080p)", src: "https://maestro.tail85c4b5.ts.net:8443/v/28out26-jogo-1080p.mp4" },
+];
+
+function getHomeVideoGames() {
+  return HOME_VIDEO_GAMES.filter((item) => state.games.some((game) => game.id === item.gameId));
+}
 
 // O leitor novo substitui o do YouTube so nos jogos desta lista (Galeria, Historico, links de momentos).
 function getBunnyGame(gameId) {
