@@ -25,6 +25,13 @@ App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (lei
 - Espaço: cada jogo ~4,4 GB. A 2026-11-01 o disco virtual da VM passou de 40 para **200 GB** (no SSD da NAS; ~175 GB livres, ~40 jogos). A swap passou a ficheiro (`/swapfile`, 2 GB); cópia da tabela de partições antiga em `~/maestro/videos/vda-particoes-antes.txt`. O HDD fica para arquivo dos jogos antigos.
 - Arranque automático: publicador no `crontab` do utilizador `joao` (de 5 em 5 min, ficheiro `~/maestro/videos/crontab.txt`); recortes no serviço `footer-cortes.service` (systemd do utilizador, arranca com a VM); NGINX e Funnel também arrancam sozinhos.
 
+## Bot de WhatsApp (2026-11-01)
+
+- Escreve no grupo **Futeboleiros** como "aparelho ligado" (Baileys, não oficial; risco de bloqueio do número aceite pelo João). Na VM, fora do Git: `~/maestro/whatsapp/` (`bot.mjs`, `mensagens.json` com os modelos, `config.json`, sessão em `sessao/`). Só escuta em `127.0.0.1:8091`; serviço `footer-whatsapp.service` (arranca com a VM).
+- Já automático: **vídeo novo** (o publicador avisa o grupo depois de publicar).
+- Por fazer: **convocatória** e **MVP** (nascem na app/Supabase; falta a VM saber quando acontecem) e uma página para o João editar os modelos e enviar um teste.
+- Para desligar: no telemóvel, Aparelhos ligados > terminar a sessão "Chrome (Ubuntu)".
+
 ## Em resumo
 
 - **O que é:** um leitor de vídeo feito por nós, fora do YouTube, com zoom, câmara lenta, imagem a imagem e marcação de momentos ao alcance do polegar.
