@@ -18,6 +18,7 @@ VM (de 5 em 5 min): publicar-videos.py → confirma H.264 + faststart → /srv/v
 App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (leitor novo, capa, momentos, ⬇)
 ```
 
+- Texto para o Footer Tracker (desktop) com estes passos: `~/maestro/videos/prompt-footer-tracker.md` na VM (envia como `.part` e só depois muda o nome).
 - Nome do ficheiro: `<grupo>_<AAAA-MM-DD>.mp4` (data do jogo, hora de Lisboa). Sem grupo assume `futeboleiros`.
 - Momentos de vídeos só de casa ficam na mesma tabela com `youtube_id = "casa-footer"` (a coluna exige 11 caracteres).
 - Scripts na VM (fora do Git): `~/maestro/videos/publicar-videos.py` (log em `publicar.log`) e `~/maestro/videos/cortes-server.py` (recortes em `/srv/videos-cortes`, só escuta em `127.0.0.1:8089`). NGINX: `/v/index.json`, `/v/…` e `/corte`.
