@@ -188,6 +188,7 @@ Validacoes:
 - 2026-10-30: zoom ate 5×; botoes ½× e 2× em ecra cheio; ver os momentos de um jogo todos seguidos (Galeria > Highlights e bloco de momentos). Versao 1.16.0. Descarregar momentos ficou em standby ate haver leitor proprio (ver [[05 - Backlog e proximos passos]]).
 - Momentos seguidos renomeados para "All Highlights" e com botao "✕ Sair" (nao havia forma clara de sair). Versao 1.16.1.
 - Barra do All Highlights simplificada a pedido do utilizador: ◀ 1/29 ▶ ✕, tudo a amarelo, com voltar ao anterior. Versao 1.16.2.
+- 2026-11-02: frequencia cardiaca do relogio no historico do jogo (carregar .fit/.tcx/.gpx, grafico, numero ao lado do video, acerto do inicio). Versao 1.17.0. Falta aplicar `supabase/heart-rate-migration.sql` e testar com o ficheiro da Huawei do utilizador.
 - Pendente: o momento das 51:44 do jogo de 29/10 (amandio.torres) continua com o texto "Quarto falhanco"; deve passar a "Quinto falhanco" (o autor ou um admin, agora pela app).
 - 2026-10-30: leitor de video proprio comecado em testes, sem tirar o do YouTube. Galeria > "🧪 Testes" so aparece ao admin da plataforma (`isPlatformAdmin`); por agora toca um video de exemplo. Proximo: amostra de 2-3 min do ultimo jogo em 1080p (esta no desktop, que esta ligado; da VM nao se le). Sem versao nova (os jogadores nao veem nada).
 

@@ -8,6 +8,16 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.17.0",
+      date: "2026-11-02",
+      title: "A tua frequência cardíaca no jogo",
+      items: [
+        "No histórico do jogo, por baixo do vídeo, podes carregar o treino do teu relógio (.fit, .tcx ou .gpx) e ver os teus batimentos ao lado do vídeo, com um gráfico.",
+        "Dá para acertar o início do registo com o vídeo, em passos de 1 s a 5 min.",
+        "É só teu: mais ninguém vê, nem os admins.",
+      ],
+    },
+    {
       version: "1.16.2",
       date: "2026-10-30",
       title: "All Highlights mais simples",

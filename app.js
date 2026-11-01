@@ -1358,6 +1358,7 @@ async function loadRemoteState() {
   await loadRemoteVideos();
   await loadHomeVideoIndex();
   await loadRemoteBookmarks();
+  await loadHeartRate();
   await loadJoinRequests();
   await loadPublicEvents();
   await refreshPendingInvite();
@@ -11229,6 +11230,341 @@ function videoClockLink(gameId, seconds) {
   return `<button type="button" class="link-btn video-seek" data-video-seek="${Number(seconds).toFixed(1)}" title="Ver no vídeo">▶ ${text}</button>`;
 }
 
+// ---- Frequencia cardiaca do relogio: supabase/heart-rate-migration.sql ----
+// O jogador carrega o treino do seu relogio (.fit, .tcx ou .gpx) no historico do jogo e acerta o inicio com o
+// video. So o proprio ve. Guarda-se so a serie de batimentos (nunca o GPS). Sem a tabela, fica neste aparelho.
+const HEART_RATE_KEY = "footer-heart-rate-v1";
+const HEART_RATE_STEP_S = 3;
+const HEART_RATE_MAX_FILE_BYTES = 30 * 1024 * 1024;
+const HEART_RATE_ADJUST_STEPS = [1, 10, 60, 300];
+let heartRateEntries = {};
+let heartRateRemote = false;
+const heartRatePanels = new Map();
+let heartRateTimer = null;
+let heartRateSaveTimers = {};
+
+function heartRateStorageKey() {
+  return `${HEART_RATE_KEY}:${currentSession?.user?.id || "local"}`;
+}
+
+function heartRateFromRow(row) {
+  const series = Array.isArray(row.series) ? row.series : [];
+  return {
+    gameId: row.game_id, fileName: row.file_name || "", format: row.format, startedAtMs: Date.parse(row.started_at),
+    series, adjustS: Number(row.adjust_s) || 0,
+  };
+}
+
+function readLocalHeartRate() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(heartRateStorageKey()) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalHeartRate() {
+  try {
+    window.localStorage.setItem(heartRateStorageKey(), JSON.stringify(heartRateEntries));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function loadHeartRate() {
+  heartRateEntries = {};
+  heartRateRemote = false;
+  if (remoteEnabled && supabaseClient && currentSession?.user) {
+    const { data, error } = await supabaseClient.from("game_heart_rate").select("*").limit(500);
+    if (!error) {
+      heartRateRemote = true;
+      (data || []).forEach((row) => { heartRateEntries[row.game_id] = heartRateFromRow(row); });
+      return;
+    }
+    console.warn("Heart rate load failed. Run supabase/heart-rate-migration.sql.", error);
+  }
+  heartRateEntries = readLocalHeartRate();
+}
+
+async function saveHeartRateEntry(entry) {
+  heartRateEntries[entry.gameId] = entry;
+  if (!heartRateRemote) {
+    if (!saveLocalHeartRate()) throw new Error("Nao foi possivel guardar neste dispositivo.");
+    return;
+  }
+  const { error } = await supabaseClient.from("game_heart_rate").upsert({
+    game_id: entry.gameId, file_name: entry.fileName, format: entry.format, started_at: new Date(entry.startedAtMs).toISOString(),
+    series: entry.series, adjust_s: entry.adjustS || 0, updated_at: new Date().toISOString(),
+  }, { onConflict: "game_id,user_id" });
+  if (error) throw new Error(`Nao foi possivel guardar o treino: ${error.message}`);
+}
+
+async function removeHeartRateEntry(gameId) {
+  if (heartRateRemote) {
+    const { error } = await supabaseClient.from("game_heart_rate").delete().eq("game_id", gameId);
+    if (error) throw new Error(`Nao foi possivel apagar o treino: ${error.message}`);
+  }
+  delete heartRateEntries[gameId];
+  if (!heartRateRemote) saveLocalHeartRate();
+}
+
+// Lista {t, hr} de cada treino, guardada a parte para nao ir para o armazenamento nem para a base de dados.
+const heartRateSampleCache = new WeakMap();
+
+function getHeartRateSamples(entry) {
+  if (!heartRateSampleCache.has(entry)) heartRateSampleCache.set(entry, entry.series.map(([t, hr]) => ({ t, hr })));
+  return heartRateSampleCache.get(entry);
+}
+
+// Segundo do treino que corresponde ao segundo 0 do jogo: pela hora do jogo + o ajuste do jogador.
+function getHeartRateOffset(game, entry) {
+  const gameMs = Date.parse(game.date);
+  const auto = Number.isFinite(gameMs) && Number.isFinite(entry.startedAtMs) ? (gameMs - entry.startedAtMs) / 1000 : 0;
+  return auto + (entry.adjustS || 0);
+}
+
+// Tempo do jogo (segundos da analise) no leitor que estiver a dar: o de casa ou o do YouTube.
+function readHeartRateClock(game, section) {
+  const lab = section.querySelector(".lab-video");
+  if (lab) {
+    return Number.isFinite(lab.currentTime) ? { gameS: lab.currentTime, durationS: lab.duration > 0 ? lab.duration : null } : null;
+  }
+  const frame = section.querySelector("[data-game-video]");
+  const seconds = getVideoCurrentTime(frame);
+  if (seconds == null) return null;
+  const parts = getGameVideoParts(game.id);
+  const part = parts.find((item) => item.youtubeId === frame.dataset.youtubeId) || parts[0];
+  return { gameS: (part?.gameStartS || 0) + seconds - (part?.videoStartS || 0), durationS: null };
+}
+
+function formatHeartRateAdjust(seconds) {
+  if (!seconds) return "Acertado pela hora do jogo";
+  const abs = Math.abs(seconds);
+  const text = abs >= 60 ? `${Math.floor(abs / 60)} min${abs % 60 ? ` ${abs % 60} s` : ""}` : `${abs} s`;
+  return `Registo ${seconds > 0 ? "adiantado" : "atrasado"} ${text}`;
+}
+
+function renderHeartRateChart(game, entry) {
+  const samples = getHeartRateSamples(entry);
+  const total = samples[samples.length - 1].t || 1;
+  const values = samples.map((sample) => sample.hr);
+  const low = Math.floor((Math.min(...values) - 4) / 5) * 5;
+  const high = Math.ceil((Math.max(...values) + 4) / 5) * 5;
+  const x = (t) => ((t / total) * 600).toFixed(1);
+  const y = (hr) => (112 - ((hr - low) / (high - low || 1)) * 100).toFixed(1);
+  const offset = getHeartRateOffset(game, entry);
+  const parts = getGameVideoParts(game.id);
+  const marks = getGameBookmarks(game.id).map((item) => {
+    const part = parts.find((entryPart) => entryPart.youtubeId === item.youtubeId) || parts[0];
+    const t = (part?.gameStartS || 0) + item.momentS - (part?.videoStartS || 0) + offset;
+    return t >= 0 && t <= total ? `<line class="hr-chart-mark" x1="${x(t)}" x2="${x(t)}" y1="6" y2="112"><title>${escapeHtml(`${formatVideoClock(item.momentS)} · ${item.note}`)}</title></line>` : "";
+  }).join("");
+  return `
+    <svg class="hr-chart" viewBox="0 0 600 124" preserveAspectRatio="none" role="img" aria-label="Frequencia cardiaca ao longo do treino">
+      <text class="hr-chart-axis" x="2" y="14">${high}</text>
+      <text class="hr-chart-axis" x="2" y="120">${low}</text>
+      ${marks}
+      <polyline class="hr-chart-line" points="${samples.map((sample) => `${x(sample.t)},${y(sample.hr)}`).join(" ")}"/>
+      <line class="hr-chart-head" data-hr-head x1="0" x2="0" y1="4" y2="114"/>
+    </svg>`;
+}
+
+function renderHeartRateBody(game) {
+  const entry = heartRateEntries[game.id];
+  if (remoteEnabled && !currentSession?.user) return `<p class="tracking-note">Entra na tua conta para carregares o treino do teu relogio.</p>`;
+  const fileInput = (label) => `
+    <label class="ghost-btn hr-file">${label}<input type="file" data-hr-file hidden></label>`;
+  if (!entry) {
+    return `
+      <p class="tracking-note">Tens relogio? Carrega o treino deste jogo (.fit, .tcx ou .gpx) e ve os teus batimentos ao lado do video. So tu ves.</p>
+      ${fileInput("♥ Carregar o meu treino")}
+      <p class="tracking-error" data-hr-error hidden></p>
+      <details class="hr-help">
+        <summary>Como tirar o ficheiro do relogio</summary>
+        <ul>
+          <li><strong>Garmin:</strong> no site do Garmin Connect, abre o treino, carrega na engrenagem ⚙ e escolhe Exportar para TCX (ou GPX).</li>
+          <li><strong>Apple Watch:</strong> com uma app de exportacao (por exemplo HealthFit ou RunGap) que gere o ficheiro de cada treino.</li>
+          <li><strong>Huawei e Amazfit:</strong> liga a app (Huawei Health / Zepp) ao Strava e, no site do Strava, exporta o treino (original ou GPX).</li>
+        </ul>
+      </details>`;
+  }
+  return `
+    <div class="hr-live" aria-live="off"><span class="hr-heart" aria-hidden="true">♥</span><strong data-hr-now>--</strong><small>bpm</small></div>
+    <div class="hr-stats">
+      <span>Média <b data-hr-avg>–</b></span><span>Máx. <b data-hr-max>–</b></span><span>Mín. <b data-hr-min>–</b></span>
+      <small data-hr-scope></small>
+    </div>
+    ${renderHeartRateChart(game, entry)}
+    <div class="hr-adjust" role="group" aria-label="Acertar o registo com o video">
+      <span class="hr-adjust-title">Acertar com o vídeo</span>
+      <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">
+        ${HEART_RATE_ADJUST_STEPS.map((step, index) => `<button type="button" class="${index === 1 ? "active" : ""}" data-hr-step="${step}" aria-pressed="${index === 1}">${step >= 60 ? `${step / 60} min` : `${step} s`}</button>`).join("")}
+      </div>
+      <div class="hr-adjust-move">
+        <button type="button" class="ghost-btn" data-hr-move="-1">◀ Atrasar</button>
+        <output data-hr-adjust-label>${escapeHtml(formatHeartRateAdjust(entry.adjustS))}</output>
+        <button type="button" class="ghost-btn" data-hr-move="1">Adiantar ▶</button>
+      </div>
+      <p class="tracking-fineprint">Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar.</p>
+    </div>
+    <p class="tracking-error" data-hr-error hidden></p>
+    <div class="hr-footer">
+      <small>${escapeHtml(entry.fileName || "Treino")} · ${escapeHtml(String(entry.format).toUpperCase())}</small>
+      <span>
+        <button type="button" class="link-btn" data-hr-reset>Repor</button>
+        ${fileInput("Trocar ficheiro")}
+        <button type="button" class="link-btn hr-remove" data-hr-remove>Remover</button>
+      </span>
+    </div>`;
+}
+
+function renderHeartRateSection(game) {
+  return `
+    <section class="profile-section tracking-section hr-panel" data-hr-panel>
+      <div class="tracking-head"><h3>♥ A minha frequência cardíaca</h3><span class="tracking-badge">Só tu vês</span></div>
+      <div data-hr-body>${renderHeartRateBody(game)}</div>
+    </section>`;
+}
+
+async function importHeartRateFile(game, file) {
+  if (file.size > HEART_RATE_MAX_FILE_BYTES) throw new Error("O ficheiro e demasiado grande (maximo 30 MB).");
+  const workout = window.FooterHeartRate.parseWorkout(await file.arrayBuffer());
+  if (!workout.ok) throw new Error(workout.error);
+  const series = window.FooterHeartRate.downsample(workout.samples, HEART_RATE_STEP_S).map((sample) => [sample.t, sample.hr]);
+  const entry = { gameId: game.id, fileName: file.name.slice(0, 120), format: workout.format, startedAtMs: workout.startedAtMs, series, adjustS: 0 };
+  await saveHeartRateEntry(entry);
+  const gameMs = Date.parse(game.date);
+  const endMs = workout.startedAtMs + workout.durationS * 1000;
+  return Number.isFinite(gameMs) && (gameMs < workout.startedAtMs - 15 * 60000 || gameMs > endMs) ? "warn" : "ok";
+}
+
+function bindHeartRatePanel(game, section) {
+  const panel = section?.querySelector("[data-hr-panel]");
+  if (!panel) return;
+  const body = panel.querySelector("[data-hr-body]");
+  let step = 10;
+  const rerender = (notice = "") => {
+    body.innerHTML = renderHeartRateBody(game);
+    bind();
+    if (notice) showError(notice);
+  };
+  const showError = (message) => {
+    const box = body.querySelector("[data-hr-error]");
+    if (box) {
+      box.textContent = message;
+      box.hidden = !message;
+    }
+  };
+  const scheduleSave = (entry) => {
+    clearTimeout(heartRateSaveTimers[entry.gameId]);
+    heartRateSaveTimers[entry.gameId] = setTimeout(() => saveHeartRateEntry(entry).catch((error) => showError(error.message)), 700);
+  };
+  function bind() {
+    const entry = heartRateEntries[game.id];
+    body.querySelectorAll("[data-hr-file]").forEach((input) => on(input, "change", async () => {
+      const file = input.files?.[0];
+      input.value = "";
+      if (!file) return;
+      try {
+        const result = await importHeartRateFile(game, file);
+        rerender(result === "warn" ? `Este treino nao coincide com a hora do jogo (${formatDate(game.date)}). Confirma se e o ficheiro certo; podes acertar abaixo.` : "");
+      } catch (error) {
+        showError(error.message || "Nao foi possivel ler o ficheiro.");
+      }
+    }));
+    if (!entry) return;
+    body.querySelectorAll("[data-hr-step]").forEach((button) => on(button, "click", () => {
+      step = Number(button.dataset.hrStep);
+      body.querySelectorAll("[data-hr-step]").forEach((other) => {
+        other.classList.toggle("active", other === button);
+        other.setAttribute("aria-pressed", String(other === button));
+      });
+    }));
+    body.querySelectorAll("[data-hr-move]").forEach((button) => on(button, "click", () => {
+      entry.adjustS = Math.max(-86400, Math.min(86400, (entry.adjustS || 0) + Number(button.dataset.hrMove) * step));
+      body.querySelector("[data-hr-adjust-label]").textContent = formatHeartRateAdjust(entry.adjustS);
+      refreshChart();
+      scheduleSave(entry);
+    }));
+    on(body.querySelector("[data-hr-reset]"), "click", () => {
+      entry.adjustS = 0;
+      body.querySelector("[data-hr-adjust-label]").textContent = formatHeartRateAdjust(0);
+      refreshChart();
+      scheduleSave(entry);
+    });
+    on(body.querySelector("[data-hr-remove]"), "click", async (event) => {
+      const button = event.currentTarget;
+      if (button.dataset.confirming !== "1") {
+        button.dataset.confirming = "1";
+        button.textContent = "Apagar?";
+        return;
+      }
+      try {
+        await removeHeartRateEntry(game.id);
+        rerender();
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+  }
+  // Os marcadores dos momentos dependem do ajuste: redesenha so o grafico.
+  const refreshChart = () => {
+    const entry = heartRateEntries[game.id];
+    const chart = body.querySelector(".hr-chart");
+    if (entry && chart) {
+      chart.outerHTML = renderHeartRateChart(game, entry);
+      panelState.scopeKey = "";
+    }
+  };
+  const panelState = { game, section, body, scopeKey: "" };
+  heartRatePanels.set(panel, panelState);
+  if (!heartRateTimer) heartRateTimer = setInterval(tickHeartRatePanels, 400);
+  bind();
+}
+
+function tickHeartRatePanels() {
+  heartRatePanels.forEach((state, panel) => {
+    if (!panel.isConnected) {
+      heartRatePanels.delete(panel);
+      return;
+    }
+    const entry = heartRateEntries[state.game.id];
+    const now = state.body.querySelector("[data-hr-now]");
+    if (!entry || !now || !panel.offsetParent) return;
+    const api = window.FooterHeartRate;
+    const samples = getHeartRateSamples(entry);
+    const offset = getHeartRateOffset(state.game, entry);
+    const clock = readHeartRateClock(state.game, state.section);
+    const bpm = clock ? api.heartRateAt(samples, clock.gameS, offset) : null;
+    now.textContent = bpm == null ? "--" : String(bpm);
+    const head = state.body.querySelector("[data-hr-head]");
+    if (head && clock) {
+      const total = samples[samples.length - 1].t || 1;
+      const x = Math.max(0, Math.min(600, ((clock.gameS + offset) / total) * 600)).toFixed(1);
+      head.setAttribute("x1", x);
+      head.setAttribute("x2", x);
+    }
+    // Resumo so do jogo (do inicio ao fim do video) quando o leitor ja sabe a duracao; senao, do treino todo.
+    const durationS = clock?.durationS;
+    const scopeKey = `${offset}|${durationS || 0}`;
+    if (scopeKey !== state.scopeKey) {
+      state.scopeKey = scopeKey;
+      const inGame = durationS ? samples.filter((sample) => sample.t >= offset && sample.t <= offset + durationS) : [];
+      const summary = api.summarize(inGame.length ? inGame : samples);
+      state.body.querySelector("[data-hr-avg]").textContent = summary.avg;
+      state.body.querySelector("[data-hr-max]").textContent = summary.max;
+      state.body.querySelector("[data-hr-min]").textContent = summary.min;
+      state.body.querySelector("[data-hr-scope]").textContent = inGame.length ? "durante o jogo" : "no treino todo";
+    }
+  });
+  if (!heartRatePanels.size) {
+    clearInterval(heartRateTimer);
+    heartRateTimer = null;
+  }
+}
+
 function renderGameVideoSection(game) {
   const parts = getGameVideoParts(game.id);
   if (!parts.length && !isAdmin) return "";
@@ -11256,6 +11592,7 @@ function renderGameVideoSection(game) {
         <p class="tracking-fineprint">Vídeo não listado no YouTube: só quem tem a ligação o encontra.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
         ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
+      ${parts.length && canMarkMoments() ? renderHeartRateSection(game) : ""}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
           <summary>${parts.length ? "Gerir vídeo · só admin" : "Juntar vídeo · só admin"}</summary>
@@ -11319,6 +11656,7 @@ function bindGameVideoSection(game, container) {
   if (!section) return;
   const frame = section.querySelector("[data-game-video]");
   const bunny = getHomeVideo(game.id);
+  bindHeartRatePanel(game, section);
   if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
   else {
     frame?.addEventListener("load", () => { frame.dataset.ready = "1"; });
