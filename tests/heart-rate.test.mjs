@@ -166,3 +166,16 @@ test("FIT estragado ou so texto em bytes", () => {
   assert.equal(heartRate.parseWorkout(asBytes).format, "tcx");
   assert.equal(heartRate.parseWorkout(asBytes.buffer).ok, true);
 });
+
+test("zonas: limites a 60, 70, 80 e 90 por cento da FC maxima", () => {
+  const zone = (bpm) => heartRate.zoneFor(bpm, 200).zone;
+  assert.deepEqual([100, 119, 120, 139, 140, 159, 160, 179, 180, 200].map(zone), [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+  assert.equal(heartRate.zoneFor(150, 0), null);
+  assert.equal(heartRate.zoneFor(NaN, 200), null);
+  assert.equal(heartRate.ZONES.length, 5);
+});
+
+test("zoneSeconds: tempo em cada zona, sem contar falhas longas", () => {
+  const samples = [{ t: 0, hr: 100 }, { t: 10, hr: 150 }, { t: 20, hr: 190 }, { t: 400, hr: 190 }];
+  assert.deepEqual(heartRate.zoneSeconds(samples, 200), [10, 0, 10, 0, 15]);
+});

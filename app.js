@@ -11247,6 +11247,24 @@ function heartRateStorageKey() {
   return `${HEART_RATE_KEY}:${currentSession?.user?.id || "local"}`;
 }
 
+function readHeartRateSetting(name) {
+  try {
+    return window.localStorage.getItem(`${HEART_RATE_KEY}-${name}:${currentSession?.user?.id || "local"}`);
+  } catch {
+    return null;
+  }
+}
+
+function saveHeartRateSetting(name, value) {
+  try {
+    const key = `${HEART_RATE_KEY}-${name}:${currentSession?.user?.id || "local"}`;
+    if (value == null || value === "") window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, String(value));
+  } catch {
+    // Sem armazenamento: a escolha vale so ate fechar a pagina.
+  }
+}
+
 function heartRateFromRow(row) {
   const series = Array.isArray(row.series) ? row.series : [];
   return {
@@ -11318,6 +11336,19 @@ function getHeartRateSamples(entry) {
   return heartRateSampleCache.get(entry);
 }
 
+// Frequencia maxima de referencia das zonas: a que o jogador escreveu ou, sem isso, o pico deste treino.
+const heartRateAutoMaxCache = new WeakMap();
+
+function getHeartRateAutoMax(entry) {
+  if (!heartRateAutoMaxCache.has(entry)) heartRateAutoMaxCache.set(entry, Math.max(...entry.series.map((point) => point[1])));
+  return heartRateAutoMaxCache.get(entry);
+}
+
+function getHeartRateMax(entry) {
+  const chosen = Number(readHeartRateSetting("max"));
+  return chosen >= 100 && chosen <= 230 ? chosen : getHeartRateAutoMax(entry);
+}
+
 // Segundo do treino que corresponde ao segundo 0 do jogo: pela hora do jogo + o ajuste do jogador.
 function getHeartRateOffset(game, entry) {
   const gameMs = Date.parse(game.date);
@@ -11356,6 +11387,20 @@ function renderHeartRateChart(game, entry) {
   const y = (hr) => (112 - ((hr - low) / (high - low || 1)) * 100).toFixed(1);
   const offset = getHeartRateOffset(game, entry);
   const parts = getGameVideoParts(game.id);
+  // A linha muda de cor com a zona de esforco; cada troco comeca onde o anterior acabou.
+  const maxHr = getHeartRateMax(entry);
+  const runs = [];
+  samples.forEach((sample) => {
+    const zone = window.FooterHeartRate.zoneFor(sample.hr, maxHr);
+    const point = `${x(sample.t)},${y(sample.hr)}`;
+    let run = runs[runs.length - 1];
+    if (!run || run.zone !== zone.zone) {
+      const previous = run;
+      run = { zone: zone.zone, color: zone.color, points: previous ? [previous.points[previous.points.length - 1]] : [] };
+      runs.push(run);
+    }
+    run.points.push(point);
+  });
   const marks = getGameBookmarks(game.id).map((item) => {
     const part = parts.find((entryPart) => entryPart.youtubeId === item.youtubeId) || parts[0];
     const t = (part?.gameStartS || 0) + item.momentS - (part?.videoStartS || 0) + offset;
@@ -11366,7 +11411,7 @@ function renderHeartRateChart(game, entry) {
       <text class="hr-chart-axis" x="2" y="14">${high}</text>
       <text class="hr-chart-axis" x="2" y="120">${low}</text>
       ${marks}
-      <polyline class="hr-chart-line" points="${samples.map((sample) => `${x(sample.t)},${y(sample.hr)}`).join(" ")}"/>
+      ${runs.map((run) => `<polyline class="hr-chart-line" style="stroke:${run.color}" points="${run.points.join(" ")}"/>`).join("")}
       <line class="hr-chart-head" data-hr-head x1="0" x2="0" y1="4" y2="114"/>
     </svg>`;
 }
@@ -11397,6 +11442,14 @@ function renderHeartRateBody(game) {
       <small data-hr-scope></small>
     </div>
     ${renderHeartRateChart(game, entry)}
+    <div class="hr-zones" data-hr-zones></div>
+    <div class="hr-options">
+      <label class="hr-max">FC máxima
+        <input type="number" inputmode="numeric" min="100" max="230" placeholder="${getHeartRateAutoMax(entry)}" value="${escapeHtml(readHeartRateSetting("max") || "")}" data-hr-maxhr>
+        <small>bpm · vazio = o teu pico deste treino</small>
+      </label>
+      <label class="hr-check"><input type="checkbox" data-hr-overlay-toggle ${readHeartRateSetting("overlay") === "off" ? "" : "checked"}> Mostrar em cima do vídeo</label>
+    </div>
     <div class="hr-adjust" role="group" aria-label="Acertar o registo com o video">
       <span class="hr-adjust-title">Acertar com o vídeo</span>
       <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">
@@ -11446,6 +11499,7 @@ function bindHeartRatePanel(game, section) {
   const body = panel.querySelector("[data-hr-body]");
   let step = 10;
   const rerender = (notice = "") => {
+    panelState.scopeKey = "";
     body.innerHTML = renderHeartRateBody(game);
     bind();
     if (notice) showError(notice);
@@ -11488,6 +11542,15 @@ function bindHeartRatePanel(game, section) {
       refreshChart();
       scheduleSave(entry);
     }));
+    on(body.querySelector("[data-hr-maxhr]"), "change", (event) => {
+      const value = Math.round(Number(event.currentTarget.value));
+      saveHeartRateSetting("max", value >= 100 && value <= 230 ? value : "");
+      if (!(value >= 100 && value <= 230)) event.currentTarget.value = "";
+      refreshChart();
+    });
+    on(body.querySelector("[data-hr-overlay-toggle]"), "change", (event) => {
+      saveHeartRateSetting("overlay", event.currentTarget.checked ? "on" : "off");
+    });
     on(body.querySelector("[data-hr-reset]"), "click", () => {
       entry.adjustS = 0;
       body.querySelector("[data-hr-adjust-label]").textContent = formatHeartRateAdjust(0);
@@ -11524,6 +11587,49 @@ function bindHeartRatePanel(game, section) {
   bind();
 }
 
+// Pilula no canto do video (leitor de casa ou YouTube): cor e nome da zona, visivel tambem em ecra cheio.
+function ensureHeartRateOverlay(section) {
+  const stage = section.querySelector("[data-lab-stage]") || section.querySelector("[data-video-stage]");
+  if (!stage) return null;
+  let overlay = stage.querySelector("[data-hr-overlay]");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "hr-overlay hidden";
+    overlay.dataset.hrOverlay = "";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><small></small>`;
+    stage.append(overlay);
+  }
+  return overlay;
+}
+
+function updateHeartRateOverlay(section, bpm, zone, visible) {
+  const overlay = ensureHeartRateOverlay(section);
+  if (!overlay) return;
+  const show = visible && bpm != null && zone;
+  overlay.classList.toggle("hidden", !show);
+  if (!show) return;
+  const key = `${bpm}|${zone.zone}`;
+  if (overlay.dataset.key === key) return;
+  overlay.dataset.key = key;
+  overlay.style.setProperty("--hr-color", zone.color);
+  overlay.querySelector("strong").textContent = bpm;
+  overlay.querySelector("small").textContent = zone.label;
+}
+
+function renderHeartRateZones(samples, maxHr) {
+  const api = window.FooterHeartRate;
+  const seconds = api.zoneSeconds(samples, maxHr);
+  const total = seconds.reduce((sum, value) => sum + value, 0) || 1;
+  return `
+    <div class="hr-zones-bar" role="img" aria-label="Tempo em cada zona de esforco">
+      ${api.ZONES.map((zone, index) => seconds[index] ? `<span style="flex:${seconds[index].toFixed(1)};background:${zone.color}"></span>` : "").join("")}
+    </div>
+    <ul class="hr-zones-legend">
+      ${api.ZONES.map((zone, index) => `<li><i style="background:${zone.color}"></i>${zone.label} <b>${Math.round(seconds[index] / 60)} min</b> <small>${Math.round((seconds[index] / total) * 100)}%</small></li>`).join("")}
+    </ul>`;
+}
+
 function tickHeartRatePanels() {
   heartRatePanels.forEach((state, panel) => {
     if (!panel.isConnected) {
@@ -11532,13 +11638,21 @@ function tickHeartRatePanels() {
     }
     const entry = heartRateEntries[state.game.id];
     const now = state.body.querySelector("[data-hr-now]");
-    if (!entry || !now || !panel.offsetParent) return;
+    if (!entry || !now) {
+      updateHeartRateOverlay(state.section, null, null, false);
+      return;
+    }
+    if (!panel.offsetParent && !state.section.querySelector(".is-fullscreen")) return;
     const api = window.FooterHeartRate;
     const samples = getHeartRateSamples(entry);
     const offset = getHeartRateOffset(state.game, entry);
+    const maxHr = getHeartRateMax(entry);
     const clock = readHeartRateClock(state.game, state.section);
     const bpm = clock ? api.heartRateAt(samples, clock.gameS, offset) : null;
+    const zone = bpm == null ? null : api.zoneFor(bpm, maxHr);
     now.textContent = bpm == null ? "--" : String(bpm);
+    now.style.color = zone ? zone.color : "";
+    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off");
     const head = state.body.querySelector("[data-hr-head]");
     if (head && clock) {
       const total = samples[samples.length - 1].t || 1;
@@ -11548,15 +11662,17 @@ function tickHeartRatePanels() {
     }
     // Resumo so do jogo (do inicio ao fim do video) quando o leitor ja sabe a duracao; senao, do treino todo.
     const durationS = clock?.durationS;
-    const scopeKey = `${offset}|${durationS || 0}`;
+    const scopeKey = `${offset}|${durationS || 0}|${maxHr}`;
     if (scopeKey !== state.scopeKey) {
       state.scopeKey = scopeKey;
       const inGame = durationS ? samples.filter((sample) => sample.t >= offset && sample.t <= offset + durationS) : [];
-      const summary = api.summarize(inGame.length ? inGame : samples);
+      const scope = inGame.length ? inGame : samples;
+      const summary = api.summarize(scope);
       state.body.querySelector("[data-hr-avg]").textContent = summary.avg;
       state.body.querySelector("[data-hr-max]").textContent = summary.max;
       state.body.querySelector("[data-hr-min]").textContent = summary.min;
       state.body.querySelector("[data-hr-scope]").textContent = inGame.length ? "durante o jogo" : "no treino todo";
+      state.body.querySelector("[data-hr-zones]").innerHTML = renderHeartRateZones(scope, maxHr);
     }
   });
   if (!heartRatePanels.size) {

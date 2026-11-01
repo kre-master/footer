@@ -207,6 +207,35 @@
     return nearest && Math.abs(nearest.t - target) <= MAX_GAP_S ? nearest.hr : null;
   }
 
+  // Zonas de esforco pela percentagem da frequencia maxima do jogador (escala habitual de 5 zonas).
+  const ZONES = [
+    { zone: 1, label: "Leve", from: 0, color: "#59b0ff" },
+    { zone: 2, label: "Moderado", from: 0.6, color: "#34c78a" },
+    { zone: 3, label: "Aerobico", from: 0.7, color: "#f3b340" },
+    { zone: 4, label: "Intenso", from: 0.8, color: "#ff9a4d" },
+    { zone: 5, label: "Maximo", from: 0.9, color: "#ff5d66" },
+  ];
+
+  function zoneFor(bpm, maxHr) {
+    if (!Number.isFinite(bpm) || !(maxHr > 0)) return null;
+    const share = bpm / maxHr;
+    let found = ZONES[0];
+    ZONES.forEach((zone) => { if (share >= zone.from) found = zone; });
+    return found;
+  }
+
+  // Segundos em cada zona (indice 0 = zona 1), com o mesmo peso por tempo da media.
+  function zoneSeconds(samples, maxHr) {
+    const seconds = ZONES.map(() => 0);
+    (samples || []).forEach((sample, index) => {
+      const next = samples[index + 1];
+      const dt = next ? Math.min(next.t - sample.t, MAX_GAP_S) : 0;
+      const zone = zoneFor(sample.hr, maxHr);
+      if (zone && dt > 0) seconds[zone.zone - 1] += dt;
+    });
+    return seconds;
+  }
+
   // Um valor a cada stepS segundos (media do intervalo): serie curta para guardar e desenhar.
   function downsample(samples, stepS = 5) {
     const buckets = new Map();
@@ -220,5 +249,5 @@
     return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([key, bucket]) => ({ t: key * stepS, hr: Math.round(bucket.sum / bucket.count) }));
   }
 
-  return { parseWorkout, sliceForWindow, summarize, heartRateAt, downsample, MAX_GAP_S };
+  return { parseWorkout, sliceForWindow, summarize, heartRateAt, downsample, zoneFor, zoneSeconds, ZONES, MAX_GAP_S };
 });

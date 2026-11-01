@@ -8,6 +8,16 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.18.0",
+      date: "2026-11-02",
+      title: "Frequência cardíaca com cores",
+      items: [
+        "Os batimentos aparecem também em cima do vídeo, também em ecrã cheio, com a cor da zona de esforço: azul (leve), verde, amarelo, laranja e vermelho (máximo).",
+        "O gráfico também muda de cor e mostra quanto tempo estiveste em cada zona.",
+        "Podes escrever a tua frequência máxima para as zonas ficarem certas, ou esconder os batimentos de cima do vídeo.",
+      ],
+    },
+    {
       version: "1.17.0",
       date: "2026-11-02",
       title: "A tua frequência cardíaca no jogo",
