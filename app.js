@@ -11597,24 +11597,26 @@ function ensureHeartRateOverlay(section) {
     overlay.className = "hr-overlay hidden";
     overlay.dataset.hrOverlay = "";
     overlay.setAttribute("aria-hidden", "true");
-    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><small></small>`;
+    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong>`;
     stage.append(overlay);
   }
   return overlay;
 }
 
+// Sem leitura neste momento (fora do registo): coracao e "-" a cinzento. `visible` falso esconde tudo.
 function updateHeartRateOverlay(section, bpm, zone, visible) {
   const overlay = ensureHeartRateOverlay(section);
   if (!overlay) return;
-  const show = visible && bpm != null && zone;
-  overlay.classList.toggle("hidden", !show);
-  if (!show) return;
-  const key = `${bpm}|${zone.zone}`;
+  overlay.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const empty = bpm == null || !zone;
+  const key = empty ? "empty" : `${bpm}|${zone.zone}`;
   if (overlay.dataset.key === key) return;
   overlay.dataset.key = key;
-  overlay.style.setProperty("--hr-color", zone.color);
-  overlay.querySelector("strong").textContent = bpm;
-  overlay.querySelector("small").textContent = zone.label;
+  overlay.classList.toggle("hr-overlay-empty", empty);
+  if (empty) overlay.style.removeProperty("--hr-color");
+  else overlay.style.setProperty("--hr-color", zone.color);
+  overlay.querySelector("strong").textContent = empty ? "-" : bpm;
 }
 
 function renderHeartRateZones(samples, maxHr) {

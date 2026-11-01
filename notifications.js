@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.18.1",
+      date: "2026-11-02",
+      title: "Batimentos mais discretos",
+      items: [
+        "Os batimentos em cima do vídeo ficaram mais pequenos e transparentes, só com o coração e o número.",
+        "Fora do registo do relógio, aparece o coração a cinzento com um traço.",
+      ],
+    },
+    {
       version: "1.18.0",
       date: "2026-11-02",
       title: "Frequência cardíaca com cores",
