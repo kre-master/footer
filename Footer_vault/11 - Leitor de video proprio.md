@@ -22,7 +22,8 @@ App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (lei
 - Nome do ficheiro: `<grupo>_<AAAA-MM-DD>.mp4` (data do jogo, hora de Lisboa). Sem grupo assume `futeboleiros`.
 - Momentos de vídeos só de casa ficam na mesma tabela com `youtube_id = "casa-footer"` (a coluna exige 11 caracteres).
 - Scripts na VM (fora do Git): `~/maestro/videos/publicar-videos.py` (log em `publicar.log`) e `~/maestro/videos/cortes-server.py` (recortes em `/srv/videos-cortes`, só escuta em `127.0.0.1:8089`). NGINX: `/v/index.json`, `/v/…` e `/corte`.
-- Espaço: cada jogo ~4,4 GB. O disco virtual da VM tem ~22 GB livres: **instalar o HDD** e passar `/srv/videos-publicos` para lá antes de ~4 jogos.
+- Espaço: cada jogo ~4,4 GB. A 2026-11-01 o disco virtual da VM passou de 40 para **200 GB** (no SSD da NAS; ~175 GB livres, ~40 jogos). A swap passou a ficheiro (`/swapfile`, 2 GB); cópia da tabela de partições antiga em `~/maestro/videos/vda-particoes-antes.txt`. O HDD fica para arquivo dos jogos antigos.
+- Arranque automático: publicador no `crontab` do utilizador `joao` (de 5 em 5 min, ficheiro `~/maestro/videos/crontab.txt`); recortes no serviço `footer-cortes.service` (systemd do utilizador, arranca com a VM); NGINX e Funnel também arrancam sozinhos.
 
 ## Em resumo
 
