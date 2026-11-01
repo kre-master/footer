@@ -28,8 +28,9 @@ App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (lei
 ## Bot de WhatsApp (2026-11-01)
 
 - Escreve no grupo **Futeboleiros** como "aparelho ligado" (Baileys, não oficial; risco de bloqueio do número aceite pelo João). Na VM, fora do Git: `~/maestro/whatsapp/` (`bot.mjs`, `mensagens.json` com os modelos, `config.json`, sessão em `sessao/`). Só escuta em `127.0.0.1:8091`; serviço `footer-whatsapp.service` (arranca com a VM).
-- Já automático: **vídeo novo** (o publicador avisa o grupo depois de publicar).
-- Por fazer: **convocatória** e **MVP** (nascem na app/Supabase; falta a VM saber quando acontecem) e uma página para o João editar os modelos e enviar um teste.
+- Automático: **vídeo novo** (o publicador avisa depois de publicar), **convocatória nova** (estado `open`, ainda por jogar) e **MVP fechado** (24 h após o resultado e ≥ 5 votos, como na app; empates com todos os nomes).
+- Convocatória e MVP: `~/maestro/whatsapp/vigia.mjs`, de 2 em 2 min (crontab). Entra no Supabase com a conta "Footer Bot" (membro do grupo, papel de jogador: só vê o que um jogador vê); credenciais em `~/.config/footer-bot/` (600). `vistos.json` guarda o que já foi avisado; na primeira passagem (2026-11-01) marcou 19 convocatórias e 23 jogos sem enviar nada. Log em `vigia.log`.
+- Textos em `~/maestro/whatsapp/mensagens.json` ({data}, {hora}, {titulo}, {local}, {mvp}, {link}). Por fazer: página para o João os editar e enviar um teste.
 - Para desligar: no telemóvel, Aparelhos ligados > terminar a sessão "Chrome (Ubuntu)".
 
 ## Em resumo
