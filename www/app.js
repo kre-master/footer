@@ -1356,6 +1356,7 @@ async function loadRemoteState() {
   currentGameId = null;
   await loadRemoteTracking();
   await loadRemoteVideos();
+  await loadHomeVideoIndex();
   await loadRemoteBookmarks();
   await loadJoinRequests();
   await loadPublicEvents();
@@ -3020,9 +3021,9 @@ function getGalleryHighlights() {
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
-// Leitor novo em testes: o admin da plataforma e os jogadores dos Futeboleiros (o video de teste e de um jogo deles).
+// Separadores de testes do leitor (Bunny e casa): so o admin da plataforma.
 function canSeeVideoLab() {
-  return isPlatformAdmin || (Boolean(currentSession?.user) && getActiveGroup()?.slug === LEGACY_GROUP_SLUG);
+  return isPlatformAdmin;
 }
 
 function renderGalleryFilter(gamesCount, highlightsCount) {
@@ -3054,7 +3055,7 @@ function renderGalleryGames(games) {
           return `
             <button type="button" class="gallery-card" data-gallery-game="${escapeHtml(game.id)}">
               <span class="gallery-thumb">
-                <img src="https://i.ytimg.com/vi/${encodeURIComponent(parts[0].youtubeId)}/hqdefault.jpg" alt="" loading="lazy">
+                <img src="${escapeHtml(getVideoThumb(game.id, parts[0].youtubeId))}" alt="" loading="lazy">
                 <span class="gallery-play" aria-hidden="true"></span>
                 ${parts.length > 1 ? `<span class="gallery-parts">${parts.length} partes</span>` : ""}
                 ${moments ? `<span class="gallery-moments">🔖 ${moments}</span>` : ""}
@@ -3091,7 +3092,7 @@ function renderGalleryHighlights(items) {
       <section class="highlight-game">
         <button type="button" class="highlight-game-head" data-gallery-game="${escapeHtml(game.id)}" title="Ver o video completo">
           <span class="highlight-game-thumb">
-            <img src="https://i.ytimg.com/vi/${encodeURIComponent((parts[0] || moments[0]).youtubeId)}/mqdefault.jpg" alt="" loading="lazy">
+            <img src="${escapeHtml(getVideoThumb(game.id, (parts[0] || moments[0]).youtubeId, "mqdefault"))}" alt="" loading="lazy">
           </span>
           <span class="highlight-game-date" aria-hidden="true">
             <b>${validDate ? date.getDate() : "?"}</b>
@@ -3196,7 +3197,7 @@ function openVideoLightbox(gameId, options = {}) {
   const modal = document.querySelector("#video-lightbox");
   if (!game || !parts.length || !modal) return;
   galleryGameId = game.id;
-  const bunny = getBunnyGame(game.id);
+  const bunny = getHomeVideo(game.id);
   document.querySelector("#video-lightbox-stage")?.classList.toggle("hidden", Boolean(bunny));
   if (bunny) {
     openBunnyLightbox(game, bunny, options, modal);
@@ -10310,7 +10311,9 @@ function saveLocalVideos() {
 }
 
 function getGameVideoParts(gameId) {
-  return [...(gameVideos[gameId] || [])].sort((a, b) => a.position - b.position);
+  const parts = [...(gameVideos[gameId] || [])].sort((a, b) => a.position - b.position);
+  if (parts.length || !getHomeVideo(gameId)) return parts;
+  return [{ id: HOME_VIDEO_PART, position: 1, youtubeId: HOME_VIDEO_PART, label: "", gameStartS: 0, videoStartS: 0, gameEndS: null, home: true }];
 }
 
 async function addGameVideoPart(game, part) {
@@ -10474,13 +10477,62 @@ function getHomeVideoGames() {
   return HOME_VIDEO_GAMES.filter((item) => state.games.some((game) => game.id === item.gameId));
 }
 
-// O leitor novo substitui o do YouTube so nos jogos desta lista (Galeria, Historico, links de momentos).
-function getBunnyGame(gameId) {
-  return VIDEO_LAB_GAMES.find((item) => item.gameId === gameId) || null;
+// ---- Videos de casa: servidos pela VM da NAS (NGINX + Tailscale Funnel), ver Footer_vault/11 ----
+// O desktop envia o jogo; a VM publica-o em <grupo>/<AAAA-MM-DD>.mp4 e lista-o em index.json.
+// Um jogo com video de casa usa o leitor novo em toda a app; os outros continuam no YouTube.
+const HOME_VIDEO_BASE = "https://maestro.tail85c4b5.ts.net:8443";
+// Marca dos momentos de videos de casa (a coluna youtube_id exige 11 caracteres).
+const HOME_VIDEO_PART = "casa-footer";
+let homeVideoIndex = {};
+
+async function loadHomeVideoIndex() {
+  if (!currentSession?.user) return;
+  try {
+    const response = await fetch(`${HOME_VIDEO_BASE}/v/index.json`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    homeVideoIndex = (await response.json()).groups || {};
+  } catch (error) {
+    // NAS desligada ou sem rede: os jogos ficam sem video de casa ate a proxima vez.
+    console.warn("Home video index failed", error);
+  }
 }
 
-function mountGamePlayer(container, bunny) {
-  return window.FooterVideoLab?.mount(container, { embedded: true, games: [bunny], moments: videoLabMoments }) || null;
+function getGameDateKey(game) {
+  const date = new Date(game.date);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("sv-SE", { timeZone: "Europe/Lisbon" });
+}
+
+function getHomeVideo(gameId) {
+  const game = state.games.find((item) => item.id === gameId);
+  const slug = getActiveGroup()?.slug || LEGACY_GROUP_SLUG;
+  const entry = game && homeVideoIndex[slug]?.[getGameDateKey(game)];
+  if (!entry) return null;
+  return {
+    gameId, label: "Jogo completo", video: entry.video,
+    src: `${HOME_VIDEO_BASE}/v/${entry.video}`,
+    poster: entry.poster ? `${HOME_VIDEO_BASE}/v/${entry.poster}` : "",
+  };
+}
+
+function getVideoThumb(gameId, youtubeId, size = "hqdefault") {
+  const home = getHomeVideo(gameId);
+  if (home) return home.poster;
+  return youtubeId && youtubeId !== HOME_VIDEO_PART ? `https://i.ytimg.com/vi/${encodeURIComponent(youtubeId)}/${size}.jpg` : "";
+}
+
+// Descarregar um momento: a VM recorta o pedaco e devolve um MP4 (ex.: footer-2026-10-28-35m38s.mp4).
+function getHomeClipDownload(home, item) {
+  const params = new URLSearchParams({ v: home.video, s: item.start.toFixed(1), e: item.end.toFixed(1) });
+  const date = home.video.split("/").pop().replace(".mp4", "");
+  const at = Math.floor(item.t);
+  const name = `footer-${date}-${String(Math.floor(at / 60)).padStart(2, "0")}m${String(at % 60).padStart(2, "0")}s.mp4`;
+  return { url: `${HOME_VIDEO_BASE}/corte?${params}`, name };
+}
+
+function mountGamePlayer(container, home) {
+  return window.FooterVideoLab?.mount(container, {
+    embedded: true, games: [home], moments: videoLabMoments, download: (item) => getHomeClipDownload(home, item),
+  }) || null;
 }
 
 function toPlayerClip(item) {
@@ -11190,7 +11242,7 @@ function renderGameVideoSection(game) {
           <div class="tracking-pitch-tabs game-video-parts" role="group" aria-label="Parte do vídeo">
             ${parts.map((v, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-video-part="${escapeHtml(v.youtubeId)}" aria-pressed="${i === 0}">${escapeHtml(v.label || `Parte ${i + 1}`)}</button>`).join("")}
           </div>` : ""}
-        ${getBunnyGame(game.id) ? `
+        ${getHomeVideo(game.id) ? `
         <div data-bunny-player></div>
         <p class="tracking-fineprint">Leitor de vídeo novo.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>` : `
         <div class="video-stage" data-video-stage>
@@ -11212,7 +11264,7 @@ function renderGameVideoSection(game) {
               ${parts.map((v, i) => `
                 <li>
                   <span><strong>${escapeHtml(v.label || `Parte ${i + 1}`)}</strong> · <code>${escapeHtml(v.youtubeId)}</code> · começa aos ${timeText(v.gameStartS)} da análise${v.videoStartS ? `, que no vídeo é ${timeText(v.videoStartS)}` : ""}${v.gameEndS != null ? `, acaba aos ${timeText(v.gameEndS)}` : ""}</span>
-                  <button class="danger-btn" type="button" data-video-remove="${escapeHtml(v.id)}">Remover</button>
+                  ${v.home ? `<small>Vídeo de casa (NAS): sai da lista se o ficheiro for retirado da NAS.</small>` : `<button class="danger-btn" type="button" data-video-remove="${escapeHtml(v.id)}">Remover</button>`}
                 </li>`).join("")}
             </ul>` : ""}
           <form class="game-video-form" data-video-form>
@@ -11233,7 +11285,7 @@ function renderGameVideoSection(game) {
 function seekGameVideo(container, game, seconds) {
   const target = window.FooterTracking.videoSeekTarget(getGameVideoParts(game.id), seconds);
   const player = container.querySelector("[data-game-video-section]")?.gamePlayer;
-  if (player && getBunnyGame(game.id)) {
+  if (player && getHomeVideo(game.id)) {
     if (target) player.seek(target.seconds);
     return;
   }
@@ -11266,7 +11318,7 @@ function bindGameVideoSection(game, container) {
   const section = container?.querySelector("[data-game-video-section]");
   if (!section) return;
   const frame = section.querySelector("[data-game-video]");
-  const bunny = getBunnyGame(game.id);
+  const bunny = getHomeVideo(game.id);
   if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
   else {
     frame?.addEventListener("load", () => { frame.dataset.ready = "1"; });

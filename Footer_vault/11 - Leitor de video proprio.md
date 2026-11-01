@@ -2,6 +2,27 @@
 
 Estado a 2026-10-31. Fonte única sobre o leitor novo que vai substituir o do YouTube. Ver também [[04 - Estado tecnico]] (detalhes por commit) e [[05 - Backlog e proximos passos]].
 
+## Decisão de 2026-11-01: os vídeos dos jogos passam a ser servidos de casa
+
+- **Daqui em diante, os vídeos dos jogos da Galeria vêm da NAS (casa)**, não do YouTube nem do Bunny. O jogo de 28/10 já usa o vídeo de casa.
+- **Os jogos antigos continuam no YouTube** (só mudam quando houver vídeo de casa para a data deles).
+- **Separadores 🧪 Testes e 🏠 Testes 2: só o admin da plataforma** (João) os vê.
+- **Descarregar momentos:** botão ⬇ em cada momento; a VM recorta o pedaço e devolve um MP4 (~13 s, ~7 MB, ~9 s a preparar; pedidos repetidos são instantâneos).
+
+### Como um vídeo novo chega à Galeria
+
+```
+Desktop: exporta 1080p H.264 (faststart) → scp para a VM: /srv/videos-entrada/<grupo>_<AAAA-MM-DD>.mp4
+VM (de 5 em 5 min): publicar-videos.py → confirma H.264 + faststart → /srv/videos-publicos/<grupo>/<AAAA-MM-DD>.mp4
+                    + capa .jpg + index.json
+App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (leitor novo, capa, momentos, ⬇)
+```
+
+- Nome do ficheiro: `<grupo>_<AAAA-MM-DD>.mp4` (data do jogo, hora de Lisboa). Sem grupo assume `futeboleiros`.
+- Momentos de vídeos só de casa ficam na mesma tabela com `youtube_id = "casa-footer"` (a coluna exige 11 caracteres).
+- Scripts na VM (fora do Git): `~/maestro/videos/publicar-videos.py` (log em `publicar.log`) e `~/maestro/videos/cortes-server.py` (recortes em `/srv/videos-cortes`, só escuta em `127.0.0.1:8089`). NGINX: `/v/index.json`, `/v/…` e `/corte`.
+- Espaço: cada jogo ~4,4 GB. O disco virtual da VM tem ~22 GB livres: **instalar o HDD** e passar `/srv/videos-publicos` para lá antes de ~4 jogos.
+
 ## Em resumo
 
 - **O que é:** um leitor de vídeo feito por nós, fora do YouTube, com zoom, câmara lenta, imagem a imagem e marcação de momentos ao alcance do polegar.

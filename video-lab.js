@@ -135,7 +135,8 @@
   // embedded: leitor de um jogo dentro da app (Galeria, Historico): so o video e os momentos desse jogo.
   // Devolve { playClip({ start, end, note }), playReel(), seek(segundos) } para a app o comandar.
   // presets/note: outros videos para escolher e o texto do topo (por defeito, os trechos do Bunny).
-  function mount(container, { admin = false, games = [], moments = null, embedded = false, presets = PRESETS, note = "" } = {}) {
+  // download(item): { url, name } para descarregar o pedaco de um momento em MP4 (videos de casa).
+  function mount(container, { admin = false, games = [], moments = null, embedded = false, presets = PRESETS, note = "", download = null } = {}) {
     if (!container) return null;
     const choices = [...games, ...presets];
     const stored = readStoredSrc();
@@ -541,6 +542,7 @@
             <b>▶ ${formatClock(item.t)}</b> <span>${escapeAttr(item.note)}</span>
             ${item.author ? `<small>${escapeAttr(item.author)} · ${Math.round(item.end - item.start)} s</small>` : ""}
           </button>
+          ${download ? `<button type="button" class="lab-moment-edit" data-lab-moment-download="${escapeAttr(item.id)}" aria-label="Descarregar momento em MP4" title="Descarregar">⬇</button>` : ""}
           ${item.canEdit ? `<button type="button" class="lab-moment-edit" data-lab-moment-edit="${escapeAttr(item.id)}" aria-label="Editar momento">✎</button>
           <button type="button" class="lab-moment-del" data-lab-moment-del="${escapeAttr(item.id)}" aria-label="Apagar momento">×</button>` : ""}
         </li>`).join("");
@@ -548,6 +550,34 @@
       momentList.querySelectorAll("[data-lab-moment-go]").forEach((button) => on(button, "click", () => {
         const item = find(button.dataset.labMomentGo);
         if (item) playClip(item);
+      }));
+      // Descarregar: a VM recorta o pedaco (alguns segundos) e o telemovel guarda-o como MP4.
+      momentList.querySelectorAll("[data-lab-moment-download]").forEach((button) => on(button, "click", async () => {
+        const item = find(button.dataset.labMomentDownload);
+        if (!item || button.disabled) return;
+        button.disabled = true;
+        button.textContent = "…";
+        showStatus("A preparar o vídeo do momento…");
+        try {
+          const target = download(item);
+          const response = await fetch(target.url);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const name = target.name || "momento.mp4";
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+          showStatus("");
+        } catch (error) {
+          showStatus("Não foi possível descarregar o momento. Tenta outra vez.");
+        } finally {
+          button.disabled = false;
+          button.textContent = "⬇";
+        }
       }));
       momentList.querySelectorAll("[data-lab-moment-edit]").forEach((button) => on(button, "click", () => {
         const item = find(button.dataset.labMomentEdit);
