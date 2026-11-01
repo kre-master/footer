@@ -9843,7 +9843,10 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   const chart = `<svg class="tracking-rhythm" viewBox="-2 0 ${n * 4 + 4} 40"${hrAttrs} role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints${hrOwn ? "; a linha de cor são os teus batimentos" : ""}">${bars}${hrLine}${ticks}</svg>`;
   const hrControls = hrOwn ? `
       <div class="hr-adjust hr-tl-adjust">
-        <span class="hr-adjust-title">♥ Os teus batimentos sobre o movimento</span>
+        <div class="hr-cal-head">
+          <span class="hr-adjust-title">♥ Os teus batimentos sobre o movimento</span>
+          <button type="button" class="ghost-btn" data-hr-cal-open="${escapeHtml(hrGame.id)}">⛶ Acertar em ecrã cheio</button>
+        </div>
         <p class="tracking-fineprint">A linha de cor são os teus batimentos (a cor é a zona de esforço). Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
         <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">${renderHeartRateStepButtons()}</div>
         <div class="hr-adjust-move">
@@ -10505,15 +10508,30 @@ const HOME_VIDEO_BASE = "https://maestro.tail85c4b5.ts.net:8443";
 const HOME_VIDEO_PART = "casa-footer";
 let homeVideoIndex = {};
 
-async function loadHomeVideoIndex() {
+// Motivo da ultima falha ao ler a lista de videos de casa (vazio = correu bem); aparece na pagina do jogo.
+let homeVideoIndexError = "";
+
+async function loadHomeVideoIndex({ retry = true } = {}) {
   if (!currentSession?.user) return;
   try {
-    const response = await fetch(`${HOME_VIDEO_BASE}/v/index.json`, { cache: "no-store" });
+    const response = await fetch(`${HOME_VIDEO_BASE}/v/index.json`, { cache: "no-store", signal: AbortSignal.timeout?.(15000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     homeVideoIndex = (await response.json()).groups || {};
+    homeVideoIndexError = "";
   } catch (error) {
-    // NAS desligada ou sem rede: os jogos ficam sem video de casa ate a proxima vez.
+    // NAS desligada, sem rede ou bloqueado pelo navegador: os jogos ficam no YouTube. Tenta uma vez mais e,
+    // se desta vez der, redesenha a pagina para passar ao video de casa.
+    homeVideoIndexError = error?.name === "TimeoutError" ? "demorou demasiado" : error?.message || "falhou";
     console.warn("Home video index failed", error);
+    if (retry) {
+      setTimeout(async () => {
+        await loadHomeVideoIndex({ retry: false });
+        if (!homeVideoIndexError) {
+          renderHistoryGameDetail();
+          renderGallery();
+        }
+      }, 4000);
+    }
   }
 }
 
@@ -10529,7 +10547,8 @@ function getHomeVideo(gameId) {
   if (!entry) return null;
   return {
     gameId, label: "Jogo completo", video: entry.video,
-    src: `${HOME_VIDEO_BASE}/v/${entry.video}`,
+    // Com varias qualidades (HLS) o leitor ajusta-se a rede; o mp4 original fica para os recortes.
+    src: `${HOME_VIDEO_BASE}/v/${entry.hls || entry.video}`,
     poster: entry.poster ? `${HOME_VIDEO_BASE}/v/${entry.poster}` : "",
   };
 }
@@ -11419,7 +11438,9 @@ function syncHeartRateViews(game, entry) {
   document.querySelectorAll("[data-hr-label]").forEach((output) => {
     if (output.dataset.hrGame === game.id) output.textContent = label;
   });
-  heartRatePanels.forEach((panelState) => { if (panelState.game.id === game.id) panelState.refreshChart?.(); });
+  heartRatePanels.forEach((panelState) => {
+    if (panelState.game.id === game.id && !panelState.body.querySelector("svg[data-hr-timeline]")) panelState.refreshChart?.();
+  });
   document.querySelectorAll("svg[data-hr-timeline]").forEach((svg) => {
     if (svg.dataset.hrGame !== game.id) return;
     const group = svg.querySelector("[data-hr-line]");
@@ -11428,6 +11449,13 @@ function syncHeartRateViews(game, entry) {
 }
 
 document.addEventListener("click", (event) => {
+  const fullscreen = event.target.closest?.("[data-hr-fullscreen]");
+  const openCal = event.target.closest?.("[data-hr-cal-open]");
+  if (fullscreen || openCal) {
+    const gameId = openCal?.dataset.hrCalOpen;
+    toggleChartFullscreen(fullscreen ? fullscreen.closest("[data-hr-cal]") : [...document.querySelectorAll("[data-hr-cal]")].find((item) => item.dataset.hrGame === gameId));
+    return;
+  }
   const move = event.target.closest?.("[data-hr-move]");
   const step = event.target.closest?.("[data-hr-step]");
   const reset = event.target.closest?.("[data-hr-reset]");
@@ -11477,9 +11505,90 @@ function renderHeartRateTimelineLine(game, entry, minutes) {
     }
     run.points.push(coordinate);
   });
-  const shape = (extra) => runs.map((item) => `<polyline fill="none" stroke-linejoin="round" stroke-linecap="round" ${extra(item)} points="${item.points.join(" ")}"/>`).join("");
-  return `<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="2.4"')}${shape((item) => `stroke="${item.color}" stroke-width="1.2"`)}</g>`;
+  const shape = (extra) => runs.map((item) => `<polyline fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" ${extra(item)} points="${item.points.join(" ")}"/>`).join("");
+  return `<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="3.6"')}${shape((item) => `stroke="${item.color}" stroke-width="2"`)}</g>`;
 }
+
+// Jogador do utilizador no video analisado (para acertar os batimentos com o movimento): null sem analise ou sem ligacao.
+function getOwnTrackingPlayer(gameId) {
+  const entry = getTrackingEntry(gameId);
+  const ownId = getLinkedPlayer()?.id;
+  if (!entry?.result?.players || !ownId) return null;
+  const player = entry.result.players.find((item) => item.timeline && entry.mapping?.[item.label] === ownId);
+  return player ? { entry, player } : null;
+}
+
+// Grafico de acertar: as barras de metros por minuto e os sprints do movimento (como "Ao longo do jogo") com a
+// linha dos batimentos por cima, no mesmo eixo de minutos. Estica-se em largura e altura (ecra cheio), por isso
+// os tracos nao escalam (non-scaling-stroke) e os sprints sao pontos de traco redondo.
+function renderMovementCalibrationChart(game, entry, own) {
+  const tl = own.player.timeline;
+  const n = tl.distanceM.length;
+  const rates = tl.distanceM.map((distance, i) => (tl.seenS[i] >= 20 ? distance / (tl.seenS[i] / 60) : null));
+  const maxRate = Math.max(...rates.filter((rate) => rate != null), 1);
+  const bars = rates.map((rate, i) => {
+    const height = rate == null ? 0.8 : Math.max(0.8, (30 * rate) / maxRate);
+    return `<rect class="hr-cal-bar${rate == null ? " hr-cal-bar-none" : ""}" x="${i * 4 + 0.5}" y="${(34 - height).toFixed(2)}" width="3" height="${height.toFixed(2)}"/>`;
+  }).join("");
+  const sprints = tl.sprints.map((sprint) => {
+    const x = ((sprint.start / 60) * 4).toFixed(2);
+    return `<path class="hr-cal-sprint" d="M${x} 2.5 l0 0.01" vector-effect="non-scaling-stroke"><title>Sprint aos ${formatVideoClock(sprint.start)} · ${formatTrackingNumber(sprint.kmh, 1)} km/h</title></path>`;
+  }).join("");
+  const total = n * 4 + 4;
+  const ticks = Array.from({ length: Math.floor(n / 5) + 1 }, (_, i) => `<span style="left:${(((i * 5 * 4) + 2) / total * 100).toFixed(2)}%">${i * 5}′</span>`).join("");
+  return `
+    <div class="hr-cal-chart">
+      <svg class="hr-chart hr-chart-move" viewBox="-2 0 ${total} 40" preserveAspectRatio="none" data-hr-timeline data-hr-game="${escapeHtml(game.id)}" data-hr-minutes="${n}" role="img" aria-label="Metros por minuto e sprints do jogo, com os teus batimentos por cima">
+        ${bars}${sprints}<g data-hr-line>${renderHeartRateTimelineLine(game, entry, n)}</g>
+        <line class="hr-chart-head" data-hr-head x1="0" x2="0" y1="0" y2="40" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <div class="hr-cal-axis" aria-hidden="true">${ticks}</div>
+    </div>`;
+}
+
+function renderHeartRateCalibrationChart(game, entry) {
+  const own = getOwnTrackingPlayer(game.id);
+  return own ? renderMovementCalibrationChart(game, entry, own) : renderHeartRateChart(game, entry);
+}
+
+// Ecra cheio do grafico de acertar (com os botoes la dentro). Sem a API (iPhone), ocupa a pagina toda.
+async function toggleChartFullscreen(element) {
+  if (!element) return;
+  const nativeElement = document.fullscreenElement || document.webkitFullscreenElement;
+  const button = element.querySelector("[data-hr-fullscreen]");
+  const setUi = (active) => {
+    element.classList.toggle("chart-fs", active);
+    if (!active) element.classList.remove("chart-fs-pseudo");
+    if (button) button.textContent = active ? "✕ Sair do ecrã cheio" : "⛶ Ecrã cheio";
+  };
+  if (element.classList.contains("chart-fs")) {
+    if (nativeElement) await Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => {});
+    document.body.classList.remove("stage-open");
+    setUi(false);
+    return;
+  }
+  const request = element.requestFullscreen || element.webkitRequestFullscreen;
+  try {
+    if (!request) throw new Error("no fullscreen");
+    await request.call(element);
+    screen.orientation?.lock?.("landscape").catch(() => {});
+  } catch {
+    element.classList.add("chart-fs-pseudo");
+    document.body.classList.add("stage-open");
+  }
+  setUi(true);
+}
+
+function handleChartFullscreenExit() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  document.querySelectorAll(".chart-fs:not(.chart-fs-pseudo)").forEach((element) => {
+    element.classList.remove("chart-fs");
+    const button = element.querySelector("[data-hr-fullscreen]");
+    if (button) button.textContent = "⛶ Ecrã cheio";
+  });
+}
+document.addEventListener("fullscreenchange", handleChartFullscreenExit);
+document.addEventListener("webkitfullscreenchange", handleChartFullscreenExit);
 
 function renderHeartRateChart(game, entry) {
   const samples = getHeartRateSamples(entry);
@@ -11549,7 +11658,26 @@ function renderHeartRateBody(game) {
       <span>Média <b data-hr-avg>–</b></span><span>Máx. <b data-hr-max>–</b></span><span>Mín. <b data-hr-min>–</b></span>
       <small data-hr-scope></small>
     </div>
-    ${renderHeartRateChart(game, entry)}
+    <div class="hr-cal" data-hr-cal data-hr-game="${escapeHtml(game.id)}">
+      <div class="hr-cal-head">
+        <span class="hr-adjust-title">${getOwnTrackingPlayer(game.id) ? "Acertar com o movimento" : "Acertar com o vídeo"}</span>
+        <button type="button" class="ghost-btn" data-hr-fullscreen>⛶ Ecrã cheio</button>
+      </div>
+      <div data-hr-chart>${renderHeartRateCalibrationChart(game, entry)}</div>
+      <div class="hr-adjust" role="group" aria-label="Acertar o registo com o video">
+        <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">
+          ${renderHeartRateStepButtons()}
+        </div>
+        <div class="hr-adjust-move">
+          <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(game.id)}">◀ Atrasar</button>
+          <output data-hr-label data-hr-game="${escapeHtml(game.id)}">${escapeHtml(formatHeartRateAdjust(entry.adjustS))}</output>
+          <button type="button" class="ghost-btn" data-hr-move="1" data-hr-game="${escapeHtml(game.id)}">Adiantar ▶</button>
+        </div>
+        <p class="tracking-fineprint">${getOwnTrackingPlayer(game.id)
+          ? "Os batimentos (linha de cor) devem subir logo depois dos sprints (pontos laranja) e das barras altas. Se sobem depois, carrega em Adiantar; se sobem antes, em Atrasar."
+          : "Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar."}</p>
+      </div>
+    </div>
     <div class="hr-zones" data-hr-zones></div>
     <div class="hr-options">
       <label class="hr-max">FC máxima
@@ -11557,18 +11685,6 @@ function renderHeartRateBody(game) {
         <small>bpm · vazio = o teu pico deste treino</small>
       </label>
       <label class="hr-check"><input type="checkbox" data-hr-overlay-toggle ${readHeartRateSetting("overlay") === "off" ? "" : "checked"}> Mostrar em cima do vídeo</label>
-    </div>
-    <div class="hr-adjust" role="group" aria-label="Acertar o registo com o video">
-      <span class="hr-adjust-title">Acertar com o vídeo</span>
-      <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">
-        ${renderHeartRateStepButtons()}
-      </div>
-      <div class="hr-adjust-move">
-        <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(game.id)}">◀ Atrasar</button>
-        <output data-hr-label data-hr-game="${escapeHtml(game.id)}">${escapeHtml(formatHeartRateAdjust(entry.adjustS))}</output>
-        <button type="button" class="ghost-btn" data-hr-move="1" data-hr-game="${escapeHtml(game.id)}">Adiantar ▶</button>
-      </div>
-      <p class="tracking-fineprint">Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar.</p>
     </div>
     <p class="tracking-error" data-hr-error ${heartRateNotices[game.id] ? "" : "hidden"}>${escapeHtml(heartRateNotices[game.id] || "")}</p>
     <div class="hr-footer">
@@ -11666,9 +11782,9 @@ function bindHeartRatePanel(game, section) {
   // Os marcadores dos momentos dependem do ajuste: redesenha so o grafico.
   const refreshChart = () => {
     const entry = heartRateEntries[game.id];
-    const chart = body.querySelector(".hr-chart");
-    if (entry && chart) {
-      chart.outerHTML = renderHeartRateChart(game, entry);
+    const holder = body.querySelector("[data-hr-chart]");
+    if (entry && holder) {
+      holder.innerHTML = renderHeartRateCalibrationChart(game, entry);
       panelState.scopeKey = "";
     }
   };
@@ -11843,8 +11959,11 @@ function tickHeartRatePanels() {
     updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0);
     const head = state.body.querySelector("[data-hr-head]");
     if (head && clock) {
+      const movement = state.body.querySelector("svg[data-hr-timeline]");
       const total = samples[samples.length - 1].t || 1;
-      const x = Math.max(0, Math.min(600, ((clock.gameS + offset) / total) * 600)).toFixed(1);
+      const x = (movement
+        ? Math.max(0, Math.min(Number(movement.dataset.hrMinutes) * 4, (clock.gameS / 60) * 4))
+        : Math.max(0, Math.min(600, ((clock.gameS + offset) / total) * 600))).toFixed(1);
       head.setAttribute("x1", x);
       head.setAttribute("x2", x);
     }
@@ -11894,6 +12013,7 @@ function renderGameVideoSection(game) {
           ${renderStageControls()}
         </div>
         <p class="tracking-fineprint">Vídeo não listado no YouTube: só quem tem a ligação o encontra.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
+        ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
         ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
       ${parts.length && canMarkMoments() ? renderHeartRateSection(game) : ""}
@@ -11958,6 +12078,10 @@ function showGameVideoPart(container, youtubeId) {
 function bindGameVideoSection(game, container) {
   const section = container?.querySelector("[data-game-video-section]");
   if (!section) return;
+  on(section.querySelector("[data-home-retry]"), "click", async () => {
+    await loadHomeVideoIndex({ retry: false });
+    renderHistoryGameDetail();
+  });
   const frame = section.querySelector("[data-game-video]");
   const bunny = getHomeVideo(game.id);
   bindHeartRatePanel(game, section);

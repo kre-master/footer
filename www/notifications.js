@@ -8,6 +8,24 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.20.1",
+      date: "2026-11-02",
+      title: "Vídeo mais fluido",
+      items: [
+        "O vídeo de casa passa a ter várias qualidades (1080p, 720p e 480p) e o leitor escolhe sozinho a que a tua rede aguenta, para deixar de dar soluços. Podes escolher à mão em Qualidade.",
+        "Se o vídeo de casa não responder, a página diz porquê, mostra o YouTube e tenta outra vez sozinha (há também um botão Tentar outra vez).",
+      ],
+    },
+    {
+      version: "1.20.0",
+      date: "2026-11-02",
+      title: "Acertar os batimentos em ecrã cheio",
+      items: [
+        "O gráfico para acertar os batimentos passa a mostrar as barras e os sprints do movimento, com a tua linha de batimentos por cima. Os batimentos devem subir logo depois dos sprints.",
+        "Há um botão de ecrã cheio, com os botões Atrasar e Adiantar lá dentro, para acertar com mais facilidade. Também dá para abrir a partir do gráfico Ao longo do jogo.",
+      ],
+    },
+    {
       version: "1.19.1",
       date: "2026-11-02",
       title: "Batimento em movimento",

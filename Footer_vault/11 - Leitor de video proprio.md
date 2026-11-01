@@ -166,3 +166,11 @@ Desktop (RTX 5080) ── reframe 360º → vídeo 4K do campo → versão 1080p
 - Bunny: biblioteca `footer-teste` (Frankfurt), CDN `vz-fdc7df5c-b0e.b-cdn.net`, só serve com o Referer da app. Chave em `~/.config/bunny/stream.env` na VM. Lista dos vídeos enviados: `~/maestro/bunny/videos.txt`.
 - Vídeos de teste locais: `~/videos-teste` na VM (servidos só no Tailscale em `https://maestro.tail85c4b5.ts.net/videos/`).
 - Commits: `a135889` separador Testes · `d3fd7f3` HLS + qualidade · `bf4aa3d` barra que se esbate · `7ea2ea9` "L", duas velocidades, momentos · `b845373` aberto aos Futeboleiros · (videolab6) jogo completo com momentos do grupo, All Highlights e edição.
+
+
+## Soluços no vídeo de casa e várias qualidades (2026-11-02)
+
+- **Sintoma:** no telemóvel o jogo de 28/10 (mp4 de casa, 1080p, ~8 Mbps) ficava sempre a carregar.
+- **Causa medida na VM:** o disco e o NGINX dão ~3,4 GB/s e a ligação de casa envia ~90 Mbps, mas **pelo Tailscale Funnel só passam ~0,85 MB/s (~6,8 Mbps)**, menos que o vídeo (~8 Mbps). O Funnel tem limite de largura de banda e é a parte lenta.
+- **Solução:** `~/maestro/videos/gerar-hls.py` (chamado de 5 em 5 min pelo `publicar-videos.py`, um jogo de cada vez, prioridade baixa) cria `/<grupo>/<AAAA-MM-DD>-hls/master.m3u8` com 3 qualidades (1080p a 4 Mbps, 720p a 2,2 Mbps, 480p a 1,1 Mbps; segmentos de 6 s, chaves a cada 2 s). Demora ~1,2× a duração do vídeo na VM (2 CPUs) e ocupa ~4 GB por jogo. O `index.json` passa a ter `hls` e a app (`getHomeVideo`) usa-o; o leitor já sabia tocar HLS (hls.js, escolha automática e manual da qualidade). O mp4 original fica para os recortes (⬇). O vídeo não tem áudio.
+- **Se continuar a engasgar:** o Funnel é partilhado por todos os que veem ao mesmo tempo. Alternativas: Cloudflare R2 (sem custo de saída, ~0,015 USD/GB/mês de armazenamento) ou voltar a um CDN.

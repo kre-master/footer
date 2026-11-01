@@ -7899,3 +7899,94 @@ body.mr-open {
 .hr-tl-adjust {
   padding-top: 4px;
 }
+
+/* Grafico de acertar: barras e sprints do movimento com os batimentos por cima; ecra cheio com os botoes dentro. */
+.hr-cal {
+  display: grid;
+  gap: 10px;
+}
+
+.hr-cal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hr-cal-chart {
+  display: grid;
+  gap: 4px;
+}
+
+.hr-chart-move {
+  height: 150px;
+}
+
+.hr-cal-bar {
+  fill: var(--accent);
+  fill-opacity: .75;
+}
+
+.hr-cal-bar-none {
+  fill: var(--line-strong);
+  fill-opacity: 1;
+}
+
+.hr-cal-sprint {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 7px;
+  stroke-linecap: round;
+}
+
+.hr-cal-axis {
+  position: relative;
+  height: 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.hr-cal-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.hr-cal.chart-fs {
+  position: relative;
+  z-index: 2;
+  align-content: center;
+  gap: 14px;
+  width: 100%;
+  height: 100%;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(18px + env(safe-area-inset-left, 0px));
+  overflow: auto;
+  background: var(--bg-solid);
+}
+
+.hr-cal.chart-fs-pseudo {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  height: 100dvh;
+}
+
+.hr-cal.chart-fs .hr-chart-move,
+.hr-cal.chart-fs .hr-chart {
+  height: min(52vh, 420px);
+}
+
+@media (max-height: 500px) {
+  .hr-cal.chart-fs {
+    gap: 8px;
+  }
+
+  .hr-cal.chart-fs .hr-chart-move,
+  .hr-cal.chart-fs .hr-chart {
+    height: 44vh;
+  }
+
+  .hr-cal.chart-fs .hr-adjust > .tracking-fineprint {
+    display: none;
+  }
+}
