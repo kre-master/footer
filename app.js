@@ -4019,6 +4019,48 @@ function renderProfileSummary(playerData, period, { isOwnProfile }) {
     </section>`;
 }
 
+// ---- Respostas pos-jogo sem interesse (2026-11-05): ver assessGameFeedback em postgame-feedback.js ----
+const FEEDBACK_REASON_LABELS = { far_from_group: "longe dos colegas", against_running: "contra a corrida do vídeo", all_minimum: "tudo no mínimo" };
+
+// Ritmo medio do jogo (m/min) segundo o video publicado.
+function getGameRunPace(gameId) {
+  const entry = getTrackingEntry(gameId);
+  if (!entry?.result?.players || entry.status === "draft") return null;
+  const paces = entry.result.players
+    .map((p) => Number(p.distanceM) / Number(p.validMinutes))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return paces.length ? paces.reduce((sum, value) => sum + value, 0) / paces.length : null;
+}
+
+function getUsualRunPace() {
+  const paces = getFinishedGames().map((game) => getGameRunPace(game.id)).filter((value) => value != null);
+  return paces.length >= 2 && PostgameRules.median ? PostgameRules.median(paces) : null;
+}
+
+function getFeedbackAssessment(gameId) {
+  const rows = gameFeedback.filter((item) => item.gameId === gameId);
+  if (!PostgameRules.assessGameFeedback) return rows.map((row) => ({ id: row.id, intensityTrusted: true, energyTrusted: true, reasons: [] }));
+  return PostgameRules.assessGameFeedback(rows, { gamePace: getGameRunPace(gameId), usualPace: getUsualRunPace() });
+}
+
+function getTrustedFeedback(item) {
+  if (!item) return { intensity: null, energy: null, reasons: [] };
+  const verdict = getFeedbackAssessment(item.gameId).find((row) => row.id === item.id);
+  return {
+    intensity: !verdict || verdict.intensityTrusted ? item.gameIntensity : null,
+    energy: !verdict || verdict.energyTrusted ? item.remainingEnergy : null,
+    reasons: verdict?.reasons || [],
+  };
+}
+
+// Para as calorias: a intensidade da propria resposta, ou a dos colegas quando a dela nao conta.
+function getEffortIntensity(answer, gameId) {
+  const own = getTrustedFeedback(answer).intensity;
+  if (own != null) return own;
+  const trusted = gameFeedback.filter((item) => item.gameId === gameId).map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null);
+  return trusted.length && PostgameRules.median ? PostgameRules.median(trusted) : undefined;
+}
+
 // So para o proprio: usa o peso privado e as respostas pos-jogo.
 // Estimativas privadas do jogador (peso e respostas pos-jogo); so aparecem no proprio perfil e na revisao do mes.
 function getPeriodEffort(playerData, period) {
@@ -4028,12 +4070,12 @@ function getPeriodEffort(playerData, period) {
     const participation = getPlayerParticipation(game, playerData.id);
     const minutes = row?.minutes ?? FooterMonthly.activeMinutesForSquad(participation ? getGameSidePlayerIds(game, participation.side).length : 5);
     const answer = feedback.find((item) => item.gameId === game.id);
-    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerData.id, game.date), minutes, met: FooterMonthly.metForIntensity(answer?.gameIntensity) });
+    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerData.id, game.date), minutes, met: FooterMonthly.metForIntensity(getEffortIntensity(answer, game.id)) });
   }, 0);
   return {
     calories,
-    energy: FooterMonthly.average(feedback.map((item) => item.remainingEnergy)),
-    intensity: FooterMonthly.average(feedback.map((item) => item.gameIntensity)),
+    energy: FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).energy).filter((value) => value != null)),
+    intensity: FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null)),
   };
 }
 
@@ -7829,9 +7871,16 @@ function renderPostgameAdminInsights(game) {
   if (!isAdmin) return "";
   const rows = gameFeedback.filter((item) => item.gameId === game.id);
   if (!rows.length) return `<div class="postgame-admin"><strong>Respostas pós-jogo</strong><span>0 respostas</span></div>`;
-  const intensity = FooterMonthly.average(rows.map((item) => item.gameIntensity));
-  const energy = FooterMonthly.average(rows.map((item) => item.remainingEnergy));
-  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${rows.length}</strong><span>Jogo ${intensity.toFixed(1)}/10 · Forma percebida ${energy.toFixed(1)}/10</span><div>${rows.map((item) => `<small>${escapeHtml(findPlayer(item.playerId)?.name || "Jogador")}: jogo ${item.gameIntensity}, forma ${item.remainingEnergy}</small>`).join("")}</div></div>`;
+  const trusted = rows.map((item) => ({ item, ...getTrustedFeedback(item) }));
+  const intensity = FooterMonthly.average(trusted.map((row) => row.intensity).filter((value) => value != null));
+  const energy = FooterMonthly.average(trusted.map((row) => row.energy).filter((value) => value != null));
+  const ignored = trusted.filter((row) => row.intensity == null || row.energy == null).length;
+  const fmt = (value) => (value == null ? "-" : value.toFixed(1));
+  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${rows.length}</strong><span>Jogo ${fmt(intensity)}/10 · Forma percebida ${fmt(energy)}/10${ignored ? ` · ${ignored} ${ignored === 1 ? "resposta não conta" : "respostas não contam"}` : ""}</span><div>${trusted.map((row) => {
+    const out = row.intensity == null || row.energy == null;
+    const why = row.reasons.filter((reason) => FEEDBACK_REASON_LABELS[reason]).map((reason) => FEEDBACK_REASON_LABELS[reason]).join(", ");
+    return `<small class="${out ? "feedback-ignored" : ""}">${escapeHtml(findPlayer(row.item.playerId)?.name || "Jogador")}: jogo ${row.item.gameIntensity}, forma ${row.item.remainingEnergy}${out ? ` · não conta${row.energy != null ? " a intensidade" : ""} (${why})` : ""}</small>`;
+  }).join("")}</div></div>`;
 }
 
 function getLatestFinishedGame() {
@@ -7890,14 +7939,14 @@ function getMonthlyRecapData(playerId, key) {
     const squadSize = participation ? getGameSidePlayerIds(game, participation.side).length : 5;
     return sum + FooterMonthly.activeMinutesForSquad(squadSize);
   }, 0);
-  const avgIntensity = FooterMonthly.average(feedback.map((item) => item.gameIntensity));
-  const avgEnergy = FooterMonthly.average(feedback.map((item) => item.remainingEnergy));
+  const avgIntensity = FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null));
+  const avgEnergy = FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).energy).filter((value) => value != null));
   const calories = games.reduce((sum, game) => {
     const participation = getPlayerParticipation(game, playerId);
     const squadSize = participation ? getGameSidePlayerIds(game, participation.side).length : 5;
     const minutes = FooterMonthly.activeMinutesForSquad(squadSize);
     const answer = feedback.find((item) => item.gameId === game.id);
-    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerId, game.date), minutes, met: FooterMonthly.metForIntensity(answer?.gameIntensity) });
+    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerId, game.date), minutes, met: FooterMonthly.metForIntensity(getEffortIntensity(answer, game.id)) });
   }, 0);
   const outcomes = games.map((game) => { const participation = getPlayerParticipation(game, playerId); return participation ? getPlayerOutcome(game, participation.side) : "open"; });
   const wins = outcomes.filter((outcome) => outcome === "win").length;

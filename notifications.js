@@ -8,6 +8,16 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.24.0",
+      date: "2026-11-05",
+      title: "Respostas pós-jogo mais justas",
+      items: [
+        "Respostas ao questionário pós-jogo dadas sem interesse deixam de contar para a média do jogo: intensidade muito longe da dos colegas, ao contrário do que o vídeo mostra da corrida, ou 1 e 1 em tudo.",
+        "Nas calorias, quando a tua intensidade não conta, usa-se a dos colegas.",
+        "O admin vê no jogo quais respostas não contaram e porquê.",
+      ],
+    },
+    {
       version: "1.23.0",
       date: "2026-11-05",
       title: "Faltas (só admins)",

@@ -275,3 +275,14 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Perfil (so admins): "Disse Vou e apareceu: X de N" contando convocatorias com resposta Vou e jogo fechado a mesma hora.
 - A falta nao mexe nos pagamentos (esses continuam a seguir as equipas e os ajustes manuais).
 
+## Respostas pos-jogo sem interesse (decidido 2026-11-05)
+
+- Regra em `postgame-feedback.js` (`assessGameFeedback`), so para calculos (nada muda na base de dados nem e mostrado ao jogador):
+  - "longe dos colegas": intensidade a 4+ pontos da mediana das outras respostas do jogo (precisa de 4+ outras) -> a intensidade nao conta;
+  - "contra a corrida do video": ritmo medio do jogo (m/min, analise publicada) >= ao habitual (mediana dos jogos) e intensidade 1-2, ou ritmo <= 92% do habitual e intensidade 9-10;
+  - "tudo no minimo": 1 e 1. Junto com outro sinal, a resposta inteira (intensidade e forma) nao conta.
+- A forma sentida e pessoal: um valor baixo sozinho nunca e descartado.
+- Nao conta na media do jogo (painel do admin), na media pessoal do periodo/revisao do mes nem nas calorias (usa-se a mediana das intensidades validas do jogo).
+- Nos jogos de outubro e novembro a regra apanha 1 a 2 respostas por jogo; o caso que a motivou (1 e 1 num jogo com corrida acima do habitual) fica de fora por inteiro.
+- Ideia por fazer: assinalar quem responde sempre igual em todos os jogos.
+

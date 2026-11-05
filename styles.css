@@ -8350,3 +8350,4 @@ body.mr-open {
 .no-show-section .hint { margin: 6px 0 0; }
 .reliability-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0 0 14px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 14px; font-size: 14px; }
 .reliability-line small { color: var(--muted); }
+.postgame-admin small.feedback-ignored { opacity: .6; text-decoration: line-through; text-decoration-thickness: 1px; }
