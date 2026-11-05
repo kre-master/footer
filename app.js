@@ -12880,112 +12880,136 @@ function ensureHeartRateOverlay(section) {
     overlay.className = "hr-overlay hidden";
     overlay.dataset.hrOverlay = "";
     overlay.setAttribute("aria-hidden", "true");
-    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><canvas class="hr-ecg"></canvas>`;
+    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><canvas class="hr-trace"></canvas>`;
     stage.append(overlay);
   }
   return overlay;
 }
 
-// Traco tipo ECG com os ultimos 2,5 s: um batimento com a forma P-QRS-T ao ritmo dos bpm (e da velocidade do
-// video), a ponta a liderar a direita e a cauda a esbater-se. E uma ilustracao: o relogio so da uma leitura a
-// cada 1-3 s, nao ha curva real de 2,5 s. Parado o video, o traco congela.
-const HEART_RATE_ECG_WINDOW_S = 2.5;
-const HEART_RATE_ECG_SIZE = { width: 56, height: 20 };
-const heartRateEcgs = new Map();
-let heartRateEcgFrame = 0;
-let heartRateEcgLast = 0;
+// Linha de batimentos em direto na pilula do video: os ultimos HEART_RATE_TRACE_WINDOW_S segundos do treino,
+// desenhados ate ao momento do video, com a cor da zona em cada troco e a cauda a esbater-se ate ficar
+// transparente. O relogio so da uma leitura a cada ~3 s (a serie guarda-se de 3 em 3 s), por isso a curva
+// e a interpolacao entre leituras. Parado o video, o traco congela.
+const HEART_RATE_TRACE_WINDOW_S = 30;
+const HEART_RATE_TRACE_SIZE = { width: 96, height: 26 };
+const HEART_RATE_TRACE_MIN_SPAN = 20;
+const heartRateTraces = new Map();
+let heartRateTraceFrame = 0;
 
-function getHeartRateEcg(overlay) {
-  let ecg = heartRateEcgs.get(overlay);
-  if (!ecg) {
-    const canvas = overlay.querySelector(".hr-ecg");
+function getHeartRateTrace(overlay) {
+  let trace = heartRateTraces.get(overlay);
+  if (!trace) {
+    const canvas = overlay.querySelector(".hr-trace");
     const ratio = Math.min(3, window.devicePixelRatio || 1);
-    canvas.width = Math.round(HEART_RATE_ECG_SIZE.width * ratio);
-    canvas.height = Math.round(HEART_RATE_ECG_SIZE.height * ratio);
-    canvas.style.width = `${HEART_RATE_ECG_SIZE.width}px`;
-    canvas.style.height = `${HEART_RATE_ECG_SIZE.height}px`;
-    ecg = { canvas, ctx: canvas.getContext("2d"), ratio, phase: 0, bpm: 0, rate: 0, color: "#fff", active: false, drawn: false };
-    heartRateEcgs.set(overlay, ecg);
+    canvas.width = Math.round(HEART_RATE_TRACE_SIZE.width * ratio);
+    canvas.height = Math.round(HEART_RATE_TRACE_SIZE.height * ratio);
+    canvas.style.width = `${HEART_RATE_TRACE_SIZE.width}px`;
+    canvas.style.height = `${HEART_RATE_TRACE_SIZE.height}px`;
+    trace = { canvas, ctx: canvas.getContext("2d"), ratio, data: null, gameS: 0, at: 0, rate: 0, active: false, drawn: false };
+    heartRateTraces.set(overlay, trace);
   }
-  return ecg;
+  return trace;
 }
 
-function drawHeartRateEcg(ecg) {
-  const { ctx, canvas, ratio } = ecg;
+function drawHeartRateTrace(trace, now) {
+  const { ctx, canvas, ratio, data } = trace;
+  const api = window.FooterHeartRate;
   const width = canvas.width;
   const height = canvas.height;
-  const speed = (ecg.bpm / 60) * (ecg.rate || 1);
-  const base = height * 0.72;
-  const amplitude = height * 0.62;
-  const [red, green, blue] = [1, 3, 5].map((index) => parseInt(ecg.color.slice(index, index + 2), 16) || 255);
-  const fade = ctx.createLinearGradient(0, 0, width, 0);
-  fade.addColorStop(0, `rgba(${red},${green},${blue},0)`);
-  fade.addColorStop(0.5, `rgba(${red},${green},${blue},.3)`);
-  fade.addColorStop(1, `rgba(${red},${green},${blue},1)`);
-  ctx.clearRect(0, 0, width, height);
-  ctx.beginPath();
-  let lastY = base;
+  const gameS = trace.gameS + (trace.rate > 0 ? ((now - trace.at) / 1000) * trace.rate : 0);
+  const points = [];
   for (let x = 0; x < width; x += 1) {
-    const secondsAgo = HEART_RATE_ECG_WINDOW_S * (1 - x / (width - 1));
-    lastY = base - window.FooterHeartRate.ecgWave(ecg.phase - speed * secondsAgo) * amplitude;
-    if (x) ctx.lineTo(x, lastY); else ctx.moveTo(x, lastY);
+    const secondsAgo = HEART_RATE_TRACE_WINDOW_S * (1 - x / (width - 1));
+    points.push(api.smoothHeartRateAt(data.samples, gameS - secondsAgo, data.offset));
   }
-  ctx.strokeStyle = fade;
-  ctx.lineWidth = 1.5 * ratio;
-  ctx.lineJoin = "round";
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(width - 2 * ratio, lastY, 1.8 * ratio, 0, Math.PI * 2);
-  ctx.fillStyle = ecg.color;
-  ctx.shadowColor = ecg.color;
-  ctx.shadowBlur = 5 * ratio;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ecg.drawn = true;
+  const values = points.filter((value) => value != null);
+  ctx.clearRect(0, 0, width, height);
+  if (!values.length) {
+    trace.drawn = true;
+    return;
+  }
+  const mid = (Math.min(...values) + Math.max(...values)) / 2;
+  const half = Math.max(HEART_RATE_TRACE_MIN_SPAN, Math.max(...values) - Math.min(...values)) / 2;
+  const pad = 3 * ratio;
+  const y = (hr) => pad + (1 - (hr - (mid - half)) / (half * 2)) * (height - pad * 2);
+  ctx.lineWidth = 1.8 * ratio;
+  ctx.lineCap = "round";
+  let lastY = null;
+  let lastColor = "#fff";
+  for (let x = 1; x < width; x += 1) {
+    const hr = points[x];
+    const before = points[x - 1];
+    if (hr == null || before == null) continue;
+    const zone = api.zoneFor(Math.round(hr), data.maxHr);
+    const alpha = Math.pow(x / (width - 1), 1.4);
+    const [red, green, blue] = [1, 3, 5].map((index) => parseInt(zone.color.slice(index, index + 2), 16) || 255);
+    ctx.strokeStyle = `rgba(${red},${green},${blue},${alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(x - 1, y(before));
+    ctx.lineTo(x, y(hr));
+    ctx.stroke();
+    lastY = y(hr);
+    lastColor = zone.color;
+  }
+  if (lastY != null && points[width - 1] != null) {
+    ctx.beginPath();
+    ctx.arc(width - 2 * ratio, lastY, 2 * ratio, 0, Math.PI * 2);
+    ctx.fillStyle = lastColor;
+    ctx.shadowColor = lastColor;
+    ctx.shadowBlur = 5 * ratio;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  trace.drawn = true;
 }
 
-function stepHeartRateEcg(now) {
-  heartRateEcgFrame = 0;
-  const seconds = Math.min(0.1, (now - heartRateEcgLast) / 1000);
-  heartRateEcgLast = now;
-  const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+function stepHeartRateTrace(now) {
+  heartRateTraceFrame = 0;
   let running = false;
-  heartRateEcgs.forEach((ecg, overlay) => {
+  heartRateTraces.forEach((trace, overlay) => {
     if (!overlay.isConnected) {
-      heartRateEcgs.delete(overlay);
+      heartRateTraces.delete(overlay);
       return;
     }
-    if (!ecg.active) return;
+    if (!trace.active || !trace.data) return;
     running = true;
-    if (ecg.drawn && (ecg.rate <= 0 || calm)) return;
-    ecg.phase = (ecg.phase + (ecg.bpm / 60) * ecg.rate * seconds) % 1;
-    drawHeartRateEcg(ecg);
+    if (trace.drawn && trace.rate <= 0) return;
+    drawHeartRateTrace(trace, now);
   });
-  if (running) heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+  if (running) heartRateTraceFrame = requestAnimationFrame(stepHeartRateTrace);
 }
 
-function startHeartRateEcg() {
-  if (heartRateEcgFrame) return;
-  heartRateEcgLast = performance.now();
-  heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+function startHeartRateTrace() {
+  if (heartRateTraceFrame) return;
+  heartRateTraceFrame = requestAnimationFrame(stepHeartRateTrace);
 }
 
 // Sem leitura neste momento (fora do registo): coracao e "-" a cinzento. `visible` falso esconde tudo.
-function updateHeartRateOverlay(section, bpm, zone, visible, rate = 0) {
+// `source` = { samples, offset, maxHr, gameS } para desenhar a linha; null quando o leitor nao da tempo.
+function updateHeartRateOverlay(section, bpm, zone, visible, rate = 0, source = null) {
   const overlay = ensureHeartRateOverlay(section);
   if (!overlay) return;
   overlay.classList.toggle("hidden", !visible);
   const empty = bpm == null || !zone;
-  const ecg = getHeartRateEcg(overlay);
-  ecg.active = Boolean(visible && !empty);
-  if (ecg.active) {
-    ecg.bpm = bpm;
-    ecg.rate = rate;
-    if (ecg.color !== zone.color) {
-      ecg.color = zone.color;
-      ecg.drawn = false;
+  const trace = getHeartRateTrace(overlay);
+  trace.active = Boolean(visible && !empty && source);
+  if (trace.active) {
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // Parado, so se redesenha se o video saltou ou o ajuste/zona mudou; a mexer, o tempo corre sozinho.
+    const moved = Math.abs(source.gameS - trace.gameS) > 0.05 || trace.data?.offset !== source.offset || trace.data?.maxHr !== source.maxHr;
+    const nowMs = performance.now();
+    // A mexer, o tempo corre sozinho a cada frame; so se corrige quando o relogio do video difere mais de 0,35 s
+    // (salto ou pausa), para a linha nao dar solavancos a cada leitura do leitor.
+    const expected = trace.gameS + (trace.rate > 0 ? ((nowMs - trace.at) / 1000) * trace.rate : 0);
+    const drifted = !(rate > 0 && trace.rate > 0) || Math.abs(expected - source.gameS) > 0.35;
+    trace.data = source;
+    if (drifted) {
+      trace.gameS = source.gameS;
+      trace.at = nowMs;
     }
-    startHeartRateEcg();
+    trace.rate = calm ? 0 : rate;
+    if (moved || rate > 0) trace.drawn = false;
+    startHeartRateTrace();
   }
   if (!visible) return;
   const key = empty ? "empty" : `${bpm}|${zone.zone}`;
@@ -13028,11 +13052,12 @@ function tickHeartRatePanels() {
     const offset = getHeartRateOffset(state.game, entry);
     const maxHr = getHeartRateMax(entry);
     const clock = readHeartRateClock(state.game, state.section);
-    const bpm = clock ? api.heartRateAt(samples, clock.gameS, offset) : null;
+    const smooth = clock ? api.smoothHeartRateAt(samples, clock.gameS, offset) : null;
+    const bpm = smooth == null ? null : Math.round(smooth);
     const zone = bpm == null ? null : api.zoneFor(bpm, maxHr);
     now.textContent = bpm == null ? "--" : String(bpm);
     now.style.color = zone ? zone.color : "";
-    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0);
+    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0, clock ? { samples, offset, maxHr, gameS: clock.gameS } : null);
     const head = state.body.querySelector("[data-hr-head]");
     if (head && clock) {
       const movement = state.body.querySelector("svg[data-hr-timeline]");

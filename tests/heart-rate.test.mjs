@@ -193,3 +193,18 @@ test("ecgWave: pico R, baseline, periodica e dentro dos limites", () => {
     assert.ok(value >= -0.3 - 1e-9 && value <= 1 + 1e-9);
   }
 });
+
+test("smoothHeartRateAt: passa pelas leituras, estima os segundos entre elas e nao ultrapassa picos", () => {
+  const samples = [0, 3, 6, 9, 12].map((t, i) => ({ t, hr: [100, 120, 160, 150, 130][i] }));
+  const at = (t) => heartRate.smoothHeartRateAt(samples, t);
+  samples.forEach((sample) => assert.equal(at(sample.t), sample.hr));
+  const between = [7, 7.5, 8, 8.5].map(at);
+  between.forEach((value) => assert.ok(value <= 160 && value >= 150));
+  const rising = [3.5, 4, 5, 5.5].map(at);
+  assert.ok(rising.every((value, i) => i === 0 || value > rising[i - 1]));
+  assert.ok(Math.abs(at(4.5) - 140) < 8);
+  assert.equal(at(100), null);
+  assert.equal(heartRate.smoothHeartRateAt([], 3), null);
+  const gap = [{ t: 0, hr: 100 }, { t: 60, hr: 140 }];
+  assert.equal(heartRate.smoothHeartRateAt(gap, 30), null);
+});

@@ -7869,12 +7869,12 @@ body.mr-open {
   font-variant-numeric: tabular-nums;
 }
 
-.hr-ecg {
+.hr-trace {
   display: block;
   margin-left: 2px;
 }
 
-.hr-overlay-empty .hr-ecg {
+.hr-overlay-empty .hr-trace {
   display: none;
 }
 
