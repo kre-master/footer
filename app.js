@@ -1365,6 +1365,7 @@ async function loadRemoteState() {
   await loadRemoteBookmarks();
   await loadHeartRate();
   await loadJoinRequests();
+  await loadNoShows();
   await loadPublicEvents();
   await refreshPendingInvite();
   saveState();
@@ -3675,6 +3676,7 @@ function renderPlayerProfile() {
     ${renderProfileHero(playerData, form, variant)}
     ${isOwnProfile ? renderMeNowBlock() : ""}
     ${isOwnProfile ? renderMonthReviewCard(playerData) : ""}
+    ${renderReliability(playerData)}
     ${renderProfilePeriodNav(months)}
     ${renderProfileSummary(playerData, period, { isOwnProfile })}
 
@@ -8633,7 +8635,7 @@ function renderRosterRow(playerData, currentGroup) {
   return `
     <div class="roster-row">
       <div class="roster-row-head">
-        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
         <button class="roster-remove" type="button" data-remove-player="${playerData.id}" aria-label="Remover ${escapeHtml(playerData.name)}" title="Remover">&times;</button>
       </div>
       <div class="roster-actions">
@@ -8674,6 +8676,7 @@ function removePlayerFromGame(playerId) {
   });
   if (game.status !== "preview") persistState();
   render();
+  promptNoShow(game, playerId);
 }
 
 function addSelectedPlayerToGame() {
@@ -9383,6 +9386,144 @@ function renderClubPanel() {
     renderClubTab();
     renderClubPanel();
   });
+}
+
+// ---- Faltas (2026-11-05): quem disse Vou e nao apareceu. So admins; tabela event_no_shows (supabase/no-shows-migration.sql) ----
+let eventNoShows = [];
+let noShowsAvailable = false;
+
+async function loadNoShows() {
+  eventNoShows = [];
+  noShowsAvailable = false;
+  if (!supabaseClient || !currentSession?.user || !isAdmin) return;
+  const { data, error } = await supabaseClient.from("event_no_shows").select("event_id, player_id");
+  if (error) {
+    console.warn("No-shows load failed. Run supabase/no-shows-migration.sql.", error);
+    return;
+  }
+  const groupEventIds = new Set((state.events || []).map((eventData) => eventData.id));
+  eventNoShows = (data || []).filter((row) => groupEventIds.has(row.event_id));
+  noShowsAvailable = true;
+}
+
+function isNoShow(eventId, playerId) {
+  return eventNoShows.some((row) => row.event_id === eventId && row.player_id === playerId);
+}
+
+// A convocatoria de um jogo: a ligada a ele, ou a da mesma hora (+-1 min).
+function getEventForGameTime(game) {
+  if (!game) return null;
+  const linked = findEventForGame(game);
+  if (linked) return linked;
+  const gameTime = new Date(game.date).getTime();
+  return (state.events || []).find((eventData) => Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000) || null;
+}
+
+async function setNoShow(eventId, playerId, missed) {
+  if (!isAdmin || !supabaseClient) return false;
+  const { error } = missed
+    ? await supabaseClient.from("event_no_shows").upsert({ event_id: eventId, player_id: playerId }, { onConflict: "event_id,player_id" })
+    : await supabaseClient.from("event_no_shows").delete().eq("event_id", eventId).eq("player_id", playerId);
+  if (error) {
+    alert(`Nao consegui guardar a falta: ${error.message}`);
+    return false;
+  }
+  eventNoShows = eventNoShows.filter((row) => !(row.event_id === eventId && row.player_id === playerId));
+  if (missed) eventNoShows.push({ event_id: eventId, player_id: playerId });
+  return true;
+}
+
+// Depois de tirar alguem das equipas: se tinha dito Vou, pergunta se faltou.
+function promptNoShow(game, playerId) {
+  if (!noShowsAvailable || !isAdmin) return;
+  const eventData = (currentEventId && game?.status === "preview" ? (state.events || []).find((item) => item.id === currentEventId) : null) || getEventForGameTime(game);
+  const playerData = findPlayer(playerId);
+  if (!eventData || !playerData || getResponseForPlayer(eventData.id, playerId)?.status !== "going" || isNoShow(eventData.id, playerId)) return;
+  showNoShowToast(eventData.id, playerData);
+}
+
+function showNoShowToast(eventId, playerData) {
+  document.querySelector(".app-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "app-toast";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `
+    <span><strong>${escapeHtml(playerData.name)}</strong> tinha dito Vou. Faltou?</span>
+    <div class="actions">
+      <button type="button" class="primary-btn" data-toast-yes>Faltou</button>
+      <button type="button" class="ghost-btn" data-toast-no>Não</button>
+    </div>`;
+  document.body.append(toast);
+  const close = () => {
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 220);
+  };
+  let timer = setTimeout(close, 9000);
+  toast.querySelector("[data-toast-no]").addEventListener("click", close);
+  toast.querySelector("[data-toast-yes]").addEventListener("click", async (event) => {
+    clearTimeout(timer);
+    const ok = await runWithButton(event.currentTarget, () => setNoShow(eventId, playerData.id, true));
+    if (!ok) return;
+    toast.innerHTML = `
+      <span>Falta registada para <strong>${escapeHtml(playerData.name)}</strong>. Só os admins veem.</span>
+      <div class="actions"><button type="button" class="ghost-btn" data-toast-undo>Desfazer</button></div>`;
+    toast.querySelector("[data-toast-undo]").addEventListener("click", async () => {
+      await setNoShow(eventId, playerData.id, false);
+      close();
+      renderHistoryGameDetail();
+    });
+    timer = setTimeout(close, 6000);
+    renderHistoryGameDetail();
+  });
+}
+
+// Pagina do jogo (admin): quem disse Vou e nao jogou, com Faltou / Desfazer.
+function renderNoShowSection(game) {
+  if (!isAdmin || !noShowsAvailable || !isFinishedGame(game)) return "";
+  const eventData = getEventForGameTime(game);
+  if (!eventData) return "";
+  const played = new Set(getGamePlayerIds(game));
+  const missing = getEventResponses(eventData.id, "going").map((response) => response.playerId).filter((playerId) => !played.has(playerId));
+  if (!missing.length) return "";
+  return `
+    <section class="profile-section no-show-section admin-actions">
+      <h3>Disseram Vou e não jogaram</h3>
+      <p class="hint">Marca quem faltou. Conta para a fiabilidade, que só os admins veem.</p>
+      <div class="no-show-list">
+        ${missing.map((playerId) => {
+          const playerData = findPlayer(playerId);
+          const missed = isNoShow(eventData.id, playerId);
+          return `
+            <div class="no-show-row">
+              <span>${playerData ? renderAvatar(playerData) : ""} ${escapeHtml(playerData?.name || "Jogador")}</span>
+              ${missed
+                ? `<span class="metric warn-pill">Faltou</span><button type="button" class="ghost-btn" data-no-show="${escapeHtml(playerId)}" data-event-id="${escapeHtml(eventData.id)}" data-missed="false">Desfazer</button>`
+                : `<button type="button" class="ghost-btn" data-no-show="${escapeHtml(playerId)}" data-event-id="${escapeHtml(eventData.id)}" data-missed="true">Faltou</button>`}
+            </div>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+function bindNoShowSection(root) {
+  root?.querySelectorAll("[data-no-show]").forEach((button) => button.addEventListener("click", async () => {
+    const ok = await runWithButton(button, () => setNoShow(button.dataset.eventId, button.dataset.noShow, button.dataset.missed === "true"));
+    if (ok) renderHistoryGameDetail();
+  }));
+}
+
+// Perfil (admin): disse Vou em jogos ja fechados e quantas vezes faltou.
+function renderReliability(playerData) {
+  if (!isAdmin || !noShowsAvailable) return "";
+  const said = (state.events || []).filter((eventData) =>
+    getResponseForPlayer(eventData.id, playerData.id)?.status === "going" && getFinishedGameAtEventTime(eventData));
+  if (!said.length) return "";
+  const missed = said.filter((eventData) => isNoShow(eventData.id, playerData.id)).length;
+  return `
+    <div class="reliability-line">
+      <span>Disse Vou e apareceu: <strong>${said.length - missed} de ${said.length}</strong>${missed ? ` · faltou ${missed}×` : ""}</span>
+      <small>Só os admins veem</small>
+    </div>`;
 }
 
 // ---- Micro-interaccoes (2026-11-05). So transform/opacity; com "reduzir movimento" nada mexe. ----
@@ -13080,11 +13221,12 @@ function renderHistoryGameDetail() {
     <div class="field-card history-field-card">
       ${renderField(game, { radarPosition: "none", clickablePlayers: true })}
     </div>
-    <section class="profile-section history-radar-section">
+    ${ratingsVisible() ? `<section class="profile-section history-radar-section">
       <h3>Equipas em comparação</h3>
       ${renderTeamRadarChart([...hydrate(game.teamA), ...hydrate(getBenchA(game))], [...hydrate(game.teamB), ...hydrate(getBenchB(game))], { inlineOdds: true })}
-    </section>
+    </section>` : ""}
     ${renderHistoryRosterEditor(game)}
+    ${renderNoShowSection(game)}
     ${renderGameVideoSection(game)}
     ${renderTrackingTestSection(game)}
   `;
@@ -13109,6 +13251,7 @@ function renderHistoryGameDetail() {
     });
   });
   bindHistoryRosterEditorActions(game);
+  bindNoShowSection(els.historyGameDetail);
   bindMvpPanelActions(game, els.historyGameDetail);
   bindTrackingTestSection(game, els.historyGameDetail);
   bindGameVideoSection(game, els.historyGameDetail);
@@ -13159,7 +13302,7 @@ function renderHistoryRosterRow(gameId, playerData, currentGroup) {
 
   return `
     <div class="roster-row">
-      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
       <div class="roster-actions">
         ${actions.map(([key, label]) => `<button class="mini-btn" data-history-move-player="${playerData.id}" data-game-id="${gameId}" data-to-group="${key}">${label}</button>`).join("")}
         <button class="mini-btn" data-history-remove-player="${playerData.id}" data-game-id="${gameId}">Remover</button>
@@ -13227,11 +13370,12 @@ async function movePlayerInHistoryGame(gameId, playerId, toGroup) {
 
 async function removePlayerFromHistoryGame(gameId, playerId) {
   if (!confirm("Remover este jogador deste jogo? Isto pode alterar pagamentos se nao houver override manual.")) return;
-  await mutateHistoryGame(gameId, (game) => {
+  const removed = await mutateHistoryGame(gameId, (game) => {
     ["teamA", "teamB", "benchA", "benchB"].forEach((group) => {
       game[group] = (game[group] || []).filter((id) => id !== playerId);
     });
   });
+  if (removed !== false) promptNoShow(state.games.find((item) => item.id === gameId), playerId);
 }
 
 async function addPlayerToHistoryGame(gameId, playerId, toGroup) {

@@ -8,6 +8,16 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.23.0",
+      date: "2026-11-05",
+      title: "Faltas (só admins)",
+      items: [
+        "Quando um admin tira das equipas alguém que tinha dito Vou, a app pergunta se faltou.",
+        "Na página de um jogo fechado, o admin vê quem disse Vou e não jogou, e marca ou desfaz a falta.",
+        "No perfil, os admins veem quantas vezes o jogador disse Vou e apareceu. Os jogadores não veem isto.",
+      ],
+    },
+    {
       version: "1.22.1",
       date: "2026-11-05",
       title: "Convocatória fechada não volta",

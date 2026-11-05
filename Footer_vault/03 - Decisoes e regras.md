@@ -268,3 +268,10 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - As cartas (premios) contam so dentro de cada clube. Cada jogador pode criar o seu jogador e pôr a foto que quiser (botao no proprio perfil).
 - Micro-interaccoes: botao -> roda -> visto (gravar), salto no Vou, bola a voar para Jogos (pedir para jogar, Vou), linhas em cascata ao entrar num ecra (70 ms, ate 12), simbolo das novidades a balancar, carta a virar ao criar o jogador e nas cartas novas, deslizar para aprovar/rejeitar nos Pedidos e pedidos para jogar. So transform/opacidade; com "reduzir movimento" nada mexe.
 
+## Faltas e fiabilidade (decidido 2026-11-05)
+
+- Falta = disse Vou e nao apareceu. So o admin marca e so admins veem (tabela `event_no_shows`, RLS so admin do grupo). Nunca publico.
+- Ao tirar das equipas alguem com Vou (Fazer equipas ou editar jogo do historico), a app pergunta "Faltou?". Na pagina de um jogo fechado ha a lista "Disseram Vou e nao jogaram" para marcar ou desfazer (serve para jogos antigos, como o de 3/11).
+- Perfil (so admins): "Disse Vou e apareceu: X de N" contando convocatorias com resposta Vou e jogo fechado a mesma hora.
+- A falta nao mexe nos pagamentos (esses continuam a seguir as equipas e os ajustes manuais).
+

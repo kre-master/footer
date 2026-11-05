@@ -8321,3 +8321,32 @@ body.mr-open {
 .player-card:has(.card-club) { container-type: inline-size; }
 .card-rating.card-club .club-symbol-card { display: inline-grid !important; flex: 0 0 auto; width: 210%; height: auto; aspect-ratio: 1; font-size: 6cqw; line-height: 1; text-shadow: none; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
 .pp-photo-cta { margin-top: 10px; min-height: 36px; display: inline-flex; align-items: center; cursor: pointer; }
+
+/* ===== Faltas (2026-11-05) ===== */
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 120;
+  width: min(440px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-opaque);
+  box-shadow: var(--shadow);
+  animation: toast-in .28s cubic-bezier(.2, .8, .3, 1);
+}
+.app-toast .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
+.app-toast.leaving { opacity: 0; transform: translate(-50%, 12px); transition: opacity .2s ease, transform .2s ease; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (max-width: 760px) { .app-toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); } }
+@media (prefers-reduced-motion: reduce) { .app-toast { animation: none; } }
+.no-show-list { display: grid; gap: 8px; margin-top: 10px; }
+.no-show-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.no-show-row > span:first-child { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 140px; font-weight: 700; }
+.no-show-section .hint { margin: 6px 0 0; }
+.reliability-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0 0 14px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 14px; font-size: 14px; }
+.reliability-line small { color: var(--muted); }
