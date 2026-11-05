@@ -12969,8 +12969,8 @@ function ensureHeartRateOverlay(section) {
 // desenhados ate ao momento do video, com a cor da zona em cada troco e a cauda a esbater-se ate ficar
 // transparente. O relogio so da uma leitura a cada ~3 s (a serie guarda-se de 3 em 3 s), por isso a curva
 // e a interpolacao entre leituras. Parado o video, o traco congela.
-const HEART_RATE_TRACE_WINDOW_S = 30;
-const HEART_RATE_TRACE_SIZE = { width: 96, height: 26 };
+const HEART_RATE_TRACE_WINDOW_S = 6;
+const HEART_RATE_TRACE_SIZE = { width: 86, height: 26 };
 const HEART_RATE_TRACE_MIN_SPAN = 20;
 const heartRateTraces = new Map();
 let heartRateTraceFrame = 0;
