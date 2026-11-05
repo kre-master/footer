@@ -11364,14 +11364,19 @@ function saveLocalVideos() {
   }
 }
 
+// So as partes guardadas (YouTube); o video de casa e acrescentado por getGameVideoParts e nao conta aqui.
+function getSavedGameVideoParts(gameId) {
+  return [...(gameVideos[gameId] || [])].sort((a, b) => a.position - b.position);
+}
+
 function getGameVideoParts(gameId) {
-  const parts = [...(gameVideos[gameId] || [])].sort((a, b) => a.position - b.position);
+  const parts = getSavedGameVideoParts(gameId);
   if (parts.length || !getHomeVideo(gameId)) return parts;
   return [{ id: HOME_VIDEO_PART, position: 1, youtubeId: HOME_VIDEO_PART, label: "", gameStartS: 0, videoStartS: 0, gameEndS: null, home: true }];
 }
 
 async function addGameVideoPart(game, part) {
-  const parts = getGameVideoParts(game.id);
+  const parts = getSavedGameVideoParts(game.id);
   const position = (parts.length ? Math.max(...parts.map((v) => v.position)) : 0) + 1;
   if (!gameVideosRemote) {
     gameVideos[game.id] = [...parts, { ...part, id: `local-${Date.now()}`, position, createdAt: new Date().toISOString() }];
@@ -11391,7 +11396,7 @@ async function removeGameVideoPart(game, partId) {
     const { error } = await supabaseClient.from("game_videos").delete().eq("id", partId);
     if (error) throw new Error(`Não foi possível remover o vídeo: ${error.message}`);
   }
-  gameVideos[game.id] = getGameVideoParts(game.id).filter((v) => v.id !== partId);
+  gameVideos[game.id] = getSavedGameVideoParts(game.id).filter((v) => v.id !== partId);
   if (!gameVideosRemote) saveLocalVideos();
 }
 
@@ -13066,6 +13071,7 @@ function renderGameVideoSection(game) {
     return canMarkMoments() ? `<section class="game-video-section" data-game-video-section>${renderHeartRateSection(game)}</section>` : "";
   }
   const first = parts[0];
+  const savedCount = getSavedGameVideoParts(game.id).length;
   const timeText = (s) => formatVideoClock(s);
   return `
     <section class="profile-section tracking-section game-video-section${parts.length ? "" : " admin-only"}" data-game-video-section>
@@ -13105,8 +13111,8 @@ function renderGameVideoSection(game) {
             </ul>` : ""}
           <form class="game-video-form" data-video-form>
             <label>Ligação do YouTube<input type="text" name="url" required placeholder="https://youtu.be/…" autocomplete="off"></label>
-            <label>Nome da parte <small>(opcional)</small><input type="text" name="label" maxlength="60" placeholder="${parts.length ? `Parte ${parts.length + 1}` : "Jogo todo"}"></label>
-            <label>Começa aos … da análise<input type="text" name="gameStart" inputmode="numeric" value="${parts.length ? "" : "0:00"}" placeholder="mm:ss" ${parts.length ? "required" : ""}></label>
+            <label>Nome da parte <small>(opcional)</small><input type="text" name="label" maxlength="60" placeholder="${savedCount ? `Parte ${savedCount + 1}` : "Jogo todo"}"></label>
+            <label>Começa aos … da análise<input type="text" name="gameStart" inputmode="numeric" value="${savedCount ? "" : "0:00"}" placeholder="mm:ss" ${savedCount ? "required" : ""}></label>
             <label>Esse momento no vídeo é aos<input type="text" name="videoStart" inputmode="numeric" value="0:00" placeholder="mm:ss"></label>
             <label>Acaba aos … da análise <small>(opcional)</small><input type="text" name="gameEnd" inputmode="numeric" placeholder="mm:ss"></label>
             <p class="tracking-fineprint">Se enviaste para o YouTube o mesmo ficheiro que foi analisado, deixa 0:00 nos dois. Num vídeo com outro início, indica onde está no vídeo o primeiro momento analisado. Com o jogo em duas gravações, junta uma parte de cada vez; a 2.ª começa onde a 1.ª acabou na análise.</p>
@@ -13227,7 +13233,7 @@ function bindGameVideoSection(game, container) {
     if (!youtubeId) return showError("Não reconheço essa ligação do YouTube. Copia-a do botão Partilhar do vídeo.");
     if (gameStartS == null || videoStartS == null || Number.isNaN(gameEndS) || (form.gameEnd.value.trim() && gameEndS == null)) return showError("Escreve os tempos como mm:ss (por exemplo 26:29).");
     if (gameEndS != null && gameEndS <= gameStartS) return showError("O fim tem de ser depois do começo.");
-    if (getGameVideoParts(game.id).some((v) => v.gameStartS === gameStartS)) return showError("Já há uma parte que começa nesse momento da análise.");
+    if (getSavedGameVideoParts(game.id).some((v) => v.gameStartS === gameStartS)) return showError("Já há uma parte que começa nesse momento da análise.");
     const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     try {
