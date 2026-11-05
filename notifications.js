@@ -8,6 +8,14 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.22.1",
+      date: "2026-11-05",
+      title: "Convocatória fechada não volta",
+      items: [
+        "Uma convocatória cujo jogo já tem resultado deixa de aparecer em Jogos, mesmo que as equipas não tenham sido exactamente os que disseram Vou.",
+      ],
+    },
+    {
       version: "1.22.0",
       date: "2026-11-05",
       title: "Pequenos movimentos e clubes sem notas",

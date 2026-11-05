@@ -6299,10 +6299,18 @@ function sharePaymentsOnWhatsApp() {
   window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
 }
 
+// Jogo ja fechado a mesma hora da convocatoria: a convocatoria acabou, mesmo que as equipas
+// nao tenham sido exactamente os que disseram Vou.
+function getFinishedGameAtEventTime(eventData) {
+  const eventTime = new Date(eventData?.startsAt).getTime();
+  if (Number.isNaN(eventTime)) return null;
+  return state.games.find((game) => isFinishedGame(game) && Math.abs(new Date(game.date).getTime() - eventTime) <= 60 * 1000) || null;
+}
+
 function getNextEvent() {
   const now = Date.now();
   return [...(state.events || [])]
-    .filter((eventData) => eventData.status !== "completed" && eventData.status !== "cancelled")
+    .filter((eventData) => eventData.status !== "completed" && eventData.status !== "cancelled" && !getFinishedGameAtEventTime(eventData))
     .sort((a, b) => {
       const aFuture = new Date(a.startsAt).getTime() >= now ? 0 : 1;
       const bFuture = new Date(b.startsAt).getTime() >= now ? 0 : 1;
@@ -6352,7 +6360,7 @@ function renderEventsList() {
 
   document.body.classList.toggle("player-linked", Boolean(getLinkedPlayer()));
   const events = [...(state.events || [])]
-    .filter((eventData) => eventData.status !== "completed")
+    .filter((eventData) => eventData.status !== "completed" && !getFinishedGameAtEventTime(eventData))
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
   if (!events.length) {
     els.eventsList.innerHTML = `<div class="empty-state">Ainda nao ha convocatorias. O admin pode lancar o proximo jogo.</div>`;
@@ -8709,7 +8717,9 @@ async function saveCurrentScore() {
 }
 
 function completeOriginEventForGame(game) {
-  const originEvent = findOriginEventForGame(game);
+  const gameTime = new Date(game.date).getTime();
+  const originEvent = findOriginEventForGame(game)
+    || (state.events || []).find((eventData) => eventData.status === "open" && Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000);
   if (!originEvent || originEvent.status === "completed") return;
   originEvent.status = "completed";
 }
@@ -9619,15 +9629,15 @@ function isOnboardingNeeded() {
   return Boolean(remoteEnabled && isAdmin && group && group.slug !== LEGACY_GROUP_SLUG && (!hasPlayers || !hasGame));
 }
 
-function getNextEvent() {
+function getUpcomingEventForMe() {
   const since = Date.now() - 3 * 60 * 60 * 1000;
   return [...(state.events || [])]
-    .filter((eventData) => !["cancelled", "completed"].includes(eventData.status) && new Date(eventData.startsAt).getTime() > since)
+    .filter((eventData) => !["cancelled", "completed"].includes(eventData.status) && !getFinishedGameAtEventTime(eventData) && new Date(eventData.startsAt).getTime() > since)
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0] || null;
 }
 
 function renderNextGameCard() {
-  const eventData = getNextEvent();
+  const eventData = getUpcomingEventForMe();
   const group = getActiveGroup();
   if (!eventData) {
     return `
