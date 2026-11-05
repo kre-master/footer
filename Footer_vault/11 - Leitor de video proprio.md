@@ -33,6 +33,11 @@ App: lê index.json → jogo do grupo nessa data passa a ter vídeo de casa (lei
 - Textos em `~/maestro/whatsapp/mensagens.json` ({data}, {hora}, {titulo}, {local}, {mvp}, {link}). Por fazer: página para o João os editar e enviar um teste.
 - Para desligar: no telemóvel, Aparelhos ligados > terminar a sessão "Chrome (Ubuntu)".
 
+## Dois leitores no mesmo jogo (2026-11-05)
+
+- Se um jogo tiver vídeo de casa **e** vídeo do YouTube (o admin junta o link como antes, 0:00/0:00), aparece o seletor **Leitor Footer | YouTube** na janela da Galeria e na página do jogo. Por defeito usa o de casa; a escolha fica guardada no telemóvel (`footer-player-youtube`). Os momentos são os mesmos nos dois (mesmo vídeo, mesmo início).
+- Para isso, o desktop também envia o 1080p para o YouTube (não listado) como reserva.
+
 ## Em resumo
 
 - **O que é:** um leitor de vídeo feito por nós, fora do YouTube, com zoom, câmara lenta, imagem a imagem e marcação de momentos ao alcance do polegar.

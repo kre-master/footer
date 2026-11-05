@@ -3263,8 +3263,23 @@ function openVideoLightbox(gameId, options = {}) {
   const modal = document.querySelector("#video-lightbox");
   if (!game || !parts.length || !modal) return;
   galleryGameId = game.id;
-  const bunny = getHomeVideo(game.id);
+  const bunny = getActiveHomeVideo(game.id);
   document.querySelector("#video-lightbox-stage")?.classList.toggle("hidden", Boolean(bunny));
+  const partsNav0 = document.querySelector("#video-lightbox-parts");
+  let switcher = document.querySelector("#video-lightbox-switch");
+  if (!switcher && partsNav0) {
+    switcher = document.createElement("div");
+    switcher.id = "video-lightbox-switch";
+    partsNav0.before(switcher);
+  }
+  if (switcher) {
+    switcher.innerHTML = renderPlayerSwitch(game.id);
+    switcher.querySelectorAll("[data-player-switch]").forEach((button) => on(button, "click", () => {
+      document.querySelectorAll("#video-lightbox .lab-video").forEach((video) => video.pause());
+      setPlayerChoice(game.id, button.dataset.playerSwitch);
+      openVideoLightbox(game.id, options);
+    }));
+  }
   if (bunny) {
     openBunnyLightbox(game, bunny, options, modal);
     return;
@@ -11569,6 +11584,46 @@ function getHomeVideo(gameId) {
   };
 }
 
+// Jogo com video de casa e do YouTube: o jogador escolhe o leitor (fica guardado neste telemovel).
+// Por defeito usa o de casa; o YouTube serve de reserva se o de casa estiver lento.
+const PLAYER_YOUTUBE_KEY = "footer-player-youtube";
+const preferYoutubeGames = new Set((() => {
+  try {
+    return JSON.parse(localStorage.getItem(PLAYER_YOUTUBE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+})());
+
+function hasYoutubeParts(gameId) {
+  return (gameVideos[gameId] || []).length > 0;
+}
+
+function getActiveHomeVideo(gameId) {
+  const home = getHomeVideo(gameId);
+  return home && !(preferYoutubeGames.has(gameId) && hasYoutubeParts(gameId)) ? home : null;
+}
+
+function setPlayerChoice(gameId, choice) {
+  if (choice === "youtube") preferYoutubeGames.add(gameId);
+  else preferYoutubeGames.delete(gameId);
+  try {
+    localStorage.setItem(PLAYER_YOUTUBE_KEY, JSON.stringify([...preferYoutubeGames]));
+  } catch {
+    // Sem armazenamento: a escolha dura ate fechar a app.
+  }
+}
+
+function renderPlayerSwitch(gameId) {
+  if (!getHomeVideo(gameId) || !hasYoutubeParts(gameId)) return "";
+  const home = Boolean(getActiveHomeVideo(gameId));
+  return `
+    <div class="tracking-pitch-tabs player-switch" role="group" aria-label="Leitor de vídeo">
+      <button type="button" class="${home ? "active" : ""}" data-player-switch="casa" aria-pressed="${home}">Leitor Footer</button>
+      <button type="button" class="${home ? "" : "active"}" data-player-switch="youtube" aria-pressed="${!home}">YouTube</button>
+    </div>`;
+}
+
 function getVideoThumb(gameId, youtubeId, size = "hqdefault") {
   const home = getHomeVideo(gameId);
   if (home) return home.poster;
@@ -13020,7 +13075,8 @@ function renderGameVideoSection(game) {
           <div class="tracking-pitch-tabs game-video-parts" role="group" aria-label="Parte do vídeo">
             ${parts.map((v, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-video-part="${escapeHtml(v.youtubeId)}" aria-pressed="${i === 0}">${escapeHtml(v.label || `Parte ${i + 1}`)}</button>`).join("")}
           </div>` : ""}
-        ${getHomeVideo(game.id) ? `
+        ${renderPlayerSwitch(game.id)}
+        ${getActiveHomeVideo(game.id) ? `
         <div data-bunny-player></div>
         <p class="tracking-fineprint">Leitor de vídeo novo.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>` : `
         <div class="video-stage" data-video-stage>
@@ -13065,7 +13121,7 @@ function renderGameVideoSection(game) {
 function seekGameVideo(container, game, seconds) {
   const target = window.FooterTracking.videoSeekTarget(getGameVideoParts(game.id), seconds);
   const player = container.querySelector("[data-game-video-section]")?.gamePlayer;
-  if (player && getHomeVideo(game.id)) {
+  if (player && getActiveHomeVideo(game.id)) {
     if (target) player.seek(target.seconds);
     return;
   }
@@ -13102,7 +13158,11 @@ function bindGameVideoSection(game, container) {
     renderHistoryGameDetail();
   });
   const frame = section.querySelector("[data-game-video]");
-  const bunny = getHomeVideo(game.id);
+  section.querySelectorAll("[data-player-switch]").forEach((button) => button.addEventListener("click", () => {
+    setPlayerChoice(game.id, button.dataset.playerSwitch);
+    renderHistoryGameDetail();
+  }));
+  const bunny = getActiveHomeVideo(game.id);
   bindHeartRatePanel(game, section);
   if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
   else {

@@ -216,7 +216,7 @@ let currentGenerationDateIso = new Date().toISOString();
 let previewGame = null;
 let authActionBusy = false;
 let currentPlayerProfileId = null;
-let currentViewName = "events";
+let currentViewName = "me";
 let currentMonthlyMonth = null;
 let navigationHistoryReady = false;
 let awardRevealSessionSeenKeys = new Set();
@@ -894,6 +894,7 @@ function bindEvents() {
     if (tab === els.myProfileTab) {
       const linkedPlayer = getLinkedPlayer();
       if (linkedPlayer) openPlayerProfile(linkedPlayer.id);
+      else showView("me");
       return;
     }
     showView(tab.dataset.view);
@@ -1000,7 +1001,10 @@ function openPendingSharedMoment() {
 // O perfil do proprio jogador e a pagina inicial; convocatorias e jogos novos chegam pelas notificacoes.
 function applyLandingRoute() {
   const linkedPlayer = getLinkedPlayer();
-  if (!linkedPlayer) return;
+  if (!linkedPlayer) {
+    showView("me", { push: false });
+    return;
+  }
   currentPlayerProfileId = linkedPlayer.id;
   showView("player-profile", { push: false });
 }
@@ -1069,7 +1073,7 @@ async function loadMyGroups() {
     .eq("user_id", currentSession.user.id)
     .order("joined_at", { ascending: true });
   // Sem a migracao group-profile-migration.sql ainda nao existem bio, logo nem favorito.
-  let { data, error } = await query("group_id, role, joined_at, is_favorite, groups(id, slug, name, bio, logo, profile_public, default_location)");
+  let { data, error } = await query("group_id, role, joined_at, is_favorite, groups(id, slug, name, bio, logo, profile_public, default_location, settings)");
   if (error) ({ data, error } = await query("group_id, role, joined_at, groups(id, slug, name)"));
   if (error) {
     console.warn("Group load failed. Run supabase/groups-migration.sql.", error);
@@ -1085,6 +1089,7 @@ async function loadMyGroups() {
       logo: row.groups.logo || "",
       isPublic: row.groups.profile_public !== false,
       defaultLocation: row.groups.default_location || "",
+      settings: row.groups.settings || {},
       isFavorite: Boolean(row.is_favorite),
       role: row.role,
     }));
@@ -1360,6 +1365,7 @@ async function loadRemoteState() {
   await loadRemoteBookmarks();
   await loadHeartRate();
   await loadJoinRequests();
+  await loadNoShows();
   await loadPublicEvents();
   await refreshPendingInvite();
   saveState();
@@ -1414,7 +1420,20 @@ async function refreshPendingInvite() {
     clearPendingInvite();
     return;
   }
-  pendingInvite = { code, groupName: row.group_name, valid: Boolean(row.valid) };
+  pendingInvite = {
+    code,
+    groupName: row.group_name,
+    valid: Boolean(row.valid),
+    logo: row.logo || "",
+    bio: row.bio || "",
+    location: row.location || "",
+    weekday: Number.isInteger(row.weekday) ? row.weekday : null,
+    startTime: row.start_time || null,
+    memberCount: row.member_count || 0,
+    nextEventAt: row.next_event_at || null,
+    nextEventGoing: row.next_event_going || 0,
+    nextEventMax: row.next_event_max || 0,
+  };
 }
 
 async function acceptPendingInvite() {
@@ -1436,8 +1455,8 @@ async function acceptPendingInvite() {
   }
   await loadAccountState();
   await loadRemoteState();
-  // A seguir escolhe o seu perfil na lista do grupo ("Qual destes es tu?").
-  showView(getLinkedPlayer() ? "player-profile" : "account");
+  // A seguir escolhe a sua carta no grupo ("Es um destes?"), no separador Eu.
+  showView("me");
   updateAccessUi();
   render();
 }
@@ -1447,7 +1466,9 @@ function renderGroupBanner() {
   const banner = document.querySelector("#group-banner");
   if (!banner) return;
   let html = "";
-  if (pendingInvite && !pendingInvite.valid) {
+  if (currentViewName === "me") {
+    // O separador Eu ja mostra o convite e a falta de grupo em grande.
+  } else if (pendingInvite && !pendingInvite.valid) {
     html = `
       <div><strong>Este convite ja nao e valido.</strong><p>Pede um link novo ao admin do grupo.</p></div>
       <div class="actions"><button class="ghost-btn" data-invite-dismiss>Fechar</button></div>`;
@@ -1465,7 +1486,7 @@ function renderGroupBanner() {
         <button class="primary-btn" data-invite-accept>Entrar no grupo</button>
         <button class="ghost-btn" data-invite-dismiss>Agora nao</button>
       </div>`;
-  } else if (remoteEnabled && currentSession?.user && groupsLoadedOk && !myGroups.length) {
+  } else if (!["me", "club", "search"].includes(currentViewName) && remoteEnabled && currentSession?.user && groupsLoadedOk && !myGroups.length) {
     html = `
       <div><strong>Ainda nao pertences a nenhum grupo.</strong><p>Pede ao admin do teu grupo o link de convite, ou cria um grupo novo. Entretanto podes ver os jogos publicos.</p></div>
       <div class="actions">
@@ -1479,7 +1500,7 @@ function renderGroupBanner() {
   banner.querySelector("[data-open-public-games]")?.addEventListener("click", () => showView("public-games"));
   banner.querySelector("[data-open-new-group]")?.addEventListener("click", () => {
     newGroupFormOpen = true;
-    showView("account");
+    showView("club");
     renderNewGroupPanel();
   });
   banner.querySelector("[data-invite-login]")?.addEventListener("click", openLoginModal);
@@ -1561,23 +1582,29 @@ function renderNewGroupPanel() {
   } else if (newGroupFormOpen) {
     body = `
       <div class="new-group-form">
-        <input data-new-group="name" maxlength="60" placeholder="Nome do grupo">
+        <input data-new-group="name" maxlength="60" placeholder="Nome do clube">
         <input data-new-group="location" maxlength="80" placeholder="Campo / local">
-        <input data-new-group="schedule" maxlength="80" placeholder="Dia e hora habituais (ex.: quartas 21h)">
+        <div class="new-group-when">
+          <select data-new-group="weekday" aria-label="Dia habitual">
+            <option value="">Dia habitual</option>
+            ${WEEKDAY_PLURAL.map((label, index) => `<option value="${index}">${label}</option>`).join("")}
+          </select>
+          <input data-new-group="time" type="time" value="21:00" aria-label="Hora habitual">
+        </div>
         <textarea data-new-group="notes" maxlength="300" rows="2" placeholder="Notas (opcional)"></textarea>
       </div>
       <div class="actions">
-        <button class="primary-btn" data-submit-new-group>Criar grupo</button>
+        <button class="primary-btn" data-submit-new-group>Criar clube</button>
         <button class="ghost-btn" data-close-new-group>Cancelar</button>
       </div>`;
   } else {
     body = `
       ${lastDecided?.status === "approved" ? `<p class="hint good">O grupo ${escapeHtml(lastDecided.name)} foi aprovado.</p>` : ""}
       ${lastDecided?.status === "rejected" ? `<p class="hint warn">O pedido do grupo ${escapeHtml(lastDecided.name)} nao foi aprovado.</p>` : ""}
-      <p>Tens um grupo de amigos que joga com regularidade? Cria um grupo proprio, com convocatorias e perfis privados. Ficas logo como dono e convidas os teus amigos.</p>
-      <div class="actions"><button class="ghost-btn" data-open-new-group>Criar um grupo novo</button></div>`;
+      <p>Tens um grupo de amigos que joga com regularidade? Cria o teu clube, com convocatorias e perfis privados. Ficas logo como dono e convidas os teus amigos.</p>
+      <div class="actions"><button class="ghost-btn" data-open-new-group>Criar um clube</button></div>`;
   }
-  panel.innerHTML = `<div class="account-card"><h3>Criar um grupo</h3>${body}</div>`;
+  panel.innerHTML = `<div class="account-card"><h3>Criar um clube</h3>${body}</div>`;
   panel.querySelector("[data-open-new-group]")?.addEventListener("click", () => {
     newGroupFormOpen = true;
     renderNewGroupPanel();
@@ -1586,7 +1613,7 @@ function renderNewGroupPanel() {
     newGroupFormOpen = false;
     renderNewGroupPanel();
   });
-  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", submitNewGroup);
+  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", (event) => submitNewGroup(event.currentTarget));
   panel.querySelector("[data-cancel-group-request]")?.addEventListener("click", async (event) => {
     if (!confirm("Cancelar o pedido do grupo?")) return;
     await supabaseClient.rpc("cancel_group_request", { p_request_id: event.currentTarget.dataset.cancelGroupRequest });
@@ -1597,19 +1624,28 @@ function renderNewGroupPanel() {
 }
 
 // Cria o grupo na hora (sem aprovacao); quem cria fica dono e passa logo para o grupo novo.
-async function submitNewGroup() {
+async function submitNewGroup(button = null) {
   const panel = document.querySelector("#new-group-panel");
   const value = (field) => panel?.querySelector(`[data-new-group="${field}"]`)?.value.trim() || "";
   if (value("name").length < 2) {
     alert("Escreve o nome do grupo.");
     return;
   }
-  const { data: groupId, error } = await supabaseClient.rpc("create_group", {
+  const weekday = value("weekday");
+  const time = value("time");
+  let result;
+  await runWithButton(button, async () => {
+    result = await supabaseClient.rpc("create_group", {
     p_name: value("name"),
     p_location: value("location"),
-    p_schedule: value("schedule"),
+    p_schedule: formatSchedule(weekday === "" ? null : Number(weekday), time || null),
     p_notes: value("notes"),
+    p_weekday: weekday === "" ? null : Number(weekday),
+    p_time: time || null,
+    });
+    return !result.error;
   });
+  const { data: groupId, error } = result;
   if (error) {
     alert(String(error.message || "").includes("group_limit_reached")
       ? "Ja es dono de 2 grupos. Nao da para criar mais."
@@ -1674,7 +1710,7 @@ function renderOnboardingPanel() {
   const group = getActiveGroup();
   const hasPlayers = state.players.length >= 6;
   const hasGame = Boolean((state.events || []).length || state.games.length);
-  const show = remoteEnabled && isAdmin && group && group.slug !== LEGACY_GROUP_SLUG && (!hasPlayers || !hasGame);
+  const show = isOnboardingNeeded();
   panel.classList.toggle("hidden", !show);
   if (!show) {
     panel.innerHTML = "";
@@ -1690,8 +1726,8 @@ function renderOnboardingPanel() {
     <ol class="onboarding-steps">
       <li class="${hasPlayers ? "done" : ""}">
         <strong>Adicionar jogadores</strong> <span class="metric">${state.players.length} no grupo</span>
-        <p class="hint">Um por linha. Podes juntar a nota de 1 a 100 no fim (ex.: "Rui 75"). Sem nota, todos comecam iguais e a forma ajusta com os jogos.</p>
-        <textarea data-onboarding-players rows="5" placeholder="Rui 75&#10;Tiago&#10;Andre 68"></textarea>
+        <p class="hint">${ratingsVisible() ? 'Um por linha. Podes juntar a nota de 1 a 100 no fim (ex.: "Rui 75"). Sem nota, todos comecam iguais e a forma ajusta com os jogos.' : "Um nome por linha. Neste clube nao ha notas: todos comecam iguais e as equipas equilibram-se pela forma, jogo a jogo. Cada um pode depois pôr a sua foto."}</p>
+        <textarea data-onboarding-players rows="5" placeholder="${ratingsVisible() ? "Rui 75&#10;Tiago&#10;Andre 68" : "Rui&#10;Tiago&#10;Andre"}"></textarea>
         <div class="actions"><button class="primary-btn" data-onboarding-add>Adicionar</button></div>
       </li>
       <li>
@@ -1736,6 +1772,7 @@ async function addOnboardingPlayers() {
     alert("Escreve pelo menos um nome novo.");
     return;
   }
+  if (!ratingsVisible()) rows.forEach((row) => { row.rating = NO_RATING_BASE; });
   const newPlayers = rows.map((row) => ({
     id: `p-${createUuid()}`,
     name: row.name,
@@ -2117,6 +2154,7 @@ function renderAdminBadges() {
   const count = getAdminPendingCount();
   setBadgeCount("#admin-tab-badge", count);
   setBadgeCount("#claims-subtab-badge", count);
+  setBadgeCount("#account-admin-badge", count);
 }
 
 // tone "info" = amarelo (ha novidades, nada urgente); por omissao vermelho.
@@ -2235,10 +2273,11 @@ function updateAccessUi(message) {
   document.body.classList.toggle("visitor-mode", remoteEnabled && !isAdmin);
   document.body.classList.toggle("admin-mode", canWriteOfficialData());
   document.body.classList.toggle("non-admin-mode", !canWriteOfficialData());
+  document.body.classList.toggle("no-ratings", !ratingsVisible());
+  document.querySelectorAll("#player-form input[type=number]").forEach((input) => { input.required = ratingsVisible(); });
   if (els.adminLogin) els.adminLogin.classList.toggle("hidden", Boolean(currentSession));
   if (els.accountSignup) els.accountSignup.classList.toggle("hidden", Boolean(currentSession) || !remoteEnabled);
   if (els.adminLogout) els.adminLogout.classList.toggle("hidden", !currentSession);
-  if (els.myProfileTab) els.myProfileTab.classList.toggle("hidden", !linkedPlayer);
   updateAccountMenu();
   renderGroupSwitcher();
 }
@@ -2409,8 +2448,10 @@ async function submitLoginForm(event) {
       forgetLogin(login);
     }
     await loadRemoteState();
+    await refreshPendingInvite();
     updateAccessUi();
     render();
+    if (pendingInvite?.valid) await acceptPendingInvite();
   } finally {
     if (submit) {
       submit.disabled = false;
@@ -2515,7 +2556,12 @@ async function submitSignupForm(event) {
   await loadAccountState();
   rememberLogin(username);
   await loadRemoteState();
-  showView("account");
+  await refreshPendingInvite();
+  if (pendingInvite?.valid) {
+    await acceptPendingInvite();
+    return;
+  }
+  showView("me");
   updateAccessUi();
   render();
 }
@@ -2689,24 +2735,28 @@ function on(element, eventName, handler) {
 }
 
 // Separadores principais agrupam varias vistas. "Jogo" mostra a convocatoria e o gerar na mesma pagina.
+// Barra (2026-11-05): Eu · Jogos · Arquivo · Clube · lupa. Admin vive dentro do Clube.
 const VIEW_GROUPS = {
-  "player-profile": "profile",
+  me: "me",
+  "player-profile": "me",
+  availability: "me",
+  "my-games": "me",
   events: "game",
   today: "game",
   "public-games": "game",
-  availability: "game",
   "new-game": "game",
   games: "history",
   "history-game": "history",
-  "my-games": "history",
-  gallery: "gallery",
-  club: "stats",
-  stats: "stats",
-  players: "stats",
-  monthly: "stats",
-  payments: "admin",
-  claims: "admin",
+  gallery: "history",
+  stats: "history",
+  club: "club",
+  players: "club",
+  monthly: "club",
+  payments: "club",
+  claims: "club",
+  search: "search",
 };
+let currentTabGroup = "me";
 
 function showView(viewName, options = {}) {
   // "O meu mes" vive agora no perfil do proprio jogador, no periodo deste mes.
@@ -2716,7 +2766,17 @@ function showView(viewName, options = {}) {
     openPlayerProfile(linkedForMonthly.id);
     return;
   }
-  const group = VIEW_GROUPS[viewName] || viewName;
+  // Eu: com ficha ligada abre o proprio perfil; sem ficha, a pagina de quem chega.
+  if (viewName === "me" && getLinkedPlayer()) {
+    openPlayerProfile(getLinkedPlayer().id);
+    return;
+  }
+  let group = VIEW_GROUPS[viewName] || viewName;
+  // O perfil de outro jogador fica no separador de onde se veio.
+  if (viewName === "player-profile" && currentPlayerProfileId && currentPlayerProfileId !== getLinkedPlayer()?.id) {
+    group = currentTabGroup || "me";
+  }
+  currentTabGroup = group;
   if (group !== "game") {
     previewGame = null;
   }
@@ -2733,6 +2793,10 @@ function showView(viewName, options = {}) {
   if (viewName === "club") renderClubPanel();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
+  if (viewName === "me") renderMePanel();
+  if (viewName === "search") renderSearchPanel();
+  renderGroupBanner();
+  playCascade(document.querySelector(`#view-${viewName}`));
   if (viewName === "today") {
     // Vindo de "abrir jogo" ou de importar confirmados: leva o utilizador ate as equipas.
     requestAnimationFrame(() => document.querySelector("#generate-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -2913,6 +2977,7 @@ function renderNotifyBadges() {
   const appCount = FooterNotifications.unseenReleases(seen.appVersion).length;
   setNotifyBadge(document.querySelector("#notify-badge"), feedCount);
   setNotifyBadge(document.querySelector("#notify-badge-app"), appCount);
+  ringNotifyBell(feedCount + appCount);
   const button = document.querySelector("#notify-btn");
   if (button) {
     const parts = [feedCount ? `${feedCount} por ver` : "", appCount ? "versão nova da app" : ""].filter(Boolean);
@@ -3198,8 +3263,23 @@ function openVideoLightbox(gameId, options = {}) {
   const modal = document.querySelector("#video-lightbox");
   if (!game || !parts.length || !modal) return;
   galleryGameId = game.id;
-  const bunny = getHomeVideo(game.id);
+  const bunny = getActiveHomeVideo(game.id);
   document.querySelector("#video-lightbox-stage")?.classList.toggle("hidden", Boolean(bunny));
+  const partsNav0 = document.querySelector("#video-lightbox-parts");
+  let switcher = document.querySelector("#video-lightbox-switch");
+  if (!switcher && partsNav0) {
+    switcher = document.createElement("div");
+    switcher.id = "video-lightbox-switch";
+    partsNav0.before(switcher);
+  }
+  if (switcher) {
+    switcher.innerHTML = renderPlayerSwitch(game.id);
+    switcher.querySelectorAll("[data-player-switch]").forEach((button) => on(button, "click", () => {
+      document.querySelectorAll("#video-lightbox .lab-video").forEach((video) => video.pause());
+      setPlayerChoice(game.id, button.dataset.playerSwitch);
+      openVideoLightbox(game.id, options);
+    }));
+  }
   if (bunny) {
     openBunnyLightbox(game, bunny, options, modal);
     return;
@@ -3369,6 +3449,7 @@ function render() {
   renderNewGroupPanel();
   renderGroupRequestsList();
   renderOnboardingPanel();
+  renderMePanel();
   renderPlayerProfile();
   renderMvpVoteGate();
   renderNotifyBadges();
@@ -3429,7 +3510,7 @@ function renderAccountPanel() {
         </div>
         <div class="profile-summary">
           ${renderAvatar(linkedPlayer)}
-          <strong>${canSeeCurrentRatings() ? form.currentRating : linkedPlayer.overall}</strong>
+          ${ratingsVisible() ? `<strong>${canSeeCurrentRatings() ? form.currentRating : linkedPlayer.overall}</strong>` : ""}
           <span>${canSeeCurrentRatings() ? renderFormChip(form) : renderFormSign(form)}</span>
         </div>
         <div class="actions">
@@ -3462,7 +3543,7 @@ function renderAccountPanel() {
   els.accountPanel.innerHTML = `
     <div class="account-card">
       <h3>Qual destes es tu?</h3>
-      <p>Escolhe o teu perfil${getActiveGroup() ? ` em ${escapeHtml(getActiveGroup().name)}` : ""}. O admin aprova antes de ficares ligado.</p>
+      <p>Escolhe o teu perfil${getActiveGroup() ? ` em ${escapeHtml(getActiveGroup().name)}` : ""}. Podes responder logo as convocatorias; o admin confirma depois.</p>
       ${renderSecurityActions()}
       <div class="claim-grid">
         ${availablePlayers.map((p) => `
@@ -3470,7 +3551,7 @@ function renderAccountPanel() {
             ${renderAvatar(p)}
             <span>
               <strong>${escapeHtml(p.name)}</strong>
-              <small>OVR ${p.overall}</small>
+              ${ratingsVisible() ? `<small>OVR ${p.overall}</small>` : ""}
             </span>
           </button>
         `).join("") || `<div class="hint">Nao ha perfis livres para reclamar.</div>`}
@@ -3515,7 +3596,7 @@ async function createOwnPlayer() {
   }
   await loadAccountState();
   await loadRemoteState();
-  showView(getLinkedPlayer() ? "player-profile" : "account");
+  showView("me");
   render();
 }
 
@@ -3608,7 +3689,9 @@ function renderPlayerProfile() {
 
   els.playerProfile.innerHTML = `
     ${renderProfileHero(playerData, form, variant)}
+    ${isOwnProfile ? renderMeNowBlock() : ""}
     ${isOwnProfile ? renderMonthReviewCard(playerData) : ""}
+    ${renderReliability(playerData)}
     ${renderProfilePeriodNav(months)}
     ${renderProfileSummary(playerData, period, { isOwnProfile })}
 
@@ -3735,6 +3818,8 @@ function renderPlayerProfile() {
     });
   });
   bindAwardDetailCards(els.playerProfile, playerData, [...awards, ...periodAwards]);
+  if (isOwnProfile) bindMeActions(els.playerProfile.querySelector(".me-now"));
+  els.playerProfile.querySelector("[data-own-player-photo]")?.addEventListener("change", handleOwnPlayerPhotoSelection);
   bindProfileOverview(playerData, period);
   els.playerProfile.querySelector("[data-player-weight]")?.addEventListener("change", async (event) => {
     const value = Number(event.target.value);
@@ -3824,10 +3909,11 @@ function getPeriodAwards(playerId, games) {
 
 function renderProfileHero(playerData, form, variant) {
   const rating = canSeeCurrentRatings() ? form.currentRating : playerData.overall;
+  const isOwn = Boolean(currentSession?.user?.id) && playerData.linkedUserId === currentSession.user.id;
   const lastFive = getPlayerAppearanceRecord(playerData.id, 5).map((item) => item.outcome);
   return `
     <section class="pp-hero">
-      <div class="pp-card-col">
+      <div class="pp-card-col ${justRevealedPlayerId === playerData.id ? "card-reveal" : ""}">
         <button type="button" class="pp-card-thumb" data-profile-card aria-label="Ver a carta de ${escapeHtml(playerData.name)}">
           ${renderPlayerCard(playerData, { mode: "field", form, variant })}
         </button>
@@ -3837,9 +3923,10 @@ function renderProfileHero(playerData, form, variant) {
         <p class="eyebrow">Jogador</p>
         <h2>${escapeHtml(playerData.name)}</h2>
         <div class="pp-meta">
-          <span class="pp-ovr"><b>${rating}</b> OVR</span>
+          ${ratingsVisible() ? `<span class="pp-ovr"><b>${rating}</b> OVR</span>` : ""}
         </div>
         ${renderClubBadge(getActiveGroup())}
+        ${isOwn ? `<label class="ghost-btn pp-photo-cta">${playerData.photoDataUrl ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
       </div>
     </section>`;
 }
@@ -4450,6 +4537,7 @@ function renderFormSign(form, options = {}) {
 }
 
 function renderRatingBadge(playerData, form = getPlayerForm(playerData)) {
+  if (!ratingsVisible()) return "";
   const variant = getPlayerCardVariant(playerData, form);
   if (canSeeCurrentRatings()) {
     return `<span class="rating-badge admin-rating ${renderCardHaloClass(playerData, variant)}">${playerData.overall}&rarr;${form.currentRating}</span>`;
@@ -5084,18 +5172,18 @@ function renderClaimsList() {
     return;
   }
 
-  els.claimsList.innerHTML = pendingClaims.map((claim) => {
+  els.claimsList.innerHTML = `<p class="swipe-hint">Desliza para a direita para aprovar, para a esquerda para rejeitar.</p>` + pendingClaims.map((claim) => {
     const playerData = findPlayer(claim.player_id);
     const profile = knownProfiles.find((item) => item.id === claim.user_id);
     return `
-      <article class="claim-row">
+      <article class="claim-row" data-swipe>
         <div>
           <strong>${escapeHtml(playerData?.name || "Jogador removido")}</strong>
           <span>${escapeHtml(profile?.display_name || profile?.email || claim.user_id)} - ${formatDate(claim.created_at)}</span>
         </div>
         <div class="actions">
-          <button class="primary-btn" data-approve-claim="${claim.id}">Aprovar</button>
-          <button class="danger-btn" data-reject-claim="${claim.id}">Rejeitar</button>
+          <button class="primary-btn" data-approve-claim="${claim.id}" data-swipe-accept>Aprovar</button>
+          <button class="danger-btn" data-reject-claim="${claim.id}" data-swipe-reject>Rejeitar</button>
         </div>
       </article>
     `;
@@ -5107,6 +5195,7 @@ function renderClaimsList() {
   els.claimsList.querySelectorAll("[data-reject-claim]").forEach((button) => {
     button.addEventListener("click", () => reviewPlayerClaim(button.dataset.rejectClaim, "rejected"));
   });
+  bindSwipe(els.claimsList);
 }
 
 function renderAccountsList() {
@@ -6227,10 +6316,18 @@ function sharePaymentsOnWhatsApp() {
   window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
 }
 
+// Jogo ja fechado a mesma hora da convocatoria: a convocatoria acabou, mesmo que as equipas
+// nao tenham sido exactamente os que disseram Vou.
+function getFinishedGameAtEventTime(eventData) {
+  const eventTime = new Date(eventData?.startsAt).getTime();
+  if (Number.isNaN(eventTime)) return null;
+  return state.games.find((game) => isFinishedGame(game) && Math.abs(new Date(game.date).getTime() - eventTime) <= 60 * 1000) || null;
+}
+
 function getNextEvent() {
   const now = Date.now();
   return [...(state.events || [])]
-    .filter((eventData) => eventData.status !== "completed" && eventData.status !== "cancelled")
+    .filter((eventData) => eventData.status !== "completed" && eventData.status !== "cancelled" && !getFinishedGameAtEventTime(eventData))
     .sort((a, b) => {
       const aFuture = new Date(a.startsAt).getTime() >= now ? 0 : 1;
       const bFuture = new Date(b.startsAt).getTime() >= now ? 0 : 1;
@@ -6274,10 +6371,13 @@ function renderEventsList() {
   if (els.eventDate && !els.eventDate.value) {
     els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
   }
+  if (els.eventTitle && !els.eventTitle.value && getActiveGroup()) {
+    els.eventTitle.value = getActiveGroup().name;
+  }
 
   document.body.classList.toggle("player-linked", Boolean(getLinkedPlayer()));
   const events = [...(state.events || [])]
-    .filter((eventData) => eventData.status !== "completed")
+    .filter((eventData) => eventData.status !== "completed" && !getFinishedGameAtEventTime(eventData))
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
   if (!events.length) {
     els.eventsList.innerHTML = `<div class="empty-state">Ainda nao ha convocatorias. O admin pode lancar o proximo jogo.</div>`;
@@ -6293,8 +6393,9 @@ function renderEventsList() {
     });
   });
   els.eventsList.querySelectorAll("[data-event-response]").forEach((button) => {
-    button.addEventListener("click", () => saveEventResponse(button.dataset.eventId, button.dataset.eventResponse));
+    button.addEventListener("click", () => respondWithMotion(button));
   });
+  bindSwipe(els.eventsList);
   els.eventsList.querySelectorAll("[data-event-admin-response]").forEach((button) => {
     button.addEventListener("click", () => saveAdminEventResponse(button.dataset.eventId, button.dataset.playerId, button.dataset.eventAdminResponse));
   });
@@ -6525,15 +6626,15 @@ function renderJoinRequestRow(row, eventData) {
     traits.age_band ? `${TRAIT_LABELS.age_band[traits.age_band]} anos` : "",
   ].filter(Boolean).join(" · ") || "Sem caracteristicas";
   return `
-    <div class="join-request-row">
+    <div class="join-request-row" data-swipe>
       <div>
         <strong>${escapeHtml(row.requester_name || "Jogador")}</strong>
         ${eventData.publicNeeds && fits ? `<span class="metric good-pill">Encaixa</span>` : ""}
         <p>${escapeHtml(traitText)}</p>
       </div>
       <div class="roster-actions">
-        <button class="mini-btn" data-join-decide="${row.id}" data-accept="true">Aceitar</button>
-        <button class="mini-btn" data-join-decide="${row.id}" data-accept="false">Recusar</button>
+        <button class="mini-btn" data-join-decide="${row.id}" data-accept="true" data-swipe-accept>Aceitar</button>
+        <button class="mini-btn" data-join-decide="${row.id}" data-accept="false" data-swipe-reject>Recusar</button>
       </div>
     </div>
   `;
@@ -6588,7 +6689,7 @@ function renderPublicGames() {
   if (!panel || !list) return;
   // So o texto: o numero vermelho fica no mesmo botao.
   const subtabLabel = document.querySelector("#public-games-subtab [data-subtab-label]");
-  if (subtabLabel) subtabLabel.textContent = publicEvents.length ? `Jogos publicos (${publicEvents.length})` : "Jogos publicos";
+  if (subtabLabel) subtabLabel.textContent = publicEvents.length ? `Abertos (${publicEvents.length})` : "Abertos";
   if (!publicEvents.length) {
     list.innerHTML = `<div class="empty-state">${currentSession?.user
       ? "Sem jogos publicos de momento. Quando um grupo abrir um jogo a quem nao e do grupo, aparece aqui."
@@ -6634,7 +6735,10 @@ function renderPublicGames() {
     }).join("")}
   `;
   list.querySelectorAll("[data-public-request]").forEach((button) => {
-    button.addEventListener("click", () => changePublicRequest(button.dataset.publicRequest, true));
+    button.addEventListener("click", () => {
+      flyTo(button, getTabButton("events"));
+      changePublicRequest(button.dataset.publicRequest, true);
+    });
   });
   list.querySelectorAll("[data-public-cancel]").forEach((button) => {
     button.addEventListener("click", () => changePublicRequest(button.dataset.publicCancel, false));
@@ -6723,8 +6827,8 @@ async function saveMyTraits() {
 }
 
 function renderEventCard(eventData) {
-  const linkedPlayer = getLinkedPlayer();
-  const myResponse = linkedPlayer ? getResponseForPlayer(eventData.id, linkedPlayer.id) : null;
+  const myPlayer = getMyPlayer();
+  const myResponse = myPlayer ? getResponseForPlayer(eventData.id, myPlayer.id) : null;
   const going = getEventPlayers(eventData.id, "going");
   const maybe = getEventPlayers(eventData.id, "maybe");
   const notGoing = getEventPlayers(eventData.id, "not_going");
@@ -6791,24 +6895,27 @@ function renderResponseActions(eventData, myResponse) {
   if (eventData.status === "cancelled") {
     return `<div class="hint warn">Convocatoria cancelada. Podes apagar esta convocatoria do historico de convocatorias.</div>`;
   }
-  const linkedPlayer = getLinkedPlayer();
+  const linkedPlayer = getMyPlayer();
   if (!currentSession) {
     return `<div class="hint">Entra para responder a esta convocatoria.</div>`;
   }
   if (!linkedPlayer && !isAdmin) {
-    return `<div class="hint warn">Associa primeiro a tua conta a um perfil de jogador.</div>`;
+    return `<div class="hint warn">Escolhe primeiro a tua carta no separador Eu.</div>`;
   }
   if (isAdmin && !linkedPlayer) {
     return `<div class="hint">Admin sem perfil associado. Podes acompanhar e fazer equipas.</div>`;
   }
   const status = myResponse?.status || "";
   const goingDisabled = status !== "going" && isEventFullForPlayer(eventData, linkedPlayer.id);
+  const pendingNote = getLinkedPlayer() ? "" : `<span class="hint">Ficha por confirmar pelo admin.</span>`;
+  const saved = (value) => (lastSavedResponse?.eventId === eventData.id && lastSavedResponse.status === value && Date.now() - lastSavedResponse.at < 1500 ? "just-saved" : "");
   return `
     <div class="response-row">
-      <button class="ghost-btn ${status === "going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="going" ${goingDisabled ? "disabled" : ""}>Vou</button>
-      <button class="ghost-btn ${status === "maybe" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="maybe">Talvez</button>
-      <button class="ghost-btn ${status === "not_going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="not_going">Nao vou</button>
+      <button class="ghost-btn ${status === "going" ? "selected" : ""} ${saved("going")}" data-event-id="${eventData.id}" data-event-response="going" ${goingDisabled ? "disabled" : ""}>Vou</button>
+      <button class="ghost-btn ${status === "maybe" ? "selected" : ""} ${saved("maybe")}" data-event-id="${eventData.id}" data-event-response="maybe">Talvez</button>
+      <button class="ghost-btn ${status === "not_going" ? "selected" : ""} ${saved("not_going")}" data-event-id="${eventData.id}" data-event-response="not_going">Nao vou</button>
       ${goingDisabled ? `<span class="hint warn">Limite de ${eventData.maxPlayers} jogadores atingido.</span>` : ""}
+      ${pendingNote}
     </div>
   `;
 }
@@ -6940,10 +7047,10 @@ async function saveEventResponse(eventId, status) {
     alert("Entra primeiro para responder.");
     return;
   }
-  const linkedPlayer = getLinkedPlayer();
+  const linkedPlayer = getMyPlayer();
   if (!linkedPlayer) {
-    alert("Associa primeiro a tua conta a um perfil.");
-    showView("account");
+    alert("Escolhe primeiro a tua carta no separador Eu.");
+    showView("me");
     return;
   }
 
@@ -6953,6 +7060,7 @@ async function saveEventResponse(eventId, status) {
     alert(`Nao consegui guardar resposta: ${formatEventResponseError(error)}`);
     return;
   }
+  lastSavedResponse = { eventId, status, at: Date.now() };
   currentEventId = eventId;
   render();
 }
@@ -7355,7 +7463,8 @@ async function createOrReuseGuestPlayer(rawName, rawScore) {
 
     let playerData = matches[0];
     if (!playerData) {
-      const score = rawScore === null || rawScore === undefined || String(rawScore).trim() === "" ? NaN : Number(rawScore);
+      const score = !ratingsVisible() ? NO_RATING_BASE
+        : rawScore === null || rawScore === undefined || String(rawScore).trim() === "" ? NaN : Number(rawScore);
       if (!Number.isFinite(score) || score < 1 || score > 100) {
         throw new Error("Para um jogador novo, indica uma nota entre 1 e 100.");
       }
@@ -8401,9 +8510,9 @@ function renderPlayerCard(playerData, options = {}) {
   const rating = canSeeCurrentRatings() ? form.currentRating : playerData.overall;
   return `
     <article class="player-card player-card-${mode} card-variant-${variant.key}" style="--card-bg: url('${variant.asset}')">
-      <div class="card-rating">
+      ${ratingsVisible() ? `<div class="card-rating">
         <strong>${rating}</strong>
-      </div>
+      </div>` : `<div class="card-rating card-club">${renderClubSymbol(getActiveGroup(), "club-symbol-card")}</div>`}
       <div class="card-photo">
         ${renderPlayerCardPhoto(playerData)}
       </div>
@@ -8541,7 +8650,7 @@ function renderRosterRow(playerData, currentGroup) {
   return `
     <div class="roster-row">
       <div class="roster-row-head">
-        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
         <button class="roster-remove" type="button" data-remove-player="${playerData.id}" aria-label="Remover ${escapeHtml(playerData.name)}" title="Remover">&times;</button>
       </div>
       <div class="roster-actions">
@@ -8582,6 +8691,7 @@ function removePlayerFromGame(playerId) {
   });
   if (game.status !== "preview") persistState();
   render();
+  promptNoShow(game, playerId);
 }
 
 function addSelectedPlayerToGame() {
@@ -8625,7 +8735,9 @@ async function saveCurrentScore() {
 }
 
 function completeOriginEventForGame(game) {
-  const originEvent = findOriginEventForGame(game);
+  const gameTime = new Date(game.date).getTime();
+  const originEvent = findOriginEventForGame(game)
+    || (state.events || []).find((eventData) => eventData.status === "open" && Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000);
   if (!originEvent || originEvent.status === "completed") return;
   originEvent.status = "completed";
 }
@@ -8808,6 +8920,10 @@ async function savePlayerFromForm(event) {
   event.preventDefault();
   if (!requireAdmin()) return;
   updateOverallFromPartialRatings();
+  if (!ratingsVisible()) {
+    [els.formPace, els.formShooting, els.formPassing, els.formDribbling, els.formDefending, els.formPhysical, els.formOverall]
+      .forEach((input) => { if (input && !input.value) input.value = NO_RATING_BASE; });
+  }
   const values = {
     id: els.playerId.value || `p-${Date.now()}-${slug(els.formName.value)}`,
     name: els.formName.value.trim(),
@@ -9110,6 +9226,14 @@ function renderClubEditor(group) {
       </div>
       <label class="auth-field"><span>Local habitual (entra automatico nas convocatorias)</span>
         <input name="location" type="text" maxlength="80" value="${escapeHtml(group.defaultLocation)}" placeholder="Ex.: Pavilhao Municipal, Maia"></label>
+      <div class="auth-field"><span>Dia e hora habituais (preenchem a proxima convocatoria)</span>
+        <div class="new-group-when">
+          <select name="weekday" aria-label="Dia habitual">
+            <option value="">Sem dia fixo</option>
+            ${WEEKDAY_PLURAL.map((label, index) => `<option value="${index}" ${getGroupSchedule(group).weekday === index ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+          <input name="time" type="time" value="${escapeHtml(getGroupSchedule(group).time || "")}" aria-label="Hora habitual">
+        </div></div>
       <label class="club-check"><input name="public" type="checkbox" ${group.isPublic ? "checked" : ""}>
         <span>Perfil publico: qualquer pessoa pode encontrar o clube e ver so o nome, simbolo e bio.</span></label>
       <div class="club-editor-block">
@@ -9143,10 +9267,18 @@ function renderClubPanel() {
       <div class="club-empty">
         ${renderClubSymbol(null, "club-symbol-lg")}
         <h3>Ainda nao tens clube</h3>
-        <p>Procura um clube e pede para entrar, ou pede um convite a um admin.</p>
-      </div>
-      ${renderClubSearchSection()}`;
-    bindClubSearch(panel);
+        <p>Cria o teu clube, procura um e pede para entrar, ou pede o link de convite a um admin.</p>
+        <div class="actions">
+          <button type="button" class="primary-btn" data-club-create>Criar o meu clube</button>
+          <button type="button" class="ghost-btn" data-club-find>Procurar clubes</button>
+        </div>
+      </div>`;
+    panel.querySelector("[data-club-create]")?.addEventListener("click", () => {
+      newGroupFormOpen = true;
+      renderNewGroupPanel();
+      document.querySelector("#new-group-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
     return;
   }
   const canEdit = isGroupAdminRole(group.role) && remoteEnabled;
@@ -9188,7 +9320,7 @@ function renderClubPanel() {
       </div>
     </section>
     ${canEdit ? '<section class="club-block" id="club-join-requests"></section>' : ""}
-    ${renderClubSearchSection()}
+    <div class="actions"><button type="button" class="ghost-btn" data-club-find>Procurar outros clubes</button></div>
     ${group.role === "owner" && remoteEnabled ? `
       <section class="club-block club-danger">
         <h4>Apagar grupo</h4>
@@ -9204,6 +9336,7 @@ function renderClubPanel() {
     renderClubPanel();
   });
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
+  panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
   panel.querySelectorAll("[data-club-player]").forEach((button) => button.addEventListener("click", () => openPlayerProfile(button.dataset.clubPlayer)));
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
@@ -9218,6 +9351,7 @@ function renderClubPanel() {
     group.bio = String(data.get("bio") || "");
     group.defaultLocation = String(data.get("location") || "");
     group.isPublic = data.has("public");
+    group.settings = { ...(group.settings || {}), weekday: data.get("weekday") === "" ? undefined : Number(data.get("weekday")), time: String(data.get("time") || "") || undefined };
   };
   editor.querySelectorAll("[data-emblem]").forEach((button) => button.addEventListener("click", () => {
     clubDraftLogo = `preset:${button.dataset.emblem}`;
@@ -9258,11 +9392,908 @@ function renderClubPanel() {
       alert(`Nao consegui guardar: ${error.message}. Confirma que a migracao group-profile-migration.sql foi aplicada.`);
       return;
     }
-    Object.assign(group, { bio: bio.trim().slice(0, 300), logo: clubDraftLogo, isPublic, defaultLocation });
+    const weekday = data.get("weekday") === "" ? null : Number(data.get("weekday"));
+    const time = String(data.get("time") || "") || null;
+    const { error: scheduleError } = await supabaseClient.rpc("set_group_schedule", { p_group_id: group.id, p_weekday: weekday, p_time: time });
+    if (scheduleError) console.warn("Group schedule save failed. Run supabase/onboarding-migration.sql.", scheduleError);
+    Object.assign(group, { bio: bio.trim().slice(0, 300), logo: clubDraftLogo, isPublic, defaultLocation, settings: { ...(group.settings || {}), weekday: weekday ?? undefined, time: time ?? undefined } });
     clubEditing = false;
     renderClubTab();
     renderClubPanel();
   });
+}
+
+// ---- Faltas (2026-11-05): quem disse Vou e nao apareceu. So admins; tabela event_no_shows (supabase/no-shows-migration.sql) ----
+let eventNoShows = [];
+let noShowsAvailable = false;
+
+async function loadNoShows() {
+  eventNoShows = [];
+  noShowsAvailable = false;
+  if (!supabaseClient || !currentSession?.user || !isAdmin) return;
+  const { data, error } = await supabaseClient.from("event_no_shows").select("event_id, player_id");
+  if (error) {
+    console.warn("No-shows load failed. Run supabase/no-shows-migration.sql.", error);
+    return;
+  }
+  const groupEventIds = new Set((state.events || []).map((eventData) => eventData.id));
+  eventNoShows = (data || []).filter((row) => groupEventIds.has(row.event_id));
+  noShowsAvailable = true;
+}
+
+function isNoShow(eventId, playerId) {
+  return eventNoShows.some((row) => row.event_id === eventId && row.player_id === playerId);
+}
+
+// A convocatoria de um jogo: a ligada a ele, ou a da mesma hora (+-1 min).
+function getEventForGameTime(game) {
+  if (!game) return null;
+  const linked = findEventForGame(game);
+  if (linked) return linked;
+  const gameTime = new Date(game.date).getTime();
+  return (state.events || []).find((eventData) => Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000) || null;
+}
+
+async function setNoShow(eventId, playerId, missed) {
+  if (!isAdmin || !supabaseClient) return false;
+  const { error } = missed
+    ? await supabaseClient.from("event_no_shows").upsert({ event_id: eventId, player_id: playerId }, { onConflict: "event_id,player_id" })
+    : await supabaseClient.from("event_no_shows").delete().eq("event_id", eventId).eq("player_id", playerId);
+  if (error) {
+    alert(`Nao consegui guardar a falta: ${error.message}`);
+    return false;
+  }
+  eventNoShows = eventNoShows.filter((row) => !(row.event_id === eventId && row.player_id === playerId));
+  if (missed) eventNoShows.push({ event_id: eventId, player_id: playerId });
+  return true;
+}
+
+// Depois de tirar alguem das equipas: se tinha dito Vou, pergunta se faltou.
+function promptNoShow(game, playerId) {
+  if (!noShowsAvailable || !isAdmin) return;
+  const eventData = (currentEventId && game?.status === "preview" ? (state.events || []).find((item) => item.id === currentEventId) : null) || getEventForGameTime(game);
+  const playerData = findPlayer(playerId);
+  if (!eventData || !playerData || getResponseForPlayer(eventData.id, playerId)?.status !== "going" || isNoShow(eventData.id, playerId)) return;
+  showNoShowToast(eventData.id, playerData);
+}
+
+function showNoShowToast(eventId, playerData) {
+  document.querySelector(".app-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "app-toast";
+  toast.setAttribute("role", "status");
+  toast.innerHTML = `
+    <span><strong>${escapeHtml(playerData.name)}</strong> tinha dito Vou. Faltou?</span>
+    <div class="actions">
+      <button type="button" class="primary-btn" data-toast-yes>Faltou</button>
+      <button type="button" class="ghost-btn" data-toast-no>Não</button>
+    </div>`;
+  document.body.append(toast);
+  const close = () => {
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 220);
+  };
+  let timer = setTimeout(close, 9000);
+  toast.querySelector("[data-toast-no]").addEventListener("click", close);
+  toast.querySelector("[data-toast-yes]").addEventListener("click", async (event) => {
+    clearTimeout(timer);
+    const ok = await runWithButton(event.currentTarget, () => setNoShow(eventId, playerData.id, true));
+    if (!ok) return;
+    toast.innerHTML = `
+      <span>Falta registada para <strong>${escapeHtml(playerData.name)}</strong>. Só os admins veem.</span>
+      <div class="actions"><button type="button" class="ghost-btn" data-toast-undo>Desfazer</button></div>`;
+    toast.querySelector("[data-toast-undo]").addEventListener("click", async () => {
+      await setNoShow(eventId, playerData.id, false);
+      close();
+      renderHistoryGameDetail();
+    });
+    timer = setTimeout(close, 6000);
+    renderHistoryGameDetail();
+  });
+}
+
+// Pagina do jogo (admin): quem disse Vou e nao jogou, com Faltou / Desfazer.
+function renderNoShowSection(game) {
+  if (!isAdmin || !noShowsAvailable || !isFinishedGame(game)) return "";
+  const eventData = getEventForGameTime(game);
+  if (!eventData) return "";
+  const played = new Set(getGamePlayerIds(game));
+  const missing = getEventResponses(eventData.id, "going").map((response) => response.playerId).filter((playerId) => !played.has(playerId));
+  if (!missing.length) return "";
+  return `
+    <section class="profile-section no-show-section admin-actions">
+      <h3>Disseram Vou e não jogaram</h3>
+      <p class="hint">Marca quem faltou. Conta para a fiabilidade, que só os admins veem.</p>
+      <div class="no-show-list">
+        ${missing.map((playerId) => {
+          const playerData = findPlayer(playerId);
+          const missed = isNoShow(eventData.id, playerId);
+          return `
+            <div class="no-show-row">
+              <span>${playerData ? renderAvatar(playerData) : ""} ${escapeHtml(playerData?.name || "Jogador")}</span>
+              ${missed
+                ? `<span class="metric warn-pill">Faltou</span><button type="button" class="ghost-btn" data-no-show="${escapeHtml(playerId)}" data-event-id="${escapeHtml(eventData.id)}" data-missed="false">Desfazer</button>`
+                : `<button type="button" class="ghost-btn" data-no-show="${escapeHtml(playerId)}" data-event-id="${escapeHtml(eventData.id)}" data-missed="true">Faltou</button>`}
+            </div>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+function bindNoShowSection(root) {
+  root?.querySelectorAll("[data-no-show]").forEach((button) => button.addEventListener("click", async () => {
+    const ok = await runWithButton(button, () => setNoShow(button.dataset.eventId, button.dataset.noShow, button.dataset.missed === "true"));
+    if (ok) renderHistoryGameDetail();
+  }));
+}
+
+// Perfil (admin): disse Vou em jogos ja fechados e quantas vezes faltou.
+function renderReliability(playerData) {
+  if (!isAdmin || !noShowsAvailable) return "";
+  const said = (state.events || []).filter((eventData) =>
+    getResponseForPlayer(eventData.id, playerData.id)?.status === "going" && getFinishedGameAtEventTime(eventData));
+  if (!said.length) return "";
+  const missed = said.filter((eventData) => isNoShow(eventData.id, playerData.id)).length;
+  return `
+    <div class="reliability-line">
+      <span>Disse Vou e apareceu: <strong>${said.length - missed} de ${said.length}</strong>${missed ? ` · faltou ${missed}×` : ""}</span>
+      <small>Só os admins veem</small>
+    </div>`;
+}
+
+// ---- Micro-interaccoes (2026-11-05). So transform/opacity; com "reduzir movimento" nada mexe. ----
+let lastSavedResponse = null;
+let justRevealedPlayerId = null;
+let lastNotifyTotal = null;
+const FLY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/></svg>';
+
+function reduceMotion() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function bumpElement(element) {
+  if (!element || reduceMotion()) return;
+  element.classList.remove("bump");
+  void element.offsetWidth;
+  element.classList.add("bump");
+  element.addEventListener("animationend", () => element.classList.remove("bump"), { once: true });
+}
+
+// 02: o botao encolhe para uma roda enquanto grava e acaba num visto (uma so forma).
+async function runWithButton(button, task) {
+  if (!button) return task();
+  button.style.width = `${button.offsetWidth}px`;
+  void button.offsetWidth;
+  button.classList.add("is-busy");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  let ok;
+  try {
+    ok = await task();
+  } finally {
+    button.removeAttribute("aria-busy");
+    button.classList.remove("is-busy");
+    if (ok !== false && button.isConnected) {
+      button.classList.add("is-done");
+      if (!reduceMotion()) await waitMs(520);
+    }
+    if (button.isConnected) {
+      button.classList.remove("is-done");
+      button.style.width = "";
+      button.disabled = false;
+    }
+  }
+  return ok;
+}
+
+// 01: uma bola voa em arco ate ao separador e o separador da um salto (500 ms).
+function flyTo(fromElement, toElement) {
+  if (!fromElement || !toElement) return;
+  if (reduceMotion() || !toElement.getClientRects().length || !document.body.animate) {
+    bumpElement(toElement);
+    return;
+  }
+  const from = fromElement.getBoundingClientRect();
+  const to = toElement.getBoundingClientRect();
+  const x0 = from.left + from.width / 2;
+  const y0 = from.top + from.height / 2;
+  const dx = to.left + to.width / 2 - x0;
+  const dy = to.top + to.height / 2 - y0;
+  const lift = Math.min(140, 60 + Math.abs(dx) * 0.35);
+  const outer = document.createElement("span");
+  outer.className = "fly-dot";
+  outer.style.left = `${x0}px`;
+  outer.style.top = `${y0}px`;
+  outer.innerHTML = `<span class="fly-dot-inner">${FLY_ICON}</span>`;
+  document.body.append(outer);
+  const inner = outer.firstElementChild;
+  outer.animate([{ transform: "translateX(0)" }, { transform: `translateX(${dx}px)` }], { duration: 500, easing: "linear" });
+  const flight = inner.animate([
+    { transform: "translateY(0) scale(1)", easing: "cubic-bezier(.2,.7,.4,1)" },
+    { transform: `translateY(${Math.min(0, dy) - lift}px) scale(1.15)`, offset: 0.42, easing: "cubic-bezier(.6,0,.8,.4)" },
+    { transform: `translateY(${dy}px) scale(.45)` },
+  ], { duration: 500 });
+  flight.onfinish = () => {
+    outer.remove();
+    bumpElement(toElement);
+  };
+}
+
+function getTabButton(view) {
+  return document.querySelector(`.tab[data-view="${view}"]`);
+}
+
+// 03: ao entrar num ecra, as linhas chegam com 70 ms entre si.
+function playCascade(root) {
+  if (!root || reduceMotion()) return;
+  root.classList.remove("cascade-in");
+  void root.offsetWidth;
+  root.classList.add("cascade-in");
+  clearTimeout(root._cascadeTimer);
+  root._cascadeTimer = setTimeout(() => root.classList.remove("cascade-in"), 1300);
+}
+
+// 06: o simbolo (sino das novidades) balanca quando ha novidades novas.
+function ringNotifyBell(total) {
+  const previous = lastNotifyTotal;
+  lastNotifyTotal = total;
+  if (!total || (previous !== null && total <= previous) || reduceMotion()) return;
+  const logo = document.querySelector("#notify-btn .brand-logo");
+  if (!logo) return;
+  logo.classList.remove("ring");
+  void logo.offsetWidth;
+  logo.classList.add("ring");
+  logo.addEventListener("animationend", () => logo.classList.remove("ring"), { once: true });
+}
+
+// 04: deslizar uma linha para a direita aceita, para a esquerda recusa (inclina ate 12 graus e sai).
+function bindSwipe(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-swipe]").forEach((row) => {
+    if (row.dataset.swipeBound) return;
+    row.dataset.swipeBound = "1";
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let tracking = false;
+    let horizontal = false;
+    row.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.target.closest("button, a, input, select, textarea, label")) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      dx = 0;
+      tracking = true;
+      horizontal = false;
+    });
+    row.addEventListener("pointermove", (event) => {
+      if (!tracking) return;
+      const moveX = event.clientX - startX;
+      const moveY = event.clientY - startY;
+      if (!horizontal) {
+        if (Math.abs(moveX) < 8 && Math.abs(moveY) < 8) return;
+        if (Math.abs(moveY) > Math.abs(moveX)) {
+          tracking = false;
+          return;
+        }
+        horizontal = true;
+        row.setPointerCapture?.(event.pointerId);
+        row.classList.add("swiping");
+      }
+      dx = moveX;
+      const width = row.offsetWidth || 1;
+      row.style.transform = `translateX(${dx}px) rotate(${(dx / width) * 12}deg)`;
+      row.dataset.swipeDir = dx > 0 ? "accept" : "reject";
+      row.style.setProperty("--swipe", String(Math.min(1, Math.abs(dx) / (width * 0.35))));
+    });
+    const finish = () => {
+      if (!tracking) return;
+      tracking = false;
+      row.classList.remove("swiping");
+      const width = row.offsetWidth || 1;
+      if (horizontal && Math.abs(dx) > width * 0.35) {
+        const accept = dx > 0;
+        row.style.transition = "transform .22s ease-in, opacity .22s ease-in";
+        row.style.transform = `translateX(${accept ? width * 1.3 : -width * 1.3}px) rotate(${accept ? 12 : -12}deg)`;
+        row.style.opacity = "0";
+        setTimeout(() => {
+          row.querySelector(accept ? "[data-swipe-accept]" : "[data-swipe-reject]")?.click();
+          // Se a accao foi cancelada (ex.: confirmacao recusada), a linha volta.
+          setTimeout(() => {
+            if (!row.isConnected) return;
+            row.style.transform = "";
+            row.style.opacity = "";
+            row.removeAttribute("data-swipe-dir");
+          }, 600);
+        }, 200);
+      } else {
+        row.style.transition = "transform .25s cubic-bezier(.2,.9,.3,1.3)";
+        row.style.transform = "";
+        row.removeAttribute("data-swipe-dir");
+        setTimeout(() => { row.style.transition = ""; }, 260);
+      }
+      dx = 0;
+    };
+    row.addEventListener("pointerup", finish);
+    row.addEventListener("pointercancel", finish);
+  });
+}
+
+// ---- Clubes sem notas (2026-11-05): fora dos Futeboleiros ninguem ve nota nem numeros; todos comecam iguais ----
+const NO_RATING_BASE = 60;
+
+function ratingsVisible(group = getActiveGroup()) {
+  if (!remoteEnabled || !group) return true;
+  return group.slug === LEGACY_GROUP_SLUG || group.settings?.ratings === true;
+}
+
+function respondWithMotion(button) {
+  if (button.dataset.eventResponse === "going" && !button.classList.contains("selected")) flyTo(button, getTabButton("events"));
+  return saveEventResponse(button.dataset.eventId, button.dataset.eventResponse);
+}
+
+// ---- Eu (2026-11-05): pagina de quem chega (convite, sem grupo, sem ficha) e bloco "Agora" no proprio perfil ----
+const WEEKDAY_PLURAL = ["Domingos", "Segundas", "Terças", "Quartas", "Quintas", "Sextas", "Sábados"];
+const ME_ICONS = {
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c.6-3 2.9-4.6 6-4.6s5.4 1.6 6 4.6M15 14.6c2.6 0 4.4 1.3 5 4"/>',
+  ball: '<circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/>',
+};
+let meTraitsDraft = null;
+
+function meIcon(key) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${ME_ICONS[key]}</svg>`;
+}
+
+function getGroupSchedule(group = getActiveGroup()) {
+  const weekday = Number.isInteger(group?.settings?.weekday) ? group.settings.weekday : null;
+  const time = /^\d{2}:\d{2}$/.test(group?.settings?.time || "") ? group.settings.time : null;
+  return { weekday, time };
+}
+
+function formatSchedule(weekday, time) {
+  if (weekday == null && !time) return "";
+  return `${weekday != null ? WEEKDAY_PLURAL[weekday] : "Jogo"}${time ? ` às ${time}` : ""}`;
+}
+
+function formatShortDateTime(value) {
+  const date = new Date(value);
+  const day = date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
+  const time = date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  return `${day} · ${time}`;
+}
+
+// A ficha pedida ("Sou eu") enquanto o admin nao confirma; serve para responder as convocatorias.
+function getPendingClaimPlayer() {
+  const claim = getMyPendingClaim();
+  return claim ? findPlayer(claim.player_id) : null;
+}
+
+function getMyPlayer() {
+  return getLinkedPlayer() || getPendingClaimPlayer();
+}
+
+function isOnboardingNeeded() {
+  const group = getActiveGroup();
+  const hasPlayers = state.players.length >= 6;
+  const hasGame = Boolean((state.events || []).length || state.games.length);
+  return Boolean(remoteEnabled && isAdmin && group && group.slug !== LEGACY_GROUP_SLUG && (!hasPlayers || !hasGame));
+}
+
+function getUpcomingEventForMe() {
+  const since = Date.now() - 3 * 60 * 60 * 1000;
+  return [...(state.events || [])]
+    .filter((eventData) => !["cancelled", "completed"].includes(eventData.status) && !getFinishedGameAtEventTime(eventData) && new Date(eventData.startsAt).getTime() > since)
+    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0] || null;
+}
+
+function renderNextGameCard() {
+  const eventData = getUpcomingEventForMe();
+  const group = getActiveGroup();
+  if (!eventData) {
+    return `
+      <article class="me-card me-next is-empty">
+        <div class="me-next-info">
+          <p class="eyebrow">Próximo jogo${group ? ` · ${escapeHtml(group.name)}` : ""}</p>
+          <strong>Ainda não há convocatória</strong>
+          <small>${isAdmin ? "Lança a próxima e o grupo responde aqui." : "Quando o admin lançar o próximo jogo, respondes aqui."}</small>
+        </div>
+        ${isAdmin ? '<button type="button" class="primary-btn" data-me-go="new-game">Nova convocatória</button>' : ""}
+      </article>`;
+  }
+  const date = new Date(eventData.startsAt);
+  const going = getEventPlayers(eventData.id, "going").length;
+  const myPlayer = getMyPlayer();
+  const myResponse = myPlayer ? getResponseForPlayer(eventData.id, myPlayer.id) : null;
+  const pct = Math.min(100, Math.round((going / Math.max(1, eventData.maxPlayers)) * 100));
+  const missing = Math.max(0, eventData.maxPlayers - going);
+  return `
+    <article class="me-card me-next">
+      <div class="me-date" aria-hidden="true">
+        <small>${escapeHtml(date.toLocaleDateString("pt-PT", { weekday: "short" }).replace(".", ""))}</small>
+        <b>${date.getDate()}</b>
+        <small>${escapeHtml(date.toLocaleDateString("pt-PT", { month: "short" }).replace(".", ""))}</small>
+      </div>
+      <div class="me-next-info">
+        <p class="eyebrow">Próximo jogo${group ? ` · ${escapeHtml(group.name)}` : ""}</p>
+        <strong>${escapeHtml(date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }))}${eventData.location ? ` · ${escapeHtml(eventData.location)}` : ""}</strong>
+        <span class="me-bar"><i style="width:${pct}%"></i></span>
+        <small>${going} de ${eventData.maxPlayers}${missing ? ` · faltam ${missing}` : " · cheio"}</small>
+      </div>
+      <div class="me-next-actions">${eventData.status === "cancelled" ? "" : renderResponseActions(eventData, myResponse)}</div>
+      <button type="button" class="ghost-btn me-next-open" data-me-go="events">Ver convocatória</button>
+    </article>`;
+}
+
+function renderOpenGamesRow(title = "Jogos abertos") {
+  if (!remoteEnabled || !currentSession?.user) return "";
+  const rows = publicEvents.filter((row) => row.my_status !== "declined").slice(0, 8);
+  const statusPill = (status) => ({
+    invited: '<span class="metric warn-pill">Convidaram-te</span>',
+    pending: '<span class="metric warn-pill">Pedido enviado</span>',
+    accepted: '<span class="metric good-pill">Aceite</span>',
+  }[status] || "");
+  return `
+    <section class="me-section">
+      <div class="me-section-head">
+        <h3>${escapeHtml(title)}</h3>
+        <button type="button" class="ghost-btn" data-me-go="public-games">Ver todos</button>
+      </div>
+      ${rows.length ? `
+        <div class="me-rail">
+          ${rows.map((row) => `
+            <button type="button" class="me-open-card" data-me-go="public-games">
+              <span class="eyebrow">${escapeHtml(row.group_name || "Grupo")}</span>
+              <strong>${escapeHtml(formatShortDateTime(row.starts_at))}</strong>
+              ${row.location ? `<small>${escapeHtml(row.location)}</small>` : ""}
+              <span class="me-pills">
+                <span class="metric ${row.spots_left > 0 ? "warn-pill" : ""}">${row.spots_left > 0 ? `Faltam ${row.spots_left}` : "Cheio"}</span>
+                ${row.needs ? `<span class="metric">${escapeHtml(NEEDS_LABELS[row.needs] || row.needs)}</span>` : ""}
+                ${statusPill(row.my_status)}
+              </span>
+            </button>`).join("")}
+        </div>
+      ` : `<p class="hint">Ainda não há jogos abertos de outros grupos. Quando um grupo precisar de jogadores, aparece aqui.</p>`}
+    </section>`;
+}
+
+function renderAvailabilityShortcut() {
+  if (!remoteEnabled || !currentSession?.user) return "";
+  const days = new Set(myWeeklyAvailability.map((row) => row.weekday)).size;
+  const summary = days ? `${days} ${days === 1 ? "dia" : "dias"} por semana marcados` : myAvailability.length ? `${myAvailability.length} dias marcados` : "Ainda não marcaste quando podes jogar";
+  return `
+    <div class="me-shortcuts">
+      <button type="button" class="me-shortcut" data-me-go="availability">
+        ${meIcon("clock")}<span><strong>Quando posso jogar</strong><small>${escapeHtml(summary)}</small></span>
+      </button>
+      ${getLinkedPlayer() ? `
+        <button type="button" class="me-shortcut" data-me-go="my-games">
+          ${meIcon("ball")}<span><strong>O meu histórico</strong><small>Os meus jogos em todos os clubes</small></span>
+        </button>` : ""}
+    </div>`;
+}
+
+// No proprio perfil, logo a seguir a carta.
+function renderMeNowBlock() {
+  return `<div class="me-now">${renderNextGameCard()}${renderOpenGamesRow()}${renderAvailabilityShortcut()}</div>`;
+}
+
+function renderTraitsChips() {
+  if (!meTraitsDraft) {
+    meTraitsDraft = { fitness: myTraits?.fitness || "", position: myTraits?.position || "", age_band: myTraits?.age_band || "" };
+  }
+  const rows = [["position", "Onde jogas?"], ["fitness", "Como estás de forma?"], ["age_band", "Idade"]];
+  return `
+    <div class="me-traits">
+      ${rows.map(([field, label]) => `
+        <div class="me-trait-row">
+          <span>${label}</span>
+          <div class="me-chips" role="group" aria-label="${label}">
+            ${Object.entries(TRAIT_LABELS[field]).map(([value, text]) => `
+              <button type="button" class="me-chip ${meTraitsDraft[field] === value ? "on" : ""}" data-me-trait="${field}" data-value="${escapeHtml(value)}" aria-pressed="${meTraitsDraft[field] === value}">${escapeHtml(text)}</button>`).join("")}
+          </div>
+        </div>`).join("")}
+    </div>`;
+}
+
+function hasAllTraits() {
+  return Boolean(myTraits?.fitness && myTraits?.position && myTraits?.age_band);
+}
+
+function renderMeTraitsCard() {
+  return `
+    <section class="panel me-block">
+      <p class="eyebrow">O teu jogador</p>
+      <h2>Três toques</h2>
+      <p class="hint">Para pedires lugar em jogos abertos. Só o admin do jogo a que pedes para ir vê isto.</p>
+      ${renderTraitsChips()}
+      <div class="actions"><button type="button" class="primary-btn" data-me-save-traits>Guardar</button></div>
+    </section>`;
+}
+
+function renderMeInvite() {
+  const invite = pendingInvite;
+  if (!invite.valid) {
+    return `
+      <section class="panel me-block me-invite">
+        <p class="eyebrow">Convite</p>
+        <h2>Este convite já não é válido</h2>
+        <p class="hint">Pede um link novo ao admin do grupo.</p>
+        <div class="actions"><button type="button" class="ghost-btn" data-invite-dismiss>Fechar</button></div>
+      </section>`;
+  }
+  const schedule = formatSchedule(invite.weekday, invite.startTime);
+  const facts = [
+    schedule ? `<li>${meIcon("clock")}${escapeHtml(schedule)}</li>` : "",
+    invite.location ? `<li>${meIcon("pin")}${escapeHtml(invite.location)}</li>` : "",
+    `<li>${meIcon("people")}${invite.memberCount} ${invite.memberCount === 1 ? "pessoa" : "pessoas"} no grupo</li>`,
+    invite.nextEventAt ? `<li>${meIcon("ball")}Próximo jogo: ${escapeHtml(formatShortDateTime(invite.nextEventAt))}${invite.nextEventMax ? ` · ${invite.nextEventGoing} de ${invite.nextEventMax}` : ""}</li>` : "",
+  ].join("");
+  return `
+    <section class="panel me-block me-invite">
+      ${renderClubSymbol({ logo: invite.logo, name: invite.groupName }, "club-symbol-xl")}
+      <p class="eyebrow">Foste convidado para jogar</p>
+      <h2>${escapeHtml(invite.groupName || "Grupo")}</h2>
+      ${invite.bio ? `<p class="club-bio">${escapeHtml(invite.bio)}</p>` : ""}
+      <ul class="me-facts">${facts}</ul>
+      <div class="actions">
+        ${currentSession?.user
+          ? `<button type="button" class="primary-btn" data-invite-accept>Entrar no grupo</button>
+             <button type="button" class="ghost-btn" data-invite-dismiss>Agora não</button>`
+          : `<button type="button" class="primary-btn" data-invite-signup>Criar conta e entrar</button>
+             <button type="button" class="ghost-btn" data-invite-login>Já tenho conta</button>`}
+      </div>
+      <p class="hint">Depois escolhes a tua carta no grupo. Demora um minuto.</p>
+    </section>`;
+}
+
+function renderMeWelcome() {
+  return `
+    <section class="panel me-block me-welcome">
+      <p class="eyebrow">Bem-vindo ao Footer</p>
+      <h2>Futebol entre amigos, sem confusão no WhatsApp</h2>
+      <p>Convocatórias, equipas equilibradas, resultados, cartas e vídeos dos jogos.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-signup>Criar conta</button>
+        <button type="button" class="ghost-btn" data-me-login>Entrar</button>
+      </div>
+    </section>
+    <div class="me-paths">
+      <article class="me-path"><strong>Recebi um convite</strong><p>Abre o link que te enviaram no WhatsApp. O grupo aparece logo aqui.</p></article>
+      <article class="me-path"><strong>Quero jogar</strong><p>Cria conta e vê os jogos abertos de grupos que precisam de jogadores.</p></article>
+      <article class="me-path"><strong>Quero organizar</strong><p>Cria conta e depois o teu clube: convocatórias, equipas e pagamentos num só sítio.</p></article>
+    </div>`;
+}
+
+function renderMeNoClub() {
+  const name = currentProfile?.display_name || "";
+  return `
+    <section class="panel me-block">
+      <p class="eyebrow">${name ? `Olá, ${escapeHtml(name)}` : "Olá"}</p>
+      <h2>Ainda não tens clube</h2>
+      <p>Se te enviaram um convite, abre o link no telemóvel. Entretanto podes procurar jogo ou criar o teu clube.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-new-club>Criar o meu clube</button>
+        <button type="button" class="ghost-btn" data-me-go="search">Procurar clubes</button>
+      </div>
+    </section>
+    ${hasAllTraits() ? "" : renderMeTraitsCard()}
+    ${renderOpenGamesRow()}
+    ${renderAvailabilityShortcut()}`;
+}
+
+function renderMeFirstSteps() {
+  if (!isOnboardingNeeded()) return "";
+  return `
+    <section class="panel me-block me-first-steps">
+      <p class="eyebrow">${escapeHtml(getActiveGroup()?.name || "")}</p>
+      <h2>Primeiros passos do teu clube</h2>
+      <p class="hint">Junta os jogadores, envia o link de convite e lança a primeira convocatória.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-go="events">Abrir primeiros passos</button>
+        <button type="button" class="ghost-btn" data-me-go="claims">Link de convite</button>
+      </div>
+    </section>`;
+}
+
+function renderMeNoPlayer() {
+  const group = getActiveGroup();
+  const claim = getMyPendingClaim();
+  const claimPlayer = getPendingClaimPlayer();
+  if (claim) {
+    return `
+      ${renderMeFirstSteps()}
+      <section class="panel me-block me-pending">
+        ${claimPlayer ? `<div class="me-card-wrap">${renderPlayerCard(claimPlayer)}</div>` : ""}
+        <div>
+          <p class="eyebrow">${escapeHtml(group?.name || "")}</p>
+          <h2>${escapeHtml(claimPlayer?.name || "A tua carta")}</h2>
+          <span class="metric warn-pill">Por confirmar pelo admin</span>
+          <p class="hint">Já podes responder às convocatórias. Quando o admin confirmar, ficas com o histórico e as cartas desta ficha.</p>
+        </div>
+      </section>
+      <div class="me-now">${renderNextGameCard()}</div>
+      ${hasAllTraits() ? "" : renderMeTraitsCard()}
+      <div class="me-now">${renderOpenGamesRow()}${renderAvailabilityShortcut()}</div>`;
+  }
+  const free = state.players
+    .filter((playerData) => !playerData.linkedUserId)
+    .sort((a, b) => Number(Boolean(a.isGuest)) - Number(Boolean(b.isGuest)) || a.name.localeCompare(b.name));
+  return `
+    ${renderMeFirstSteps()}
+    <section class="panel me-block me-claim">
+      <p class="eyebrow">${escapeHtml(group?.name || "")}</p>
+      <h2>És um destes?</h2>
+      <p class="hint">${free.length ? "O admin já criou cartas para quem joga. Escolhe a tua: podes responder logo às convocatórias e o admin confirma depois." : "Ainda não há cartas livres neste grupo. Cria o teu jogador aqui em baixo."}</p>
+      ${free.length ? `
+        <div class="me-rail me-claim-rail">
+          ${free.map((playerData) => `
+            <button type="button" class="me-claim-card" data-me-claim="${escapeHtml(playerData.id)}" aria-label="Sou eu: ${escapeHtml(playerData.name)}">
+              <span class="me-card-wrap">${renderPlayerCard(playerData)}</span>
+              <span class="ghost-btn">Sou eu</span>
+            </button>`).join("")}
+        </div>` : ""}
+    </section>
+    <section class="panel me-block me-new-player">
+      <p class="eyebrow">Não estás na lista?</p>
+      <h2>Cria o teu jogador</h2>
+      <label class="auth-field"><span>Como te chamam no jogo</span>
+        <input id="me-player-name" maxlength="40" value="${escapeHtml(currentProfile?.display_name || "")}" autocomplete="nickname"></label>
+      ${renderTraitsChips()}
+      <div class="actions"><button type="button" class="primary-btn" data-me-create-player>Criar o meu jogador</button></div>
+      <p class="hint">${ratingsVisible() ? "Começas com a nota média do grupo. O admin acerta depois." : "Neste clube não há notas: as equipas equilibram-se pela forma."} Depois podes pôr a tua foto de perfil.</p>
+    </section>
+    <div class="me-now">${renderNextGameCard()}</div>`;
+}
+
+function getMePanelHtml() {
+  if (!remoteEnabled) {
+    return `<section class="panel me-block"><p class="eyebrow">Modo local</p><h2>Sem ligação à base de dados</h2><p class="hint">Podes fazer equipas em Jogos.</p></section>`;
+  }
+  if (pendingInvite) return renderMeInvite();
+  if (!currentSession?.user) return renderMeWelcome();
+  if (groupsLoadedOk && !myGroups.length) return renderMeNoClub();
+  return renderMeNoPlayer();
+}
+
+function renderMePanel() {
+  const panel = document.querySelector("#me-panel");
+  if (!panel) return;
+  if (currentViewName !== "me") {
+    panel.innerHTML = "";
+    return;
+  }
+  panel.innerHTML = getMePanelHtml();
+  bindMeActions(panel);
+}
+
+async function saveTraitsDraft() {
+  if (!supabaseClient || !currentSession?.user || !meTraitsDraft) return true;
+  const row = {
+    user_id: currentSession.user.id,
+    fitness: meTraitsDraft.fitness || null,
+    position: meTraitsDraft.position || null,
+    age_band: meTraitsDraft.age_band || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabaseClient.from("player_traits").upsert(row);
+  if (error) {
+    alert(`Nao consegui guardar as caracteristicas: ${error.message}`);
+    return false;
+  }
+  myTraits = row;
+  return true;
+}
+
+async function createMePlayer(button) {
+  if (!supabaseClient || !currentSession?.user || !activeGroupId) return;
+  const name = document.querySelector("#me-player-name")?.value.trim() || "";
+  if (name.length < 2) {
+    alert("Escreve o teu nome.");
+    return;
+  }
+  let error = null;
+  await runWithButton(button, async () => {
+    ({ error } = await supabaseClient.rpc("create_own_player", { p_group_id: activeGroupId, p_name: name }));
+    return !error;
+  });
+  if (error) {
+    const message = String(error.message || "");
+    alert(message.includes("claim_pending")
+      ? "Ja tens um pedido pendente. Espera pela aprovacao do admin."
+      : message.includes("already_linked")
+        ? "Ja tens um perfil neste grupo."
+        : `Nao consegui criar o jogador: ${message}`);
+    return;
+  }
+  if (meTraitsDraft && Object.values(meTraitsDraft).some(Boolean)) await saveTraitsDraft();
+  await loadAccountState();
+  await loadRemoteState();
+  justRevealedPlayerId = getLinkedPlayer()?.id || null;
+  setTimeout(() => { justRevealedPlayerId = null; }, 1600);
+  updateAccessUi();
+  showView("me");
+  render();
+}
+
+function bindMeActions(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-me-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.meGo)));
+  root.querySelectorAll("[data-event-response]").forEach((button) => {
+    button.addEventListener("click", () => respondWithMotion(button));
+  });
+  root.querySelectorAll("[data-me-trait]").forEach((button) => button.addEventListener("click", () => {
+    const field = button.dataset.meTrait;
+    meTraitsDraft[field] = meTraitsDraft[field] === button.dataset.value ? "" : button.dataset.value;
+    root.querySelectorAll(`[data-me-trait="${field}"]`).forEach((chip) => {
+      const on = chip.dataset.value === meTraitsDraft[field];
+      chip.classList.toggle("on", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+  }));
+  root.querySelector("[data-me-save-traits]")?.addEventListener("click", async (event) => {
+    if (await runWithButton(event.currentTarget, saveTraitsDraft)) {
+      renderPublicGames();
+      renderTraitsPanel();
+      renderMePanel();
+    }
+  });
+  root.querySelector("[data-me-create-player]")?.addEventListener("click", (event) => createMePlayer(event.currentTarget));
+  root.querySelectorAll("[data-me-claim]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    flyTo(button.querySelector(".me-card-wrap") || button, getTabButton("me"));
+    await requestPlayerClaim(button.dataset.meClaim);
+    renderMePanel();
+  }));
+  root.querySelector("[data-me-new-club]")?.addEventListener("click", () => {
+    newGroupFormOpen = true;
+    showView("club");
+    renderNewGroupPanel();
+    requestAnimationFrame(() => document.querySelector("#new-group-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  });
+  root.querySelector("[data-me-signup]")?.addEventListener("click", createAccount);
+  root.querySelector("[data-invite-signup]")?.addEventListener("click", createAccount);
+  root.querySelector("[data-me-login]")?.addEventListener("click", openLoginModal);
+  root.querySelector("[data-invite-login]")?.addEventListener("click", openLoginModal);
+  root.querySelector("[data-invite-accept]")?.addEventListener("click", acceptPendingInvite);
+  root.querySelector("[data-invite-dismiss]")?.addEventListener("click", () => {
+    clearPendingInvite();
+    render();
+  });
+}
+
+// ---- Lupa (2026-11-05): jogadores dos meus clubes e clubes com perfil publico; mais tarde jogos perto ----
+let searchQuery = "";
+let searchResults = null;
+let searchBusy = false;
+let searchTimer = null;
+let searchToken = 0;
+
+function renderSearchPanel() {
+  const panel = document.querySelector("#search-panel");
+  if (!panel) return;
+  if (!remoteEnabled || !currentSession?.user) {
+    panel.innerHTML = `<div class="empty-state">Entra na tua conta para procurar jogadores e clubes.</div>`;
+    return;
+  }
+  panel.innerHTML = `
+    <form class="search-form" data-search-form role="search">
+      <input id="search-q" type="search" name="q" value="${escapeHtml(searchQuery)}" placeholder="Nome de um jogador ou clube" maxlength="40" autocomplete="off" aria-label="Procurar jogadores e clubes">
+      <button class="primary-btn" type="submit">Procurar</button>
+    </form>
+    <div data-search-results>${renderSearchResults()}</div>
+    <p class="hint search-soon">Em breve: jogos perto de ti.</p>`;
+  const form = panel.querySelector("[data-search-form]");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    runSearch(String(new FormData(form).get("q") || "").trim());
+  });
+  form.querySelector("#search-q").addEventListener("input", (event) => {
+    clearTimeout(searchTimer);
+    const value = event.target.value.trim();
+    searchTimer = setTimeout(() => runSearch(value), 350);
+  });
+  bindSearchResults(panel);
+}
+
+function renderSearchResults() {
+  if (searchBusy && !searchResults) return `<p class="hint">A procurar…</p>`;
+  if (!searchResults) return `<p class="hint">Procura jogadores dos teus clubes e clubes com perfil público.</p>`;
+  const { players, clubs, failed } = searchResults;
+  if (failed) return `<p class="hint warn">Não consegui procurar agora. Tenta outra vez daqui a pouco.</p>`;
+  if (!players.length && !clubs.length) return `<p class="hint">Nada encontrado para "${escapeHtml(searchQuery)}".</p>`;
+  return `
+    ${players.length ? `
+      <section class="search-section">
+        <h3>Jogadores</h3>
+        <div class="search-list">
+          ${players.map((row) => `
+            <button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">
+              <span class="avatar search-avatar">${escapeHtml(groupInitials(row.name))}</span>
+              <span class="search-row-text"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.group_name)}${row.is_guest ? " · convidado" : ""}</small></span>
+              <b class="search-ovr">${ratingsVisible(myGroups.find((group) => group.id === row.group_id) || { slug: "" }) ? (row.overall ?? "") : ""}</b>
+            </button>`).join("")}
+        </div>
+      </section>` : ""}
+    ${clubs.length ? `
+      <section class="search-section">
+        <h3>Clubes</h3>
+        <div class="club-list">
+          ${clubs.map((club) => `
+            <div class="club-row">
+              ${renderClubSymbol(club, "club-symbol-md")}
+              <div class="club-row-text"><strong>${escapeHtml(club.name)}</strong>
+                <small>${club.member_count} membros${club.bio ? ` - ${escapeHtml(club.bio)}` : ""}</small></div>
+              ${club.is_member
+                ? (club.id === activeGroupId ? '<small class="hint">O teu clube</small>' : `<button type="button" class="ghost-btn" data-search-switch="${escapeHtml(club.id)}">Abrir</button>`)
+                : club.request_status === "pending" ? '<small class="hint">Pedido enviado</small>'
+                : `<button type="button" class="ghost-btn" data-search-join="${escapeHtml(club.id)}">Pedir para entrar</button>`}
+            </div>`).join("")}
+        </div>
+      </section>` : ""}`;
+}
+
+function updateSearchResults() {
+  const holder = document.querySelector("#search-panel [data-search-results]");
+  if (!holder) return;
+  holder.innerHTML = renderSearchResults();
+  bindSearchResults(holder);
+  if (searchResults && !searchBusy) playCascade(holder);
+}
+
+async function runSearch(query) {
+  searchQuery = query;
+  const token = ++searchToken;
+  if (!query) {
+    searchResults = null;
+    searchBusy = false;
+    updateSearchResults();
+    return;
+  }
+  searchBusy = true;
+  updateSearchResults();
+  const [players, clubs] = await Promise.all([
+    supabaseClient.rpc("search_players", { p_query: query }),
+    supabaseClient.rpc("search_clubs", { p_query: query }),
+  ]);
+  if (token !== searchToken) return;
+  searchBusy = false;
+  if (players.error) console.warn("Player search failed. Run supabase/onboarding-migration.sql.", players.error);
+  if (clubs.error) console.warn("Club search failed", clubs.error);
+  searchResults = {
+    players: players.data || [],
+    clubs: (clubs.data || []).map((row) => ({ ...row, logo: row.logo || "" })),
+    failed: Boolean(players.error && clubs.error),
+  };
+  updateSearchResults();
+}
+
+function bindSearchResults(root) {
+  root.querySelectorAll("[data-search-player]").forEach((button) => button.addEventListener("click", async () => {
+    const groupId = button.dataset.searchGroup;
+    if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId);
+    openPlayerProfile(button.dataset.searchPlayer);
+  }));
+  root.querySelectorAll("[data-search-switch]").forEach((button) => button.addEventListener("click", async () => {
+    await switchActiveGroup(button.dataset.searchSwitch);
+    showView("club");
+  }));
+  root.querySelectorAll("[data-search-join]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const { error } = await supabaseClient.rpc("request_join_group", { p_group_id: button.dataset.searchJoin });
+    if (error) {
+      alert(`Nao consegui enviar o pedido: ${error.message}`);
+      button.disabled = false;
+      return;
+    }
+    await runSearch(searchQuery);
+  }));
 }
 
 // ---- Pesquisa de clubes e pedidos de entrada ----
@@ -10553,6 +11584,46 @@ function getHomeVideo(gameId) {
   };
 }
 
+// Jogo com video de casa e do YouTube: o jogador escolhe o leitor (fica guardado neste telemovel).
+// Por defeito usa o de casa; o YouTube serve de reserva se o de casa estiver lento.
+const PLAYER_YOUTUBE_KEY = "footer-player-youtube";
+const preferYoutubeGames = new Set((() => {
+  try {
+    return JSON.parse(localStorage.getItem(PLAYER_YOUTUBE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+})());
+
+function hasYoutubeParts(gameId) {
+  return (gameVideos[gameId] || []).length > 0;
+}
+
+function getActiveHomeVideo(gameId) {
+  const home = getHomeVideo(gameId);
+  return home && !(preferYoutubeGames.has(gameId) && hasYoutubeParts(gameId)) ? home : null;
+}
+
+function setPlayerChoice(gameId, choice) {
+  if (choice === "youtube") preferYoutubeGames.add(gameId);
+  else preferYoutubeGames.delete(gameId);
+  try {
+    localStorage.setItem(PLAYER_YOUTUBE_KEY, JSON.stringify([...preferYoutubeGames]));
+  } catch {
+    // Sem armazenamento: a escolha dura ate fechar a app.
+  }
+}
+
+function renderPlayerSwitch(gameId) {
+  if (!getHomeVideo(gameId) || !hasYoutubeParts(gameId)) return "";
+  const home = Boolean(getActiveHomeVideo(gameId));
+  return `
+    <div class="tracking-pitch-tabs player-switch" role="group" aria-label="Leitor de vídeo">
+      <button type="button" class="${home ? "active" : ""}" data-player-switch="casa" aria-pressed="${home}">Leitor Footer</button>
+      <button type="button" class="${home ? "" : "active"}" data-player-switch="youtube" aria-pressed="${!home}">YouTube</button>
+    </div>`;
+}
+
 function getVideoThumb(gameId, youtubeId, size = "hqdefault") {
   const home = getHomeVideo(gameId);
   if (home) return home.poster;
@@ -11658,7 +12729,7 @@ function renderHeartRateBody(game) {
       <span>Média <b data-hr-avg>–</b></span><span>Máx. <b data-hr-max>–</b></span><span>Mín. <b data-hr-min>–</b></span>
       <small data-hr-scope></small>
     </div>
-    <div class="hr-cal" data-hr-cal data-hr-game="${escapeHtml(game.id)}">
+    ${!getGameVideoParts(game.id).length && !getOwnTrackingPlayer(game.id) ? `<p class="tracking-note">Treino guardado. Quando este jogo tiver vídeo, os batimentos ligam-se a ele pela hora do jogo e podes acertar aqui.</p>` : `<div class="hr-cal" data-hr-cal data-hr-game="${escapeHtml(game.id)}">
       <div class="hr-cal-head">
         <span class="hr-adjust-title">${getOwnTrackingPlayer(game.id) ? "Acertar com o movimento" : "Acertar com o vídeo"}</span>
         <button type="button" class="ghost-btn" data-hr-fullscreen>⛶ Ecrã cheio</button>
@@ -11677,7 +12748,7 @@ function renderHeartRateBody(game) {
           ? "Os batimentos (linha de cor) devem subir logo depois dos sprints (pontos laranja) e das barras altas. Se sobem depois, carrega em Adiantar; se sobem antes, em Atrasar."
           : "Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar."}</p>
       </div>
-    </div>
+    </div>`}
     <div class="hr-zones" data-hr-zones></div>
     <div class="hr-options">
       <label class="hr-max">FC máxima
@@ -11990,7 +13061,10 @@ function tickHeartRatePanels() {
 
 function renderGameVideoSection(game) {
   const parts = getGameVideoParts(game.id);
-  if (!parts.length && !isAdmin) return "";
+  // Sem video o treino ja se pode carregar; quando houver video, liga-se pela hora do jogo.
+  if (!parts.length && !isAdmin) {
+    return canMarkMoments() ? `<section class="game-video-section" data-game-video-section>${renderHeartRateSection(game)}</section>` : "";
+  }
   const first = parts[0];
   const timeText = (s) => formatVideoClock(s);
   return `
@@ -12001,7 +13075,8 @@ function renderGameVideoSection(game) {
           <div class="tracking-pitch-tabs game-video-parts" role="group" aria-label="Parte do vídeo">
             ${parts.map((v, i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-video-part="${escapeHtml(v.youtubeId)}" aria-pressed="${i === 0}">${escapeHtml(v.label || `Parte ${i + 1}`)}</button>`).join("")}
           </div>` : ""}
-        ${getHomeVideo(game.id) ? `
+        ${renderPlayerSwitch(game.id)}
+        ${getActiveHomeVideo(game.id) ? `
         <div data-bunny-player></div>
         <p class="tracking-fineprint">Leitor de vídeo novo.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>` : `
         <div class="video-stage" data-video-stage>
@@ -12016,7 +13091,7 @@ function renderGameVideoSection(game) {
         ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
         ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
-      ${parts.length && canMarkMoments() ? renderHeartRateSection(game) : ""}
+      ${canMarkMoments() ? renderHeartRateSection(game) : ""}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
           <summary>${parts.length ? "Gerir vídeo · só admin" : "Juntar vídeo · só admin"}</summary>
@@ -12046,7 +13121,7 @@ function renderGameVideoSection(game) {
 function seekGameVideo(container, game, seconds) {
   const target = window.FooterTracking.videoSeekTarget(getGameVideoParts(game.id), seconds);
   const player = container.querySelector("[data-game-video-section]")?.gamePlayer;
-  if (player && getHomeVideo(game.id)) {
+  if (player && getActiveHomeVideo(game.id)) {
     if (target) player.seek(target.seconds);
     return;
   }
@@ -12083,7 +13158,11 @@ function bindGameVideoSection(game, container) {
     renderHistoryGameDetail();
   });
   const frame = section.querySelector("[data-game-video]");
-  const bunny = getHomeVideo(game.id);
+  section.querySelectorAll("[data-player-switch]").forEach((button) => button.addEventListener("click", () => {
+    setPlayerChoice(game.id, button.dataset.playerSwitch);
+    renderHistoryGameDetail();
+  }));
+  const bunny = getActiveHomeVideo(game.id);
   bindHeartRatePanel(game, section);
   if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
   else {
@@ -12202,11 +13281,12 @@ function renderHistoryGameDetail() {
     <div class="field-card history-field-card">
       ${renderField(game, { radarPosition: "none", clickablePlayers: true })}
     </div>
-    <section class="profile-section history-radar-section">
+    ${ratingsVisible() ? `<section class="profile-section history-radar-section">
       <h3>Equipas em comparação</h3>
       ${renderTeamRadarChart([...hydrate(game.teamA), ...hydrate(getBenchA(game))], [...hydrate(game.teamB), ...hydrate(getBenchB(game))], { inlineOdds: true })}
-    </section>
+    </section>` : ""}
     ${renderHistoryRosterEditor(game)}
+    ${renderNoShowSection(game)}
     ${renderGameVideoSection(game)}
     ${renderTrackingTestSection(game)}
   `;
@@ -12231,6 +13311,7 @@ function renderHistoryGameDetail() {
     });
   });
   bindHistoryRosterEditorActions(game);
+  bindNoShowSection(els.historyGameDetail);
   bindMvpPanelActions(game, els.historyGameDetail);
   bindTrackingTestSection(game, els.historyGameDetail);
   bindGameVideoSection(game, els.historyGameDetail);
@@ -12281,7 +13362,7 @@ function renderHistoryRosterRow(gameId, playerData, currentGroup) {
 
   return `
     <div class="roster-row">
-      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)} - ${playerData.overall}</strong>
+      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
       <div class="roster-actions">
         ${actions.map(([key, label]) => `<button class="mini-btn" data-history-move-player="${playerData.id}" data-game-id="${gameId}" data-to-group="${key}">${label}</button>`).join("")}
         <button class="mini-btn" data-history-remove-player="${playerData.id}" data-game-id="${gameId}">Remover</button>
@@ -12349,11 +13430,12 @@ async function movePlayerInHistoryGame(gameId, playerId, toGroup) {
 
 async function removePlayerFromHistoryGame(gameId, playerId) {
   if (!confirm("Remover este jogador deste jogo? Isto pode alterar pagamentos se nao houver override manual.")) return;
-  await mutateHistoryGame(gameId, (game) => {
+  const removed = await mutateHistoryGame(gameId, (game) => {
     ["teamA", "teamB", "benchA", "benchB"].forEach((group) => {
       game[group] = (game[group] || []).filter((id) => id !== playerId);
     });
   });
+  if (removed !== false) promptNoShow(state.games.find((item) => item.id === gameId), playerId);
 }
 
 async function addPlayerToHistoryGame(gameId, playerId, toGroup) {
@@ -12576,7 +13658,7 @@ async function drawPlayerDot(ctx, playerData, pos, color, game = null) {
   ctx.font = `900 ${Math.round(width * 0.086)}px Bahnschrift Condensed, Arial Narrow, Segoe UI, Arial`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(canSeeCurrentRatings() ? form.currentRating : playerData.overall), x + width * 0.1820, y + height * 0.2482);
+  if (ratingsVisible()) ctx.fillText(String(canSeeCurrentRatings() ? form.currentRating : playerData.overall), x + width * 0.1820, y + height * 0.2482);
 
   const nameBox = {
     x: x + width * 0.12,
@@ -12999,6 +14081,7 @@ function radarPolygonPoints(values, centerX, centerY, radius, maxValue) {
 }
 
 function renderTeamRadarChart(teamA, teamB, options = {}) {
+  if (!ratingsVisible()) return "";
   const compact = Boolean(options.compact);
   const inlineOdds = Boolean(options.inlineOdds);
   const statsA = getTeamRadarStats(teamA);
@@ -13245,10 +14328,15 @@ function euro(value) {
   return `${formatted}€`;
 }
 
+// Proximo dia e hora habituais do clube (por defeito, terca as 21:00).
 function defaultEventDate() {
+  const { weekday, time } = getGroupSchedule();
+  const [hours, minutes] = (time || "21:00").split(":").map(Number);
   const date = new Date();
-  date.setDate(date.getDate() + ((2 + 7 - date.getDay()) % 7 || 7));
-  date.setHours(21, 0, 0, 0);
+  let add = ((weekday ?? 2) + 7 - date.getDay()) % 7;
+  date.setHours(hours, minutes, 0, 0);
+  if (add === 0 && date <= new Date()) add = 7;
+  date.setDate(date.getDate() + add);
   return date;
 }
 
