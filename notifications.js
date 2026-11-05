@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.25.1",
+      date: "2026-11-05",
+      title: "Batimentos em direto no vídeo",
+      items: [
+        "Em cima do vídeo, a pilula dos batimentos mostra agora a tua curva real dos últimos 30 segundos, com a cor da zona e a cauda a esbater-se.",
+        "Podes carregar o treino do relógio logo depois do jogo, mesmo sem vídeo. Quando houver vídeo, liga-se pela hora do jogo.",
+      ],
+    },
+    {
       version: "1.25.0",
       date: "2026-11-05",
       title: "Respostas pós-jogo anónimas",
