@@ -1366,6 +1366,7 @@ async function loadRemoteState() {
   await loadHeartRate();
   await loadJoinRequests();
   await loadNoShows();
+  await loadGroupFeedbackAnswers();
   await loadPublicEvents();
   await refreshPendingInvite();
   saveState();
@@ -4020,7 +4021,34 @@ function renderProfileSummary(playerData, period, { isOwnProfile }) {
 }
 
 // ---- Respostas pos-jogo sem interesse (2026-11-05): ver assessGameFeedback em postgame-feedback.js ----
-const FEEDBACK_REASON_LABELS = { far_from_group: "longe dos colegas", against_running: "contra a corrida do vídeo", all_minimum: "tudo no mínimo" };
+const FEEDBACK_REASON_LABELS = { far_from_group: "longe dos colegas", against_running: "contra a corrida do vídeo", all_minimum: "tudo no mínimo", repeated: "sempre a mesma resposta" };
+// Respostas do grupo sem nomes (RPC group_feedback_answers, supabase/feedback-privacy-migration.sql); null = indisponivel.
+let groupFeedbackAnswers = null;
+
+async function loadGroupFeedbackAnswers() {
+  groupFeedbackAnswers = null;
+  if (!supabaseClient || !currentSession?.user || !activeGroupId) return;
+  const { data, error } = await supabaseClient.rpc("group_feedback_answers", { p_group_id: activeGroupId });
+  if (error) {
+    console.warn("Anonymous feedback load failed. Run supabase/feedback-privacy-migration.sql.", error);
+    return;
+  }
+  groupFeedbackAnswers = (data || []).map((row, index) => ({
+    id: `answer-${index}`,
+    gameId: row.game_id,
+    gameIntensity: row.game_intensity,
+    remainingEnergy: row.remaining_energy,
+    isMine: Boolean(row.is_mine),
+    repeated: Boolean(row.repeated),
+  }));
+}
+
+function getGameAnswerRows(gameId) {
+  if (groupFeedbackAnswers) return groupFeedbackAnswers.filter((row) => row.gameId === gameId);
+  return gameFeedback
+    .filter((item) => item.gameId === gameId)
+    .map((item) => ({ ...item, isMine: Boolean(currentSession?.user?.id) && item.userId === currentSession.user.id, repeated: false }));
+}
 
 // Ritmo medio do jogo (m/min) segundo o video publicado.
 function getGameRunPace(gameId) {
@@ -4038,14 +4066,19 @@ function getUsualRunPace() {
 }
 
 function getFeedbackAssessment(gameId) {
-  const rows = gameFeedback.filter((item) => item.gameId === gameId);
-  if (!PostgameRules.assessGameFeedback) return rows.map((row) => ({ id: row.id, intensityTrusted: true, energyTrusted: true, reasons: [] }));
-  return PostgameRules.assessGameFeedback(rows, { gamePace: getGameRunPace(gameId), usualPace: getUsualRunPace() });
+  const rows = getGameAnswerRows(gameId);
+  const verdicts = PostgameRules.assessGameFeedback
+    ? PostgameRules.assessGameFeedback(rows, { gamePace: getGameRunPace(gameId), usualPace: getUsualRunPace() })
+    : rows.map((row) => ({ id: row.id, intensityTrusted: true, energyTrusted: true, reasons: [] }));
+  return verdicts.map((verdict, index) => ({ ...verdict, row: rows[index] }));
 }
 
+// A propria resposta (gameFeedback so tem as da propria conta).
 function getTrustedFeedback(item) {
   if (!item) return { intensity: null, energy: null, reasons: [] };
-  const verdict = getFeedbackAssessment(item.gameId).find((row) => row.id === item.id);
+  const verdicts = getFeedbackAssessment(item.gameId);
+  const verdict = verdicts.find((entry) => entry.row.id === item.id)
+    || verdicts.find((entry) => entry.row.isMine && entry.row.gameIntensity === item.gameIntensity && entry.row.remainingEnergy === item.remainingEnergy);
   return {
     intensity: !verdict || verdict.intensityTrusted ? item.gameIntensity : null,
     energy: !verdict || verdict.energyTrusted ? item.remainingEnergy : null,
@@ -4057,7 +4090,7 @@ function getTrustedFeedback(item) {
 function getEffortIntensity(answer, gameId) {
   const own = getTrustedFeedback(answer).intensity;
   if (own != null) return own;
-  const trusted = gameFeedback.filter((item) => item.gameId === gameId).map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null);
+  const trusted = getFeedbackAssessment(gameId).filter((entry) => entry.intensityTrusted).map((entry) => entry.row.gameIntensity);
   return trusted.length && PostgameRules.median ? PostgameRules.median(trusted) : undefined;
 }
 
@@ -7867,20 +7900,17 @@ function renderMvpPanel(game) {
   `;
 }
 
+// Admin: so medias e quantas nao contam. Ninguem ve o que cada jogador respondeu.
 function renderPostgameAdminInsights(game) {
   if (!isAdmin) return "";
-  const rows = gameFeedback.filter((item) => item.gameId === game.id);
-  if (!rows.length) return `<div class="postgame-admin"><strong>Respostas pós-jogo</strong><span>0 respostas</span></div>`;
-  const trusted = rows.map((item) => ({ item, ...getTrustedFeedback(item) }));
-  const intensity = FooterMonthly.average(trusted.map((row) => row.intensity).filter((value) => value != null));
-  const energy = FooterMonthly.average(trusted.map((row) => row.energy).filter((value) => value != null));
-  const ignored = trusted.filter((row) => row.intensity == null || row.energy == null).length;
+  const verdicts = getFeedbackAssessment(game.id);
+  if (!verdicts.length) return `<div class="postgame-admin"><strong>Respostas pós-jogo</strong><span>0 respostas</span></div>`;
+  const intensity = FooterMonthly.average(verdicts.filter((entry) => entry.intensityTrusted).map((entry) => entry.row.gameIntensity));
+  const energy = FooterMonthly.average(verdicts.filter((entry) => entry.energyTrusted).map((entry) => entry.row.remainingEnergy));
+  const ignored = verdicts.filter((entry) => !entry.intensityTrusted || !entry.energyTrusted);
+  const reasons = [...new Set(ignored.flatMap((entry) => entry.reasons))].map((reason) => FEEDBACK_REASON_LABELS[reason]).filter(Boolean);
   const fmt = (value) => (value == null ? "-" : value.toFixed(1));
-  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${rows.length}</strong><span>Jogo ${fmt(intensity)}/10 · Forma percebida ${fmt(energy)}/10${ignored ? ` · ${ignored} ${ignored === 1 ? "resposta não conta" : "respostas não contam"}` : ""}</span><div>${trusted.map((row) => {
-    const out = row.intensity == null || row.energy == null;
-    const why = row.reasons.filter((reason) => FEEDBACK_REASON_LABELS[reason]).map((reason) => FEEDBACK_REASON_LABELS[reason]).join(", ");
-    return `<small class="${out ? "feedback-ignored" : ""}">${escapeHtml(findPlayer(row.item.playerId)?.name || "Jogador")}: jogo ${row.item.gameIntensity}, forma ${row.item.remainingEnergy}${out ? ` · não conta${row.energy != null ? " a intensidade" : ""} (${why})` : ""}</small>`;
-  }).join("")}</div></div>`;
+  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${verdicts.length}</strong><span>Jogo ${fmt(intensity)}/10 · Forma percebida ${fmt(energy)}/10</span>${ignored.length ? `<small>${ignored.length === 1 ? "1 resposta não conta" : `${ignored.length} respostas não contam`}: ${escapeHtml(reasons.join(", "))}</small>` : ""}<small>As respostas são anónimas: ninguém vê o que cada um respondeu.</small></div>`;
 }
 
 function getLatestFinishedGame() {

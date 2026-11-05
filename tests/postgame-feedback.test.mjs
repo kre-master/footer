@@ -131,3 +131,12 @@ test("does not judge when there are too few answers and no running data", () => 
   assert.equal(result[0].energyTrusted, true);
   assert.deepEqual(result[0].reasons, ["all_minimum"]);
 });
+
+test("an answer repeated in the last 4 games does not count for the game intensity", () => {
+  const rows = [[7, 7], [8, 9], [5, 10], [8, 5], [7, 3]]
+    .map(([gameIntensity, remainingEnergy], index) => ({ id: `f${index}`, gameIntensity, remainingEnergy, repeated: index === 2 }));
+  const result = feedback.assessGameFeedback(rows);
+  assert.equal(result[2].intensityTrusted, false);
+  assert.equal(result[2].energyTrusted, true);
+  assert.ok(result[2].reasons.includes("repeated"));
+});

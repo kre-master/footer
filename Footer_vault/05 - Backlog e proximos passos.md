@@ -125,3 +125,5 @@ Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3p
 - [ ] Notas nos clubes novos: pensar numa forma justa e pouco trabalhosa (por agora escondidas; todos iguais e equilibrio pela forma).
 - [ ] Dono da app: eliminar jogadores e contas (migracao para o utilizador correr).
 - [ ] Correr `supabase/no-shows-migration.sql` no projeto "kre-master's Project" e marcar a falta do jogo de 3/11 na pagina do jogo.
+- [ ] Correr `supabase/feedback-privacy-migration.sql` (respostas pos-jogo anonimas).
+- Atencao: ha outra sessao (autor "Maestro") a trabalhar na mesma pasta `~/maestro/footer`; antes de enviar, confirmar `git status` e o cache-buster de `index.html`.

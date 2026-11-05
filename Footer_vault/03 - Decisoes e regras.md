@@ -285,4 +285,5 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Nao conta na media do jogo (painel do admin), na media pessoal do periodo/revisao do mes nem nas calorias (usa-se a mediana das intensidades validas do jogo).
 - Nos jogos de outubro e novembro a regra apanha 1 a 2 respostas por jogo; o caso que a motivou (1 e 1 num jogo com corrida acima do habitual) fica de fora por inteiro.
 - Ideia por fazer: assinalar quem responde sempre igual em todos os jogos.
+- 2026-11-05 (2): as respostas pos-jogo passam a ser anonimas para todos, incluindo admins. Cada conta so le as proprias (RLS); medias e regra vem de `group_feedback_answers` (sem quem respondeu). O admin ve so medias, numero de respostas e quantas nao contam (com os motivos agregados). Novo sinal "sempre a mesma resposta": mesma resposta nos ultimos 4 jogos seguidos -> a intensidade nao conta (a forma sim).
 

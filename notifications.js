@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.25.0",
+      date: "2026-11-05",
+      title: "Respostas pós-jogo anónimas",
+      items: [
+        "Ninguém, nem o admin, vê o que cada jogador respondeu no questionário pós-jogo. O admin vê só as médias do jogo e quantas respostas não contaram.",
+        "Quem dá exactamente a mesma resposta em 4 jogos seguidos deixa de contar para a intensidade do jogo.",
+      ],
+    },
+    {
       version: "1.24.0",
       date: "2026-11-05",
       title: "Respostas pós-jogo mais justas",

@@ -84,8 +84,9 @@
   // - "longe dos colegas": intensidade a 4+ pontos da mediana das outras respostas (precisa de 4+ outras);
   // - "contra a corrida": o video diz que o jogo teve ritmo normal ou alto (>= habitual) e a resposta diz 1-2,
   //   ou ritmo baixo (<= 92% do habitual) e a resposta diz 9-10;
-  // - "tudo no minimo": 1 e 1.
-  // A intensidade nao conta com "longe dos colegas", ou com "contra a corrida" + "tudo no minimo".
+  // - "tudo no minimo": 1 e 1;
+  // - "sempre a mesma resposta": a mesma pessoa deu a mesma resposta nos ultimos 4 jogos (row.repeated, vem da base de dados).
+  // A intensidade nao conta com "longe dos colegas", "sempre a mesma resposta", ou "contra a corrida" + "tudo no minimo".
   // A forma (pessoal) so deixa de contar quando a resposta inteira e descartada ("tudo no minimo" + outro sinal).
   function assessGameFeedback(rows, { gamePace = null, usualPace = null } = {}) {
     const list = Array.isArray(rows) ? rows : [];
@@ -99,7 +100,9 @@
       if (othersMedian != null && Math.abs(intensity - othersMedian) >= 4) reasons.push("far_from_group");
       if (hasPace && ((gamePace >= usualPace && intensity <= 2) || (gamePace <= usualPace * 0.92 && intensity >= 9))) reasons.push("against_running");
       if (intensity === 1 && energy === 1) reasons.push("all_minimum");
-      const dropIntensity = reasons.includes("far_from_group") || (reasons.includes("against_running") && reasons.includes("all_minimum"));
+      if (row.repeated) reasons.push("repeated");
+      const dropIntensity = reasons.includes("far_from_group") || reasons.includes("repeated")
+        || (reasons.includes("against_running") && reasons.includes("all_minimum"));
       const dropAll = reasons.includes("all_minimum") && reasons.length > 1;
       return {
         id: row.id,
