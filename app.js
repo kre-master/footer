@@ -12533,7 +12533,7 @@ function renderHeartRateBody(game) {
       <span>Média <b data-hr-avg>–</b></span><span>Máx. <b data-hr-max>–</b></span><span>Mín. <b data-hr-min>–</b></span>
       <small data-hr-scope></small>
     </div>
-    <div class="hr-cal" data-hr-cal data-hr-game="${escapeHtml(game.id)}">
+    ${!getGameVideoParts(game.id).length && !getOwnTrackingPlayer(game.id) ? `<p class="tracking-note">Treino guardado. Quando este jogo tiver vídeo, os batimentos ligam-se a ele pela hora do jogo e podes acertar aqui.</p>` : `<div class="hr-cal" data-hr-cal data-hr-game="${escapeHtml(game.id)}">
       <div class="hr-cal-head">
         <span class="hr-adjust-title">${getOwnTrackingPlayer(game.id) ? "Acertar com o movimento" : "Acertar com o vídeo"}</span>
         <button type="button" class="ghost-btn" data-hr-fullscreen>⛶ Ecrã cheio</button>
@@ -12552,7 +12552,7 @@ function renderHeartRateBody(game) {
           ? "Os batimentos (linha de cor) devem subir logo depois dos sprints (pontos laranja) e das barras altas. Se sobem depois, carrega em Adiantar; se sobem antes, em Atrasar."
           : "Se o coração sobe depois da jogada que vês, carrega em Adiantar; se sobe antes, em Atrasar."}</p>
       </div>
-    </div>
+    </div>`}
     <div class="hr-zones" data-hr-zones></div>
     <div class="hr-options">
       <label class="hr-max">FC máxima
@@ -12865,7 +12865,10 @@ function tickHeartRatePanels() {
 
 function renderGameVideoSection(game) {
   const parts = getGameVideoParts(game.id);
-  if (!parts.length && !isAdmin) return "";
+  // Sem video o treino ja se pode carregar; quando houver video, liga-se pela hora do jogo.
+  if (!parts.length && !isAdmin) {
+    return canMarkMoments() ? `<section class="game-video-section" data-game-video-section>${renderHeartRateSection(game)}</section>` : "";
+  }
   const first = parts[0];
   const timeText = (s) => formatVideoClock(s);
   return `
@@ -12891,7 +12894,7 @@ function renderGameVideoSection(game) {
         ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
         ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
-      ${parts.length && canMarkMoments() ? renderHeartRateSection(game) : ""}
+      ${canMarkMoments() ? renderHeartRateSection(game) : ""}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
           <summary>${parts.length ? "Gerir vídeo · só admin" : "Juntar vídeo · só admin"}</summary>
