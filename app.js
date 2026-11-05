@@ -1612,7 +1612,7 @@ function renderNewGroupPanel() {
     newGroupFormOpen = false;
     renderNewGroupPanel();
   });
-  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", submitNewGroup);
+  panel.querySelector("[data-submit-new-group]")?.addEventListener("click", (event) => submitNewGroup(event.currentTarget));
   panel.querySelector("[data-cancel-group-request]")?.addEventListener("click", async (event) => {
     if (!confirm("Cancelar o pedido do grupo?")) return;
     await supabaseClient.rpc("cancel_group_request", { p_request_id: event.currentTarget.dataset.cancelGroupRequest });
@@ -1623,7 +1623,7 @@ function renderNewGroupPanel() {
 }
 
 // Cria o grupo na hora (sem aprovacao); quem cria fica dono e passa logo para o grupo novo.
-async function submitNewGroup() {
+async function submitNewGroup(button = null) {
   const panel = document.querySelector("#new-group-panel");
   const value = (field) => panel?.querySelector(`[data-new-group="${field}"]`)?.value.trim() || "";
   if (value("name").length < 2) {
@@ -1632,14 +1632,19 @@ async function submitNewGroup() {
   }
   const weekday = value("weekday");
   const time = value("time");
-  const { data: groupId, error } = await supabaseClient.rpc("create_group", {
+  let result;
+  await runWithButton(button, async () => {
+    result = await supabaseClient.rpc("create_group", {
     p_name: value("name"),
     p_location: value("location"),
     p_schedule: formatSchedule(weekday === "" ? null : Number(weekday), time || null),
     p_notes: value("notes"),
     p_weekday: weekday === "" ? null : Number(weekday),
     p_time: time || null,
+    });
+    return !result.error;
   });
+  const { data: groupId, error } = result;
   if (error) {
     alert(String(error.message || "").includes("group_limit_reached")
       ? "Ja es dono de 2 grupos. Nao da para criar mais."
@@ -1720,8 +1725,8 @@ function renderOnboardingPanel() {
     <ol class="onboarding-steps">
       <li class="${hasPlayers ? "done" : ""}">
         <strong>Adicionar jogadores</strong> <span class="metric">${state.players.length} no grupo</span>
-        <p class="hint">Um por linha. Podes juntar a nota de 1 a 100 no fim (ex.: "Rui 75"). Sem nota, todos comecam iguais e a forma ajusta com os jogos.</p>
-        <textarea data-onboarding-players rows="5" placeholder="Rui 75&#10;Tiago&#10;Andre 68"></textarea>
+        <p class="hint">${ratingsVisible() ? 'Um por linha. Podes juntar a nota de 1 a 100 no fim (ex.: "Rui 75"). Sem nota, todos comecam iguais e a forma ajusta com os jogos.' : "Um nome por linha. Neste clube nao ha notas: todos comecam iguais e as equipas equilibram-se pela forma, jogo a jogo. Cada um pode depois pôr a sua foto."}</p>
+        <textarea data-onboarding-players rows="5" placeholder="${ratingsVisible() ? "Rui 75&#10;Tiago&#10;Andre 68" : "Rui&#10;Tiago&#10;Andre"}"></textarea>
         <div class="actions"><button class="primary-btn" data-onboarding-add>Adicionar</button></div>
       </li>
       <li>
@@ -1766,6 +1771,7 @@ async function addOnboardingPlayers() {
     alert("Escreve pelo menos um nome novo.");
     return;
   }
+  if (!ratingsVisible()) rows.forEach((row) => { row.rating = NO_RATING_BASE; });
   const newPlayers = rows.map((row) => ({
     id: `p-${createUuid()}`,
     name: row.name,
@@ -2266,6 +2272,8 @@ function updateAccessUi(message) {
   document.body.classList.toggle("visitor-mode", remoteEnabled && !isAdmin);
   document.body.classList.toggle("admin-mode", canWriteOfficialData());
   document.body.classList.toggle("non-admin-mode", !canWriteOfficialData());
+  document.body.classList.toggle("no-ratings", !ratingsVisible());
+  document.querySelectorAll("#player-form input[type=number]").forEach((input) => { input.required = ratingsVisible(); });
   if (els.adminLogin) els.adminLogin.classList.toggle("hidden", Boolean(currentSession));
   if (els.accountSignup) els.accountSignup.classList.toggle("hidden", Boolean(currentSession) || !remoteEnabled);
   if (els.adminLogout) els.adminLogout.classList.toggle("hidden", !currentSession);
@@ -2787,6 +2795,7 @@ function showView(viewName, options = {}) {
   if (viewName === "me") renderMePanel();
   if (viewName === "search") renderSearchPanel();
   renderGroupBanner();
+  playCascade(document.querySelector(`#view-${viewName}`));
   if (viewName === "today") {
     // Vindo de "abrir jogo" ou de importar confirmados: leva o utilizador ate as equipas.
     requestAnimationFrame(() => document.querySelector("#generate-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -2967,6 +2976,7 @@ function renderNotifyBadges() {
   const appCount = FooterNotifications.unseenReleases(seen.appVersion).length;
   setNotifyBadge(document.querySelector("#notify-badge"), feedCount);
   setNotifyBadge(document.querySelector("#notify-badge-app"), appCount);
+  ringNotifyBell(feedCount + appCount);
   const button = document.querySelector("#notify-btn");
   if (button) {
     const parts = [feedCount ? `${feedCount} por ver` : "", appCount ? "versão nova da app" : ""].filter(Boolean);
@@ -3484,7 +3494,7 @@ function renderAccountPanel() {
         </div>
         <div class="profile-summary">
           ${renderAvatar(linkedPlayer)}
-          <strong>${canSeeCurrentRatings() ? form.currentRating : linkedPlayer.overall}</strong>
+          ${ratingsVisible() ? `<strong>${canSeeCurrentRatings() ? form.currentRating : linkedPlayer.overall}</strong>` : ""}
           <span>${canSeeCurrentRatings() ? renderFormChip(form) : renderFormSign(form)}</span>
         </div>
         <div class="actions">
@@ -3525,7 +3535,7 @@ function renderAccountPanel() {
             ${renderAvatar(p)}
             <span>
               <strong>${escapeHtml(p.name)}</strong>
-              <small>OVR ${p.overall}</small>
+              ${ratingsVisible() ? `<small>OVR ${p.overall}</small>` : ""}
             </span>
           </button>
         `).join("") || `<div class="hint">Nao ha perfis livres para reclamar.</div>`}
@@ -3792,6 +3802,7 @@ function renderPlayerProfile() {
   });
   bindAwardDetailCards(els.playerProfile, playerData, [...awards, ...periodAwards]);
   if (isOwnProfile) bindMeActions(els.playerProfile.querySelector(".me-now"));
+  els.playerProfile.querySelector("[data-own-player-photo]")?.addEventListener("change", handleOwnPlayerPhotoSelection);
   bindProfileOverview(playerData, period);
   els.playerProfile.querySelector("[data-player-weight]")?.addEventListener("change", async (event) => {
     const value = Number(event.target.value);
@@ -3881,10 +3892,11 @@ function getPeriodAwards(playerId, games) {
 
 function renderProfileHero(playerData, form, variant) {
   const rating = canSeeCurrentRatings() ? form.currentRating : playerData.overall;
+  const isOwn = Boolean(currentSession?.user?.id) && playerData.linkedUserId === currentSession.user.id;
   const lastFive = getPlayerAppearanceRecord(playerData.id, 5).map((item) => item.outcome);
   return `
     <section class="pp-hero">
-      <div class="pp-card-col">
+      <div class="pp-card-col ${justRevealedPlayerId === playerData.id ? "card-reveal" : ""}">
         <button type="button" class="pp-card-thumb" data-profile-card aria-label="Ver a carta de ${escapeHtml(playerData.name)}">
           ${renderPlayerCard(playerData, { mode: "field", form, variant })}
         </button>
@@ -3894,9 +3906,10 @@ function renderProfileHero(playerData, form, variant) {
         <p class="eyebrow">Jogador</p>
         <h2>${escapeHtml(playerData.name)}</h2>
         <div class="pp-meta">
-          <span class="pp-ovr"><b>${rating}</b> OVR</span>
+          ${ratingsVisible() ? `<span class="pp-ovr"><b>${rating}</b> OVR</span>` : ""}
         </div>
         ${renderClubBadge(getActiveGroup())}
+        ${isOwn ? `<label class="ghost-btn pp-photo-cta">${playerData.photoDataUrl ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
       </div>
     </section>`;
 }
@@ -4507,6 +4520,7 @@ function renderFormSign(form, options = {}) {
 }
 
 function renderRatingBadge(playerData, form = getPlayerForm(playerData)) {
+  if (!ratingsVisible()) return "";
   const variant = getPlayerCardVariant(playerData, form);
   if (canSeeCurrentRatings()) {
     return `<span class="rating-badge admin-rating ${renderCardHaloClass(playerData, variant)}">${playerData.overall}&rarr;${form.currentRating}</span>`;
@@ -5141,18 +5155,18 @@ function renderClaimsList() {
     return;
   }
 
-  els.claimsList.innerHTML = pendingClaims.map((claim) => {
+  els.claimsList.innerHTML = `<p class="swipe-hint">Desliza para a direita para aprovar, para a esquerda para rejeitar.</p>` + pendingClaims.map((claim) => {
     const playerData = findPlayer(claim.player_id);
     const profile = knownProfiles.find((item) => item.id === claim.user_id);
     return `
-      <article class="claim-row">
+      <article class="claim-row" data-swipe>
         <div>
           <strong>${escapeHtml(playerData?.name || "Jogador removido")}</strong>
           <span>${escapeHtml(profile?.display_name || profile?.email || claim.user_id)} - ${formatDate(claim.created_at)}</span>
         </div>
         <div class="actions">
-          <button class="primary-btn" data-approve-claim="${claim.id}">Aprovar</button>
-          <button class="danger-btn" data-reject-claim="${claim.id}">Rejeitar</button>
+          <button class="primary-btn" data-approve-claim="${claim.id}" data-swipe-accept>Aprovar</button>
+          <button class="danger-btn" data-reject-claim="${claim.id}" data-swipe-reject>Rejeitar</button>
         </div>
       </article>
     `;
@@ -5164,6 +5178,7 @@ function renderClaimsList() {
   els.claimsList.querySelectorAll("[data-reject-claim]").forEach((button) => {
     button.addEventListener("click", () => reviewPlayerClaim(button.dataset.rejectClaim, "rejected"));
   });
+  bindSwipe(els.claimsList);
 }
 
 function renderAccountsList() {
@@ -6353,8 +6368,9 @@ function renderEventsList() {
     });
   });
   els.eventsList.querySelectorAll("[data-event-response]").forEach((button) => {
-    button.addEventListener("click", () => saveEventResponse(button.dataset.eventId, button.dataset.eventResponse));
+    button.addEventListener("click", () => respondWithMotion(button));
   });
+  bindSwipe(els.eventsList);
   els.eventsList.querySelectorAll("[data-event-admin-response]").forEach((button) => {
     button.addEventListener("click", () => saveAdminEventResponse(button.dataset.eventId, button.dataset.playerId, button.dataset.eventAdminResponse));
   });
@@ -6585,15 +6601,15 @@ function renderJoinRequestRow(row, eventData) {
     traits.age_band ? `${TRAIT_LABELS.age_band[traits.age_band]} anos` : "",
   ].filter(Boolean).join(" · ") || "Sem caracteristicas";
   return `
-    <div class="join-request-row">
+    <div class="join-request-row" data-swipe>
       <div>
         <strong>${escapeHtml(row.requester_name || "Jogador")}</strong>
         ${eventData.publicNeeds && fits ? `<span class="metric good-pill">Encaixa</span>` : ""}
         <p>${escapeHtml(traitText)}</p>
       </div>
       <div class="roster-actions">
-        <button class="mini-btn" data-join-decide="${row.id}" data-accept="true">Aceitar</button>
-        <button class="mini-btn" data-join-decide="${row.id}" data-accept="false">Recusar</button>
+        <button class="mini-btn" data-join-decide="${row.id}" data-accept="true" data-swipe-accept>Aceitar</button>
+        <button class="mini-btn" data-join-decide="${row.id}" data-accept="false" data-swipe-reject>Recusar</button>
       </div>
     </div>
   `;
@@ -6694,7 +6710,10 @@ function renderPublicGames() {
     }).join("")}
   `;
   list.querySelectorAll("[data-public-request]").forEach((button) => {
-    button.addEventListener("click", () => changePublicRequest(button.dataset.publicRequest, true));
+    button.addEventListener("click", () => {
+      flyTo(button, getTabButton("events"));
+      changePublicRequest(button.dataset.publicRequest, true);
+    });
   });
   list.querySelectorAll("[data-public-cancel]").forEach((button) => {
     button.addEventListener("click", () => changePublicRequest(button.dataset.publicCancel, false));
@@ -6864,11 +6883,12 @@ function renderResponseActions(eventData, myResponse) {
   const status = myResponse?.status || "";
   const goingDisabled = status !== "going" && isEventFullForPlayer(eventData, linkedPlayer.id);
   const pendingNote = getLinkedPlayer() ? "" : `<span class="hint">Ficha por confirmar pelo admin.</span>`;
+  const saved = (value) => (lastSavedResponse?.eventId === eventData.id && lastSavedResponse.status === value && Date.now() - lastSavedResponse.at < 1500 ? "just-saved" : "");
   return `
     <div class="response-row">
-      <button class="ghost-btn ${status === "going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="going" ${goingDisabled ? "disabled" : ""}>Vou</button>
-      <button class="ghost-btn ${status === "maybe" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="maybe">Talvez</button>
-      <button class="ghost-btn ${status === "not_going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="not_going">Nao vou</button>
+      <button class="ghost-btn ${status === "going" ? "selected" : ""} ${saved("going")}" data-event-id="${eventData.id}" data-event-response="going" ${goingDisabled ? "disabled" : ""}>Vou</button>
+      <button class="ghost-btn ${status === "maybe" ? "selected" : ""} ${saved("maybe")}" data-event-id="${eventData.id}" data-event-response="maybe">Talvez</button>
+      <button class="ghost-btn ${status === "not_going" ? "selected" : ""} ${saved("not_going")}" data-event-id="${eventData.id}" data-event-response="not_going">Nao vou</button>
       ${goingDisabled ? `<span class="hint warn">Limite de ${eventData.maxPlayers} jogadores atingido.</span>` : ""}
       ${pendingNote}
     </div>
@@ -7015,6 +7035,7 @@ async function saveEventResponse(eventId, status) {
     alert(`Nao consegui guardar resposta: ${formatEventResponseError(error)}`);
     return;
   }
+  lastSavedResponse = { eventId, status, at: Date.now() };
   currentEventId = eventId;
   render();
 }
@@ -7417,7 +7438,8 @@ async function createOrReuseGuestPlayer(rawName, rawScore) {
 
     let playerData = matches[0];
     if (!playerData) {
-      const score = rawScore === null || rawScore === undefined || String(rawScore).trim() === "" ? NaN : Number(rawScore);
+      const score = !ratingsVisible() ? NO_RATING_BASE
+        : rawScore === null || rawScore === undefined || String(rawScore).trim() === "" ? NaN : Number(rawScore);
       if (!Number.isFinite(score) || score < 1 || score > 100) {
         throw new Error("Para um jogador novo, indica uma nota entre 1 e 100.");
       }
@@ -8463,9 +8485,9 @@ function renderPlayerCard(playerData, options = {}) {
   const rating = canSeeCurrentRatings() ? form.currentRating : playerData.overall;
   return `
     <article class="player-card player-card-${mode} card-variant-${variant.key}" style="--card-bg: url('${variant.asset}')">
-      <div class="card-rating">
+      ${ratingsVisible() ? `<div class="card-rating">
         <strong>${rating}</strong>
-      </div>
+      </div>` : `<div class="card-rating card-club">${renderClubSymbol(getActiveGroup(), "club-symbol-card")}</div>`}
       <div class="card-photo">
         ${renderPlayerCardPhoto(playerData)}
       </div>
@@ -8870,6 +8892,10 @@ async function savePlayerFromForm(event) {
   event.preventDefault();
   if (!requireAdmin()) return;
   updateOverallFromPartialRatings();
+  if (!ratingsVisible()) {
+    [els.formPace, els.formShooting, els.formPassing, els.formDribbling, els.formDefending, els.formPhysical, els.formOverall]
+      .forEach((input) => { if (input && !input.value) input.value = NO_RATING_BASE; });
+  }
   const values = {
     id: els.playerId.value || `p-${Date.now()}-${slug(els.formName.value)}`,
     name: els.formName.value.trim(),
@@ -9349,6 +9375,201 @@ function renderClubPanel() {
   });
 }
 
+// ---- Micro-interaccoes (2026-11-05). So transform/opacity; com "reduzir movimento" nada mexe. ----
+let lastSavedResponse = null;
+let justRevealedPlayerId = null;
+let lastNotifyTotal = null;
+const FLY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/></svg>';
+
+function reduceMotion() {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function bumpElement(element) {
+  if (!element || reduceMotion()) return;
+  element.classList.remove("bump");
+  void element.offsetWidth;
+  element.classList.add("bump");
+  element.addEventListener("animationend", () => element.classList.remove("bump"), { once: true });
+}
+
+// 02: o botao encolhe para uma roda enquanto grava e acaba num visto (uma so forma).
+async function runWithButton(button, task) {
+  if (!button) return task();
+  button.style.width = `${button.offsetWidth}px`;
+  void button.offsetWidth;
+  button.classList.add("is-busy");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  let ok;
+  try {
+    ok = await task();
+  } finally {
+    button.removeAttribute("aria-busy");
+    button.classList.remove("is-busy");
+    if (ok !== false && button.isConnected) {
+      button.classList.add("is-done");
+      if (!reduceMotion()) await waitMs(520);
+    }
+    if (button.isConnected) {
+      button.classList.remove("is-done");
+      button.style.width = "";
+      button.disabled = false;
+    }
+  }
+  return ok;
+}
+
+// 01: uma bola voa em arco ate ao separador e o separador da um salto (500 ms).
+function flyTo(fromElement, toElement) {
+  if (!fromElement || !toElement) return;
+  if (reduceMotion() || !toElement.getClientRects().length || !document.body.animate) {
+    bumpElement(toElement);
+    return;
+  }
+  const from = fromElement.getBoundingClientRect();
+  const to = toElement.getBoundingClientRect();
+  const x0 = from.left + from.width / 2;
+  const y0 = from.top + from.height / 2;
+  const dx = to.left + to.width / 2 - x0;
+  const dy = to.top + to.height / 2 - y0;
+  const lift = Math.min(140, 60 + Math.abs(dx) * 0.35);
+  const outer = document.createElement("span");
+  outer.className = "fly-dot";
+  outer.style.left = `${x0}px`;
+  outer.style.top = `${y0}px`;
+  outer.innerHTML = `<span class="fly-dot-inner">${FLY_ICON}</span>`;
+  document.body.append(outer);
+  const inner = outer.firstElementChild;
+  outer.animate([{ transform: "translateX(0)" }, { transform: `translateX(${dx}px)` }], { duration: 500, easing: "linear" });
+  const flight = inner.animate([
+    { transform: "translateY(0) scale(1)", easing: "cubic-bezier(.2,.7,.4,1)" },
+    { transform: `translateY(${Math.min(0, dy) - lift}px) scale(1.15)`, offset: 0.42, easing: "cubic-bezier(.6,0,.8,.4)" },
+    { transform: `translateY(${dy}px) scale(.45)` },
+  ], { duration: 500 });
+  flight.onfinish = () => {
+    outer.remove();
+    bumpElement(toElement);
+  };
+}
+
+function getTabButton(view) {
+  return document.querySelector(`.tab[data-view="${view}"]`);
+}
+
+// 03: ao entrar num ecra, as linhas chegam com 70 ms entre si.
+function playCascade(root) {
+  if (!root || reduceMotion()) return;
+  root.classList.remove("cascade-in");
+  void root.offsetWidth;
+  root.classList.add("cascade-in");
+  clearTimeout(root._cascadeTimer);
+  root._cascadeTimer = setTimeout(() => root.classList.remove("cascade-in"), 1300);
+}
+
+// 06: o simbolo (sino das novidades) balanca quando ha novidades novas.
+function ringNotifyBell(total) {
+  const previous = lastNotifyTotal;
+  lastNotifyTotal = total;
+  if (!total || (previous !== null && total <= previous) || reduceMotion()) return;
+  const logo = document.querySelector("#notify-btn .brand-logo");
+  if (!logo) return;
+  logo.classList.remove("ring");
+  void logo.offsetWidth;
+  logo.classList.add("ring");
+  logo.addEventListener("animationend", () => logo.classList.remove("ring"), { once: true });
+}
+
+// 04: deslizar uma linha para a direita aceita, para a esquerda recusa (inclina ate 12 graus e sai).
+function bindSwipe(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-swipe]").forEach((row) => {
+    if (row.dataset.swipeBound) return;
+    row.dataset.swipeBound = "1";
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let tracking = false;
+    let horizontal = false;
+    row.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.target.closest("button, a, input, select, textarea, label")) return;
+      startX = event.clientX;
+      startY = event.clientY;
+      dx = 0;
+      tracking = true;
+      horizontal = false;
+    });
+    row.addEventListener("pointermove", (event) => {
+      if (!tracking) return;
+      const moveX = event.clientX - startX;
+      const moveY = event.clientY - startY;
+      if (!horizontal) {
+        if (Math.abs(moveX) < 8 && Math.abs(moveY) < 8) return;
+        if (Math.abs(moveY) > Math.abs(moveX)) {
+          tracking = false;
+          return;
+        }
+        horizontal = true;
+        row.setPointerCapture?.(event.pointerId);
+        row.classList.add("swiping");
+      }
+      dx = moveX;
+      const width = row.offsetWidth || 1;
+      row.style.transform = `translateX(${dx}px) rotate(${(dx / width) * 12}deg)`;
+      row.dataset.swipeDir = dx > 0 ? "accept" : "reject";
+      row.style.setProperty("--swipe", String(Math.min(1, Math.abs(dx) / (width * 0.35))));
+    });
+    const finish = () => {
+      if (!tracking) return;
+      tracking = false;
+      row.classList.remove("swiping");
+      const width = row.offsetWidth || 1;
+      if (horizontal && Math.abs(dx) > width * 0.35) {
+        const accept = dx > 0;
+        row.style.transition = "transform .22s ease-in, opacity .22s ease-in";
+        row.style.transform = `translateX(${accept ? width * 1.3 : -width * 1.3}px) rotate(${accept ? 12 : -12}deg)`;
+        row.style.opacity = "0";
+        setTimeout(() => {
+          row.querySelector(accept ? "[data-swipe-accept]" : "[data-swipe-reject]")?.click();
+          // Se a accao foi cancelada (ex.: confirmacao recusada), a linha volta.
+          setTimeout(() => {
+            if (!row.isConnected) return;
+            row.style.transform = "";
+            row.style.opacity = "";
+            row.removeAttribute("data-swipe-dir");
+          }, 600);
+        }, 200);
+      } else {
+        row.style.transition = "transform .25s cubic-bezier(.2,.9,.3,1.3)";
+        row.style.transform = "";
+        row.removeAttribute("data-swipe-dir");
+        setTimeout(() => { row.style.transition = ""; }, 260);
+      }
+      dx = 0;
+    };
+    row.addEventListener("pointerup", finish);
+    row.addEventListener("pointercancel", finish);
+  });
+}
+
+// ---- Clubes sem notas (2026-11-05): fora dos Futeboleiros ninguem ve nota nem numeros; todos comecam iguais ----
+const NO_RATING_BASE = 60;
+
+function ratingsVisible(group = getActiveGroup()) {
+  if (!remoteEnabled || !group) return true;
+  return group.slug === LEGACY_GROUP_SLUG || group.settings?.ratings === true;
+}
+
+function respondWithMotion(button) {
+  if (button.dataset.eventResponse === "going" && !button.classList.contains("selected")) flyTo(button, getTabButton("events"));
+  return saveEventResponse(button.dataset.eventId, button.dataset.eventResponse);
+}
+
 // ---- Eu (2026-11-05): pagina de quem chega (convite, sem grupo, sem ficha) e bloco "Agora" no proprio perfil ----
 const WEEKDAY_PLURAL = ["Domingos", "Segundas", "Terças", "Quartas", "Quintas", "Sextas", "Sábados"];
 const ME_ICONS = {
@@ -9659,7 +9880,7 @@ function renderMeNoPlayer() {
         <input id="me-player-name" maxlength="40" value="${escapeHtml(currentProfile?.display_name || "")}" autocomplete="nickname"></label>
       ${renderTraitsChips()}
       <div class="actions"><button type="button" class="primary-btn" data-me-create-player>Criar o meu jogador</button></div>
-      <p class="hint">Começas com a nota média do grupo. O admin acerta depois.</p>
+      <p class="hint">${ratingsVisible() ? "Começas com a nota média do grupo. O admin acerta depois." : "Neste clube não há notas: as equipas equilibram-se pela forma."} Depois podes pôr a tua foto de perfil.</p>
     </section>
     <div class="me-now">${renderNextGameCard()}</div>`;
 }
@@ -9710,10 +9931,12 @@ async function createMePlayer(button) {
     alert("Escreve o teu nome.");
     return;
   }
-  button.disabled = true;
-  const { error } = await supabaseClient.rpc("create_own_player", { p_group_id: activeGroupId, p_name: name });
+  let error = null;
+  await runWithButton(button, async () => {
+    ({ error } = await supabaseClient.rpc("create_own_player", { p_group_id: activeGroupId, p_name: name }));
+    return !error;
+  });
   if (error) {
-    button.disabled = false;
     const message = String(error.message || "");
     alert(message.includes("claim_pending")
       ? "Ja tens um pedido pendente. Espera pela aprovacao do admin."
@@ -9725,6 +9948,8 @@ async function createMePlayer(button) {
   if (meTraitsDraft && Object.values(meTraitsDraft).some(Boolean)) await saveTraitsDraft();
   await loadAccountState();
   await loadRemoteState();
+  justRevealedPlayerId = getLinkedPlayer()?.id || null;
+  setTimeout(() => { justRevealedPlayerId = null; }, 1600);
   updateAccessUi();
   showView("me");
   render();
@@ -9734,7 +9959,7 @@ function bindMeActions(root) {
   if (!root) return;
   root.querySelectorAll("[data-me-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.meGo)));
   root.querySelectorAll("[data-event-response]").forEach((button) => {
-    button.addEventListener("click", () => saveEventResponse(button.dataset.eventId, button.dataset.eventResponse));
+    button.addEventListener("click", () => respondWithMotion(button));
   });
   root.querySelectorAll("[data-me-trait]").forEach((button) => button.addEventListener("click", () => {
     const field = button.dataset.meTrait;
@@ -9746,18 +9971,16 @@ function bindMeActions(root) {
     });
   }));
   root.querySelector("[data-me-save-traits]")?.addEventListener("click", async (event) => {
-    event.currentTarget.disabled = true;
-    if (await saveTraitsDraft()) {
+    if (await runWithButton(event.currentTarget, saveTraitsDraft)) {
       renderPublicGames();
       renderTraitsPanel();
       renderMePanel();
-    } else {
-      event.currentTarget.disabled = false;
     }
   });
   root.querySelector("[data-me-create-player]")?.addEventListener("click", (event) => createMePlayer(event.currentTarget));
   root.querySelectorAll("[data-me-claim]").forEach((button) => button.addEventListener("click", async () => {
     button.disabled = true;
+    flyTo(button.querySelector(".me-card-wrap") || button, getTabButton("me"));
     await requestPlayerClaim(button.dataset.meClaim);
     renderMePanel();
   }));
@@ -9828,7 +10051,7 @@ function renderSearchResults() {
             <button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">
               <span class="avatar search-avatar">${escapeHtml(groupInitials(row.name))}</span>
               <span class="search-row-text"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.group_name)}${row.is_guest ? " · convidado" : ""}</small></span>
-              <b class="search-ovr">${row.overall ?? ""}</b>
+              <b class="search-ovr">${ratingsVisible(myGroups.find((group) => group.id === row.group_id) || { slug: "" }) ? (row.overall ?? "") : ""}</b>
             </button>`).join("")}
         </div>
       </section>` : ""}
@@ -9855,6 +10078,7 @@ function updateSearchResults() {
   if (!holder) return;
   holder.innerHTML = renderSearchResults();
   bindSearchResults(holder);
+  if (searchResults && !searchBusy) playCascade(holder);
 }
 
 async function runSearch(query) {
@@ -13217,7 +13441,7 @@ async function drawPlayerDot(ctx, playerData, pos, color, game = null) {
   ctx.font = `900 ${Math.round(width * 0.086)}px Bahnschrift Condensed, Arial Narrow, Segoe UI, Arial`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(canSeeCurrentRatings() ? form.currentRating : playerData.overall), x + width * 0.1820, y + height * 0.2482);
+  if (ratingsVisible()) ctx.fillText(String(canSeeCurrentRatings() ? form.currentRating : playerData.overall), x + width * 0.1820, y + height * 0.2482);
 
   const nameBox = {
     x: x + width * 0.12,
@@ -13640,6 +13864,7 @@ function radarPolygonPoints(values, centerX, centerY, radius, maxValue) {
 }
 
 function renderTeamRadarChart(teamA, teamB, options = {}) {
+  if (!ratingsVisible()) return "";
   const compact = Boolean(options.compact);
   const inlineOdds = Boolean(options.inlineOdds);
   const statsA = getTeamRadarStats(teamA);

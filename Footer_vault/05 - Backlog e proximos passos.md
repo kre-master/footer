@@ -119,5 +119,7 @@ Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3p
 - [x] "Vou" com ficha por confirmar (mexe no Supabase: respostas de quem tem pedido de associacao pendente).
 - [ ] Encontra jogo (jogador sem grupo): onde, quando, posicao num so ecra.
 - [ ] Dono da app: eliminar jogadores e contas (Gerir Footer), com cuidado RGPD.
-- [ ] Micro-interaccoes (proposta de 2026-11-05: voar para o carrinho, botao que vira visto, listas em cascata, deslizar para responder, virar carta, sino a balancar).
+- [x] Micro-interaccoes (feitas na 1.22.0; proposta de 2026-11-05: voar para o carrinho, botao que vira visto, listas em cascata, deslizar para responder, virar carta, sino a balancar).
 - [ ] Piloto: enviar o convite ao admin do clube de teste e observar (tempo ate a primeira convocatoria, quem entra sem ajuda).
+- [ ] Notas nos clubes novos: pensar numa forma justa e pouco trabalhosa (por agora escondidas; todos iguais e equilibrio pela forma).
+- [ ] Dono da app: eliminar jogadores e contas (migracao para o utilizador correr).

@@ -261,3 +261,10 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Caracteristicas (posicao, forma, faixa etaria) sao perguntadas ao criar o jogador, em 3 toques; deixam de estar so na Conta.
 - Dono da app: nao aprova clubes novos (ja e assim desde 28/10); pode apagar clubes (ja existe) e passa a poder eliminar jogadores e contas (por fazer).
 - Desenho de referencia: pagina privada "Planta da App Footer" (ver [[05 - Backlog e proximos passos]]).
+
+## Clubes sem notas e micro-interaccoes (decidido 2026-11-05)
+
+- Fora dos Futeboleiros (slug legacy) ninguem ve nota (OVR) nem numeros individuais, por agora; `groups.settings.ratings = true` voltaria a liga-las num clube. No lugar da nota, a carta mostra o emblema do clube. Todos comecam iguais (60, `NO_RATING_BASE`) e as equipas equilibram-se pela forma (resultados). O admin nao da notas ao colar a lista nem aos convidados. Os Futeboleiros ficam como estavam. Forma justa e pouco trabalhosa de incluir notas: a pensar mais tarde.
+- As cartas (premios) contam so dentro de cada clube. Cada jogador pode criar o seu jogador e pôr a foto que quiser (botao no proprio perfil).
+- Micro-interaccoes: botao -> roda -> visto (gravar), salto no Vou, bola a voar para Jogos (pedir para jogar, Vou), linhas em cascata ao entrar num ecra (70 ms, ate 12), simbolo das novidades a balancar, carta a virar ao criar o jogador e nas cartas novas, deslizar para aprovar/rejeitar nos Pedidos e pedidos para jogar. So transform/opacidade; com "reduzir movimento" nada mexe.
+

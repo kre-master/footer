@@ -8,6 +8,18 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.22.0",
+      date: "2026-11-05",
+      title: "Pequenos movimentos e clubes sem notas",
+      items: [
+        "Os botões que gravam mostram uma roda e acabam num visto; o Vou dá um pequeno salto.",
+        "Ao pedir para jogar, uma bola voa até Jogos. As listas chegam em cascata, o símbolo das novidades balança quando há coisas novas e a tua carta vira quando a crias.",
+        "Nos Pedidos, desliza para a direita para aprovar e para a esquerda para rejeitar.",
+        "Nos clubes novos não há notas: no lugar do número a carta mostra o emblema do clube, todos começam iguais e as equipas equilibram-se pela forma.",
+        "No teu perfil há um botão para pores a tua foto.",
+      ],
+    },
+    {
       version: "1.21.0",
       date: "2026-11-05",
       title: "Barra nova e entrada mais fácil",
