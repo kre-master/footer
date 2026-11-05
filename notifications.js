@@ -8,6 +8,18 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.21.0",
+      date: "2026-11-05",
+      title: "Barra nova e entrada mais fácil",
+      items: [
+        "A barra passa a ser Eu, Jogos, Arquivo, Clube e uma lupa. O Arquivo junta os jogos, os vídeos e o Hall of Fame; o Admin passa para dentro do Clube (Pagamentos e Pedidos).",
+        "No Eu vês logo o próximo jogo para responder, os jogos abertos de outros grupos e quando podes jogar.",
+        "A lupa procura jogadores dos teus clubes e clubes com perfil público.",
+        "Quem entra por convite vê a cara do grupo, cria conta e entra logo, escolhe a sua carta e pode responder às convocatórias enquanto o admin confirma.",
+        "Ao criar um clube escolhes o dia e a hora habituais: a convocatória seguinte já vem preenchida.",
+      ],
+    },
+    {
       version: "1.20.1",
       date: "2026-11-02",
       title: "Vídeo mais fluido",

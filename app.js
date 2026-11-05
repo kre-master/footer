@@ -216,7 +216,7 @@ let currentGenerationDateIso = new Date().toISOString();
 let previewGame = null;
 let authActionBusy = false;
 let currentPlayerProfileId = null;
-let currentViewName = "events";
+let currentViewName = "me";
 let currentMonthlyMonth = null;
 let navigationHistoryReady = false;
 let awardRevealSessionSeenKeys = new Set();
@@ -894,6 +894,7 @@ function bindEvents() {
     if (tab === els.myProfileTab) {
       const linkedPlayer = getLinkedPlayer();
       if (linkedPlayer) openPlayerProfile(linkedPlayer.id);
+      else showView("me");
       return;
     }
     showView(tab.dataset.view);
@@ -1000,7 +1001,10 @@ function openPendingSharedMoment() {
 // O perfil do proprio jogador e a pagina inicial; convocatorias e jogos novos chegam pelas notificacoes.
 function applyLandingRoute() {
   const linkedPlayer = getLinkedPlayer();
-  if (!linkedPlayer) return;
+  if (!linkedPlayer) {
+    showView("me", { push: false });
+    return;
+  }
   currentPlayerProfileId = linkedPlayer.id;
   showView("player-profile", { push: false });
 }
@@ -1069,7 +1073,7 @@ async function loadMyGroups() {
     .eq("user_id", currentSession.user.id)
     .order("joined_at", { ascending: true });
   // Sem a migracao group-profile-migration.sql ainda nao existem bio, logo nem favorito.
-  let { data, error } = await query("group_id, role, joined_at, is_favorite, groups(id, slug, name, bio, logo, profile_public, default_location)");
+  let { data, error } = await query("group_id, role, joined_at, is_favorite, groups(id, slug, name, bio, logo, profile_public, default_location, settings)");
   if (error) ({ data, error } = await query("group_id, role, joined_at, groups(id, slug, name)"));
   if (error) {
     console.warn("Group load failed. Run supabase/groups-migration.sql.", error);
@@ -1085,6 +1089,7 @@ async function loadMyGroups() {
       logo: row.groups.logo || "",
       isPublic: row.groups.profile_public !== false,
       defaultLocation: row.groups.default_location || "",
+      settings: row.groups.settings || {},
       isFavorite: Boolean(row.is_favorite),
       role: row.role,
     }));
@@ -1414,7 +1419,20 @@ async function refreshPendingInvite() {
     clearPendingInvite();
     return;
   }
-  pendingInvite = { code, groupName: row.group_name, valid: Boolean(row.valid) };
+  pendingInvite = {
+    code,
+    groupName: row.group_name,
+    valid: Boolean(row.valid),
+    logo: row.logo || "",
+    bio: row.bio || "",
+    location: row.location || "",
+    weekday: Number.isInteger(row.weekday) ? row.weekday : null,
+    startTime: row.start_time || null,
+    memberCount: row.member_count || 0,
+    nextEventAt: row.next_event_at || null,
+    nextEventGoing: row.next_event_going || 0,
+    nextEventMax: row.next_event_max || 0,
+  };
 }
 
 async function acceptPendingInvite() {
@@ -1436,8 +1454,8 @@ async function acceptPendingInvite() {
   }
   await loadAccountState();
   await loadRemoteState();
-  // A seguir escolhe o seu perfil na lista do grupo ("Qual destes es tu?").
-  showView(getLinkedPlayer() ? "player-profile" : "account");
+  // A seguir escolhe a sua carta no grupo ("Es um destes?"), no separador Eu.
+  showView("me");
   updateAccessUi();
   render();
 }
@@ -1447,7 +1465,9 @@ function renderGroupBanner() {
   const banner = document.querySelector("#group-banner");
   if (!banner) return;
   let html = "";
-  if (pendingInvite && !pendingInvite.valid) {
+  if (currentViewName === "me") {
+    // O separador Eu ja mostra o convite e a falta de grupo em grande.
+  } else if (pendingInvite && !pendingInvite.valid) {
     html = `
       <div><strong>Este convite ja nao e valido.</strong><p>Pede um link novo ao admin do grupo.</p></div>
       <div class="actions"><button class="ghost-btn" data-invite-dismiss>Fechar</button></div>`;
@@ -1465,7 +1485,7 @@ function renderGroupBanner() {
         <button class="primary-btn" data-invite-accept>Entrar no grupo</button>
         <button class="ghost-btn" data-invite-dismiss>Agora nao</button>
       </div>`;
-  } else if (remoteEnabled && currentSession?.user && groupsLoadedOk && !myGroups.length) {
+  } else if (!["me", "club", "search"].includes(currentViewName) && remoteEnabled && currentSession?.user && groupsLoadedOk && !myGroups.length) {
     html = `
       <div><strong>Ainda nao pertences a nenhum grupo.</strong><p>Pede ao admin do teu grupo o link de convite, ou cria um grupo novo. Entretanto podes ver os jogos publicos.</p></div>
       <div class="actions">
@@ -1479,7 +1499,7 @@ function renderGroupBanner() {
   banner.querySelector("[data-open-public-games]")?.addEventListener("click", () => showView("public-games"));
   banner.querySelector("[data-open-new-group]")?.addEventListener("click", () => {
     newGroupFormOpen = true;
-    showView("account");
+    showView("club");
     renderNewGroupPanel();
   });
   banner.querySelector("[data-invite-login]")?.addEventListener("click", openLoginModal);
@@ -1561,23 +1581,29 @@ function renderNewGroupPanel() {
   } else if (newGroupFormOpen) {
     body = `
       <div class="new-group-form">
-        <input data-new-group="name" maxlength="60" placeholder="Nome do grupo">
+        <input data-new-group="name" maxlength="60" placeholder="Nome do clube">
         <input data-new-group="location" maxlength="80" placeholder="Campo / local">
-        <input data-new-group="schedule" maxlength="80" placeholder="Dia e hora habituais (ex.: quartas 21h)">
+        <div class="new-group-when">
+          <select data-new-group="weekday" aria-label="Dia habitual">
+            <option value="">Dia habitual</option>
+            ${WEEKDAY_PLURAL.map((label, index) => `<option value="${index}">${label}</option>`).join("")}
+          </select>
+          <input data-new-group="time" type="time" value="21:00" aria-label="Hora habitual">
+        </div>
         <textarea data-new-group="notes" maxlength="300" rows="2" placeholder="Notas (opcional)"></textarea>
       </div>
       <div class="actions">
-        <button class="primary-btn" data-submit-new-group>Criar grupo</button>
+        <button class="primary-btn" data-submit-new-group>Criar clube</button>
         <button class="ghost-btn" data-close-new-group>Cancelar</button>
       </div>`;
   } else {
     body = `
       ${lastDecided?.status === "approved" ? `<p class="hint good">O grupo ${escapeHtml(lastDecided.name)} foi aprovado.</p>` : ""}
       ${lastDecided?.status === "rejected" ? `<p class="hint warn">O pedido do grupo ${escapeHtml(lastDecided.name)} nao foi aprovado.</p>` : ""}
-      <p>Tens um grupo de amigos que joga com regularidade? Cria um grupo proprio, com convocatorias e perfis privados. Ficas logo como dono e convidas os teus amigos.</p>
-      <div class="actions"><button class="ghost-btn" data-open-new-group>Criar um grupo novo</button></div>`;
+      <p>Tens um grupo de amigos que joga com regularidade? Cria o teu clube, com convocatorias e perfis privados. Ficas logo como dono e convidas os teus amigos.</p>
+      <div class="actions"><button class="ghost-btn" data-open-new-group>Criar um clube</button></div>`;
   }
-  panel.innerHTML = `<div class="account-card"><h3>Criar um grupo</h3>${body}</div>`;
+  panel.innerHTML = `<div class="account-card"><h3>Criar um clube</h3>${body}</div>`;
   panel.querySelector("[data-open-new-group]")?.addEventListener("click", () => {
     newGroupFormOpen = true;
     renderNewGroupPanel();
@@ -1604,11 +1630,15 @@ async function submitNewGroup() {
     alert("Escreve o nome do grupo.");
     return;
   }
+  const weekday = value("weekday");
+  const time = value("time");
   const { data: groupId, error } = await supabaseClient.rpc("create_group", {
     p_name: value("name"),
     p_location: value("location"),
-    p_schedule: value("schedule"),
+    p_schedule: formatSchedule(weekday === "" ? null : Number(weekday), time || null),
     p_notes: value("notes"),
+    p_weekday: weekday === "" ? null : Number(weekday),
+    p_time: time || null,
   });
   if (error) {
     alert(String(error.message || "").includes("group_limit_reached")
@@ -1674,7 +1704,7 @@ function renderOnboardingPanel() {
   const group = getActiveGroup();
   const hasPlayers = state.players.length >= 6;
   const hasGame = Boolean((state.events || []).length || state.games.length);
-  const show = remoteEnabled && isAdmin && group && group.slug !== LEGACY_GROUP_SLUG && (!hasPlayers || !hasGame);
+  const show = isOnboardingNeeded();
   panel.classList.toggle("hidden", !show);
   if (!show) {
     panel.innerHTML = "";
@@ -2117,6 +2147,7 @@ function renderAdminBadges() {
   const count = getAdminPendingCount();
   setBadgeCount("#admin-tab-badge", count);
   setBadgeCount("#claims-subtab-badge", count);
+  setBadgeCount("#account-admin-badge", count);
 }
 
 // tone "info" = amarelo (ha novidades, nada urgente); por omissao vermelho.
@@ -2238,7 +2269,6 @@ function updateAccessUi(message) {
   if (els.adminLogin) els.adminLogin.classList.toggle("hidden", Boolean(currentSession));
   if (els.accountSignup) els.accountSignup.classList.toggle("hidden", Boolean(currentSession) || !remoteEnabled);
   if (els.adminLogout) els.adminLogout.classList.toggle("hidden", !currentSession);
-  if (els.myProfileTab) els.myProfileTab.classList.toggle("hidden", !linkedPlayer);
   updateAccountMenu();
   renderGroupSwitcher();
 }
@@ -2409,8 +2439,10 @@ async function submitLoginForm(event) {
       forgetLogin(login);
     }
     await loadRemoteState();
+    await refreshPendingInvite();
     updateAccessUi();
     render();
+    if (pendingInvite?.valid) await acceptPendingInvite();
   } finally {
     if (submit) {
       submit.disabled = false;
@@ -2515,7 +2547,12 @@ async function submitSignupForm(event) {
   await loadAccountState();
   rememberLogin(username);
   await loadRemoteState();
-  showView("account");
+  await refreshPendingInvite();
+  if (pendingInvite?.valid) {
+    await acceptPendingInvite();
+    return;
+  }
+  showView("me");
   updateAccessUi();
   render();
 }
@@ -2689,24 +2726,28 @@ function on(element, eventName, handler) {
 }
 
 // Separadores principais agrupam varias vistas. "Jogo" mostra a convocatoria e o gerar na mesma pagina.
+// Barra (2026-11-05): Eu · Jogos · Arquivo · Clube · lupa. Admin vive dentro do Clube.
 const VIEW_GROUPS = {
-  "player-profile": "profile",
+  me: "me",
+  "player-profile": "me",
+  availability: "me",
+  "my-games": "me",
   events: "game",
   today: "game",
   "public-games": "game",
-  availability: "game",
   "new-game": "game",
   games: "history",
   "history-game": "history",
-  "my-games": "history",
-  gallery: "gallery",
-  club: "stats",
-  stats: "stats",
-  players: "stats",
-  monthly: "stats",
-  payments: "admin",
-  claims: "admin",
+  gallery: "history",
+  stats: "history",
+  club: "club",
+  players: "club",
+  monthly: "club",
+  payments: "club",
+  claims: "club",
+  search: "search",
 };
+let currentTabGroup = "me";
 
 function showView(viewName, options = {}) {
   // "O meu mes" vive agora no perfil do proprio jogador, no periodo deste mes.
@@ -2716,7 +2757,17 @@ function showView(viewName, options = {}) {
     openPlayerProfile(linkedForMonthly.id);
     return;
   }
-  const group = VIEW_GROUPS[viewName] || viewName;
+  // Eu: com ficha ligada abre o proprio perfil; sem ficha, a pagina de quem chega.
+  if (viewName === "me" && getLinkedPlayer()) {
+    openPlayerProfile(getLinkedPlayer().id);
+    return;
+  }
+  let group = VIEW_GROUPS[viewName] || viewName;
+  // O perfil de outro jogador fica no separador de onde se veio.
+  if (viewName === "player-profile" && currentPlayerProfileId && currentPlayerProfileId !== getLinkedPlayer()?.id) {
+    group = currentTabGroup || "me";
+  }
+  currentTabGroup = group;
   if (group !== "game") {
     previewGame = null;
   }
@@ -2733,6 +2784,9 @@ function showView(viewName, options = {}) {
   if (viewName === "club") renderClubPanel();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
+  if (viewName === "me") renderMePanel();
+  if (viewName === "search") renderSearchPanel();
+  renderGroupBanner();
   if (viewName === "today") {
     // Vindo de "abrir jogo" ou de importar confirmados: leva o utilizador ate as equipas.
     requestAnimationFrame(() => document.querySelector("#generate-anchor")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -3369,6 +3423,7 @@ function render() {
   renderNewGroupPanel();
   renderGroupRequestsList();
   renderOnboardingPanel();
+  renderMePanel();
   renderPlayerProfile();
   renderMvpVoteGate();
   renderNotifyBadges();
@@ -3462,7 +3517,7 @@ function renderAccountPanel() {
   els.accountPanel.innerHTML = `
     <div class="account-card">
       <h3>Qual destes es tu?</h3>
-      <p>Escolhe o teu perfil${getActiveGroup() ? ` em ${escapeHtml(getActiveGroup().name)}` : ""}. O admin aprova antes de ficares ligado.</p>
+      <p>Escolhe o teu perfil${getActiveGroup() ? ` em ${escapeHtml(getActiveGroup().name)}` : ""}. Podes responder logo as convocatorias; o admin confirma depois.</p>
       ${renderSecurityActions()}
       <div class="claim-grid">
         ${availablePlayers.map((p) => `
@@ -3515,7 +3570,7 @@ async function createOwnPlayer() {
   }
   await loadAccountState();
   await loadRemoteState();
-  showView(getLinkedPlayer() ? "player-profile" : "account");
+  showView("me");
   render();
 }
 
@@ -3608,6 +3663,7 @@ function renderPlayerProfile() {
 
   els.playerProfile.innerHTML = `
     ${renderProfileHero(playerData, form, variant)}
+    ${isOwnProfile ? renderMeNowBlock() : ""}
     ${isOwnProfile ? renderMonthReviewCard(playerData) : ""}
     ${renderProfilePeriodNav(months)}
     ${renderProfileSummary(playerData, period, { isOwnProfile })}
@@ -3735,6 +3791,7 @@ function renderPlayerProfile() {
     });
   });
   bindAwardDetailCards(els.playerProfile, playerData, [...awards, ...periodAwards]);
+  if (isOwnProfile) bindMeActions(els.playerProfile.querySelector(".me-now"));
   bindProfileOverview(playerData, period);
   els.playerProfile.querySelector("[data-player-weight]")?.addEventListener("change", async (event) => {
     const value = Number(event.target.value);
@@ -6274,6 +6331,9 @@ function renderEventsList() {
   if (els.eventDate && !els.eventDate.value) {
     els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
   }
+  if (els.eventTitle && !els.eventTitle.value && getActiveGroup()) {
+    els.eventTitle.value = getActiveGroup().name;
+  }
 
   document.body.classList.toggle("player-linked", Boolean(getLinkedPlayer()));
   const events = [...(state.events || [])]
@@ -6588,7 +6648,7 @@ function renderPublicGames() {
   if (!panel || !list) return;
   // So o texto: o numero vermelho fica no mesmo botao.
   const subtabLabel = document.querySelector("#public-games-subtab [data-subtab-label]");
-  if (subtabLabel) subtabLabel.textContent = publicEvents.length ? `Jogos publicos (${publicEvents.length})` : "Jogos publicos";
+  if (subtabLabel) subtabLabel.textContent = publicEvents.length ? `Abertos (${publicEvents.length})` : "Abertos";
   if (!publicEvents.length) {
     list.innerHTML = `<div class="empty-state">${currentSession?.user
       ? "Sem jogos publicos de momento. Quando um grupo abrir um jogo a quem nao e do grupo, aparece aqui."
@@ -6723,8 +6783,8 @@ async function saveMyTraits() {
 }
 
 function renderEventCard(eventData) {
-  const linkedPlayer = getLinkedPlayer();
-  const myResponse = linkedPlayer ? getResponseForPlayer(eventData.id, linkedPlayer.id) : null;
+  const myPlayer = getMyPlayer();
+  const myResponse = myPlayer ? getResponseForPlayer(eventData.id, myPlayer.id) : null;
   const going = getEventPlayers(eventData.id, "going");
   const maybe = getEventPlayers(eventData.id, "maybe");
   const notGoing = getEventPlayers(eventData.id, "not_going");
@@ -6791,24 +6851,26 @@ function renderResponseActions(eventData, myResponse) {
   if (eventData.status === "cancelled") {
     return `<div class="hint warn">Convocatoria cancelada. Podes apagar esta convocatoria do historico de convocatorias.</div>`;
   }
-  const linkedPlayer = getLinkedPlayer();
+  const linkedPlayer = getMyPlayer();
   if (!currentSession) {
     return `<div class="hint">Entra para responder a esta convocatoria.</div>`;
   }
   if (!linkedPlayer && !isAdmin) {
-    return `<div class="hint warn">Associa primeiro a tua conta a um perfil de jogador.</div>`;
+    return `<div class="hint warn">Escolhe primeiro a tua carta no separador Eu.</div>`;
   }
   if (isAdmin && !linkedPlayer) {
     return `<div class="hint">Admin sem perfil associado. Podes acompanhar e fazer equipas.</div>`;
   }
   const status = myResponse?.status || "";
   const goingDisabled = status !== "going" && isEventFullForPlayer(eventData, linkedPlayer.id);
+  const pendingNote = getLinkedPlayer() ? "" : `<span class="hint">Ficha por confirmar pelo admin.</span>`;
   return `
     <div class="response-row">
       <button class="ghost-btn ${status === "going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="going" ${goingDisabled ? "disabled" : ""}>Vou</button>
       <button class="ghost-btn ${status === "maybe" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="maybe">Talvez</button>
       <button class="ghost-btn ${status === "not_going" ? "selected" : ""}" data-event-id="${eventData.id}" data-event-response="not_going">Nao vou</button>
       ${goingDisabled ? `<span class="hint warn">Limite de ${eventData.maxPlayers} jogadores atingido.</span>` : ""}
+      ${pendingNote}
     </div>
   `;
 }
@@ -6940,10 +7002,10 @@ async function saveEventResponse(eventId, status) {
     alert("Entra primeiro para responder.");
     return;
   }
-  const linkedPlayer = getLinkedPlayer();
+  const linkedPlayer = getMyPlayer();
   if (!linkedPlayer) {
-    alert("Associa primeiro a tua conta a um perfil.");
-    showView("account");
+    alert("Escolhe primeiro a tua carta no separador Eu.");
+    showView("me");
     return;
   }
 
@@ -9110,6 +9172,14 @@ function renderClubEditor(group) {
       </div>
       <label class="auth-field"><span>Local habitual (entra automatico nas convocatorias)</span>
         <input name="location" type="text" maxlength="80" value="${escapeHtml(group.defaultLocation)}" placeholder="Ex.: Pavilhao Municipal, Maia"></label>
+      <div class="auth-field"><span>Dia e hora habituais (preenchem a proxima convocatoria)</span>
+        <div class="new-group-when">
+          <select name="weekday" aria-label="Dia habitual">
+            <option value="">Sem dia fixo</option>
+            ${WEEKDAY_PLURAL.map((label, index) => `<option value="${index}" ${getGroupSchedule(group).weekday === index ? "selected" : ""}>${label}</option>`).join("")}
+          </select>
+          <input name="time" type="time" value="${escapeHtml(getGroupSchedule(group).time || "")}" aria-label="Hora habitual">
+        </div></div>
       <label class="club-check"><input name="public" type="checkbox" ${group.isPublic ? "checked" : ""}>
         <span>Perfil publico: qualquer pessoa pode encontrar o clube e ver so o nome, simbolo e bio.</span></label>
       <div class="club-editor-block">
@@ -9143,10 +9213,18 @@ function renderClubPanel() {
       <div class="club-empty">
         ${renderClubSymbol(null, "club-symbol-lg")}
         <h3>Ainda nao tens clube</h3>
-        <p>Procura um clube e pede para entrar, ou pede um convite a um admin.</p>
-      </div>
-      ${renderClubSearchSection()}`;
-    bindClubSearch(panel);
+        <p>Cria o teu clube, procura um e pede para entrar, ou pede o link de convite a um admin.</p>
+        <div class="actions">
+          <button type="button" class="primary-btn" data-club-create>Criar o meu clube</button>
+          <button type="button" class="ghost-btn" data-club-find>Procurar clubes</button>
+        </div>
+      </div>`;
+    panel.querySelector("[data-club-create]")?.addEventListener("click", () => {
+      newGroupFormOpen = true;
+      renderNewGroupPanel();
+      document.querySelector("#new-group-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
     return;
   }
   const canEdit = isGroupAdminRole(group.role) && remoteEnabled;
@@ -9188,7 +9266,7 @@ function renderClubPanel() {
       </div>
     </section>
     ${canEdit ? '<section class="club-block" id="club-join-requests"></section>' : ""}
-    ${renderClubSearchSection()}
+    <div class="actions"><button type="button" class="ghost-btn" data-club-find>Procurar outros clubes</button></div>
     ${group.role === "owner" && remoteEnabled ? `
       <section class="club-block club-danger">
         <h4>Apagar grupo</h4>
@@ -9204,6 +9282,7 @@ function renderClubPanel() {
     renderClubPanel();
   });
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
+  panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
   panel.querySelectorAll("[data-club-player]").forEach((button) => button.addEventListener("click", () => openPlayerProfile(button.dataset.clubPlayer)));
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
@@ -9218,6 +9297,7 @@ function renderClubPanel() {
     group.bio = String(data.get("bio") || "");
     group.defaultLocation = String(data.get("location") || "");
     group.isPublic = data.has("public");
+    group.settings = { ...(group.settings || {}), weekday: data.get("weekday") === "" ? undefined : Number(data.get("weekday")), time: String(data.get("time") || "") || undefined };
   };
   editor.querySelectorAll("[data-emblem]").forEach((button) => button.addEventListener("click", () => {
     clubDraftLogo = `preset:${button.dataset.emblem}`;
@@ -9258,11 +9338,572 @@ function renderClubPanel() {
       alert(`Nao consegui guardar: ${error.message}. Confirma que a migracao group-profile-migration.sql foi aplicada.`);
       return;
     }
-    Object.assign(group, { bio: bio.trim().slice(0, 300), logo: clubDraftLogo, isPublic, defaultLocation });
+    const weekday = data.get("weekday") === "" ? null : Number(data.get("weekday"));
+    const time = String(data.get("time") || "") || null;
+    const { error: scheduleError } = await supabaseClient.rpc("set_group_schedule", { p_group_id: group.id, p_weekday: weekday, p_time: time });
+    if (scheduleError) console.warn("Group schedule save failed. Run supabase/onboarding-migration.sql.", scheduleError);
+    Object.assign(group, { bio: bio.trim().slice(0, 300), logo: clubDraftLogo, isPublic, defaultLocation, settings: { ...(group.settings || {}), weekday: weekday ?? undefined, time: time ?? undefined } });
     clubEditing = false;
     renderClubTab();
     renderClubPanel();
   });
+}
+
+// ---- Eu (2026-11-05): pagina de quem chega (convite, sem grupo, sem ficha) e bloco "Agora" no proprio perfil ----
+const WEEKDAY_PLURAL = ["Domingos", "Segundas", "Terças", "Quartas", "Quintas", "Sextas", "Sábados"];
+const ME_ICONS = {
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  people: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 19c.6-3 2.9-4.6 6-4.6s5.4 1.6 6 4.6M15 14.6c2.6 0 4.4 1.3 5 4"/>',
+  ball: '<circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/>',
+};
+let meTraitsDraft = null;
+
+function meIcon(key) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${ME_ICONS[key]}</svg>`;
+}
+
+function getGroupSchedule(group = getActiveGroup()) {
+  const weekday = Number.isInteger(group?.settings?.weekday) ? group.settings.weekday : null;
+  const time = /^\d{2}:\d{2}$/.test(group?.settings?.time || "") ? group.settings.time : null;
+  return { weekday, time };
+}
+
+function formatSchedule(weekday, time) {
+  if (weekday == null && !time) return "";
+  return `${weekday != null ? WEEKDAY_PLURAL[weekday] : "Jogo"}${time ? ` às ${time}` : ""}`;
+}
+
+function formatShortDateTime(value) {
+  const date = new Date(value);
+  const day = date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
+  const time = date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  return `${day} · ${time}`;
+}
+
+// A ficha pedida ("Sou eu") enquanto o admin nao confirma; serve para responder as convocatorias.
+function getPendingClaimPlayer() {
+  const claim = getMyPendingClaim();
+  return claim ? findPlayer(claim.player_id) : null;
+}
+
+function getMyPlayer() {
+  return getLinkedPlayer() || getPendingClaimPlayer();
+}
+
+function isOnboardingNeeded() {
+  const group = getActiveGroup();
+  const hasPlayers = state.players.length >= 6;
+  const hasGame = Boolean((state.events || []).length || state.games.length);
+  return Boolean(remoteEnabled && isAdmin && group && group.slug !== LEGACY_GROUP_SLUG && (!hasPlayers || !hasGame));
+}
+
+function getNextEvent() {
+  const since = Date.now() - 3 * 60 * 60 * 1000;
+  return [...(state.events || [])]
+    .filter((eventData) => !["cancelled", "completed"].includes(eventData.status) && new Date(eventData.startsAt).getTime() > since)
+    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0] || null;
+}
+
+function renderNextGameCard() {
+  const eventData = getNextEvent();
+  const group = getActiveGroup();
+  if (!eventData) {
+    return `
+      <article class="me-card me-next is-empty">
+        <div class="me-next-info">
+          <p class="eyebrow">Próximo jogo${group ? ` · ${escapeHtml(group.name)}` : ""}</p>
+          <strong>Ainda não há convocatória</strong>
+          <small>${isAdmin ? "Lança a próxima e o grupo responde aqui." : "Quando o admin lançar o próximo jogo, respondes aqui."}</small>
+        </div>
+        ${isAdmin ? '<button type="button" class="primary-btn" data-me-go="new-game">Nova convocatória</button>' : ""}
+      </article>`;
+  }
+  const date = new Date(eventData.startsAt);
+  const going = getEventPlayers(eventData.id, "going").length;
+  const myPlayer = getMyPlayer();
+  const myResponse = myPlayer ? getResponseForPlayer(eventData.id, myPlayer.id) : null;
+  const pct = Math.min(100, Math.round((going / Math.max(1, eventData.maxPlayers)) * 100));
+  const missing = Math.max(0, eventData.maxPlayers - going);
+  return `
+    <article class="me-card me-next">
+      <div class="me-date" aria-hidden="true">
+        <small>${escapeHtml(date.toLocaleDateString("pt-PT", { weekday: "short" }).replace(".", ""))}</small>
+        <b>${date.getDate()}</b>
+        <small>${escapeHtml(date.toLocaleDateString("pt-PT", { month: "short" }).replace(".", ""))}</small>
+      </div>
+      <div class="me-next-info">
+        <p class="eyebrow">Próximo jogo${group ? ` · ${escapeHtml(group.name)}` : ""}</p>
+        <strong>${escapeHtml(date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }))}${eventData.location ? ` · ${escapeHtml(eventData.location)}` : ""}</strong>
+        <span class="me-bar"><i style="width:${pct}%"></i></span>
+        <small>${going} de ${eventData.maxPlayers}${missing ? ` · faltam ${missing}` : " · cheio"}</small>
+      </div>
+      <div class="me-next-actions">${eventData.status === "cancelled" ? "" : renderResponseActions(eventData, myResponse)}</div>
+      <button type="button" class="ghost-btn me-next-open" data-me-go="events">Ver convocatória</button>
+    </article>`;
+}
+
+function renderOpenGamesRow(title = "Jogos abertos") {
+  if (!remoteEnabled || !currentSession?.user) return "";
+  const rows = publicEvents.filter((row) => row.my_status !== "declined").slice(0, 8);
+  const statusPill = (status) => ({
+    invited: '<span class="metric warn-pill">Convidaram-te</span>',
+    pending: '<span class="metric warn-pill">Pedido enviado</span>',
+    accepted: '<span class="metric good-pill">Aceite</span>',
+  }[status] || "");
+  return `
+    <section class="me-section">
+      <div class="me-section-head">
+        <h3>${escapeHtml(title)}</h3>
+        <button type="button" class="ghost-btn" data-me-go="public-games">Ver todos</button>
+      </div>
+      ${rows.length ? `
+        <div class="me-rail">
+          ${rows.map((row) => `
+            <button type="button" class="me-open-card" data-me-go="public-games">
+              <span class="eyebrow">${escapeHtml(row.group_name || "Grupo")}</span>
+              <strong>${escapeHtml(formatShortDateTime(row.starts_at))}</strong>
+              ${row.location ? `<small>${escapeHtml(row.location)}</small>` : ""}
+              <span class="me-pills">
+                <span class="metric ${row.spots_left > 0 ? "warn-pill" : ""}">${row.spots_left > 0 ? `Faltam ${row.spots_left}` : "Cheio"}</span>
+                ${row.needs ? `<span class="metric">${escapeHtml(NEEDS_LABELS[row.needs] || row.needs)}</span>` : ""}
+                ${statusPill(row.my_status)}
+              </span>
+            </button>`).join("")}
+        </div>
+      ` : `<p class="hint">Ainda não há jogos abertos de outros grupos. Quando um grupo precisar de jogadores, aparece aqui.</p>`}
+    </section>`;
+}
+
+function renderAvailabilityShortcut() {
+  if (!remoteEnabled || !currentSession?.user) return "";
+  const days = new Set(myWeeklyAvailability.map((row) => row.weekday)).size;
+  const summary = days ? `${days} ${days === 1 ? "dia" : "dias"} por semana marcados` : myAvailability.length ? `${myAvailability.length} dias marcados` : "Ainda não marcaste quando podes jogar";
+  return `
+    <div class="me-shortcuts">
+      <button type="button" class="me-shortcut" data-me-go="availability">
+        ${meIcon("clock")}<span><strong>Quando posso jogar</strong><small>${escapeHtml(summary)}</small></span>
+      </button>
+      ${getLinkedPlayer() ? `
+        <button type="button" class="me-shortcut" data-me-go="my-games">
+          ${meIcon("ball")}<span><strong>O meu histórico</strong><small>Os meus jogos em todos os clubes</small></span>
+        </button>` : ""}
+    </div>`;
+}
+
+// No proprio perfil, logo a seguir a carta.
+function renderMeNowBlock() {
+  return `<div class="me-now">${renderNextGameCard()}${renderOpenGamesRow()}${renderAvailabilityShortcut()}</div>`;
+}
+
+function renderTraitsChips() {
+  if (!meTraitsDraft) {
+    meTraitsDraft = { fitness: myTraits?.fitness || "", position: myTraits?.position || "", age_band: myTraits?.age_band || "" };
+  }
+  const rows = [["position", "Onde jogas?"], ["fitness", "Como estás de forma?"], ["age_band", "Idade"]];
+  return `
+    <div class="me-traits">
+      ${rows.map(([field, label]) => `
+        <div class="me-trait-row">
+          <span>${label}</span>
+          <div class="me-chips" role="group" aria-label="${label}">
+            ${Object.entries(TRAIT_LABELS[field]).map(([value, text]) => `
+              <button type="button" class="me-chip ${meTraitsDraft[field] === value ? "on" : ""}" data-me-trait="${field}" data-value="${escapeHtml(value)}" aria-pressed="${meTraitsDraft[field] === value}">${escapeHtml(text)}</button>`).join("")}
+          </div>
+        </div>`).join("")}
+    </div>`;
+}
+
+function hasAllTraits() {
+  return Boolean(myTraits?.fitness && myTraits?.position && myTraits?.age_band);
+}
+
+function renderMeTraitsCard() {
+  return `
+    <section class="panel me-block">
+      <p class="eyebrow">O teu jogador</p>
+      <h2>Três toques</h2>
+      <p class="hint">Para pedires lugar em jogos abertos. Só o admin do jogo a que pedes para ir vê isto.</p>
+      ${renderTraitsChips()}
+      <div class="actions"><button type="button" class="primary-btn" data-me-save-traits>Guardar</button></div>
+    </section>`;
+}
+
+function renderMeInvite() {
+  const invite = pendingInvite;
+  if (!invite.valid) {
+    return `
+      <section class="panel me-block me-invite">
+        <p class="eyebrow">Convite</p>
+        <h2>Este convite já não é válido</h2>
+        <p class="hint">Pede um link novo ao admin do grupo.</p>
+        <div class="actions"><button type="button" class="ghost-btn" data-invite-dismiss>Fechar</button></div>
+      </section>`;
+  }
+  const schedule = formatSchedule(invite.weekday, invite.startTime);
+  const facts = [
+    schedule ? `<li>${meIcon("clock")}${escapeHtml(schedule)}</li>` : "",
+    invite.location ? `<li>${meIcon("pin")}${escapeHtml(invite.location)}</li>` : "",
+    `<li>${meIcon("people")}${invite.memberCount} ${invite.memberCount === 1 ? "pessoa" : "pessoas"} no grupo</li>`,
+    invite.nextEventAt ? `<li>${meIcon("ball")}Próximo jogo: ${escapeHtml(formatShortDateTime(invite.nextEventAt))}${invite.nextEventMax ? ` · ${invite.nextEventGoing} de ${invite.nextEventMax}` : ""}</li>` : "",
+  ].join("");
+  return `
+    <section class="panel me-block me-invite">
+      ${renderClubSymbol({ logo: invite.logo, name: invite.groupName }, "club-symbol-xl")}
+      <p class="eyebrow">Foste convidado para jogar</p>
+      <h2>${escapeHtml(invite.groupName || "Grupo")}</h2>
+      ${invite.bio ? `<p class="club-bio">${escapeHtml(invite.bio)}</p>` : ""}
+      <ul class="me-facts">${facts}</ul>
+      <div class="actions">
+        ${currentSession?.user
+          ? `<button type="button" class="primary-btn" data-invite-accept>Entrar no grupo</button>
+             <button type="button" class="ghost-btn" data-invite-dismiss>Agora não</button>`
+          : `<button type="button" class="primary-btn" data-invite-signup>Criar conta e entrar</button>
+             <button type="button" class="ghost-btn" data-invite-login>Já tenho conta</button>`}
+      </div>
+      <p class="hint">Depois escolhes a tua carta no grupo. Demora um minuto.</p>
+    </section>`;
+}
+
+function renderMeWelcome() {
+  return `
+    <section class="panel me-block me-welcome">
+      <p class="eyebrow">Bem-vindo ao Footer</p>
+      <h2>Futebol entre amigos, sem confusão no WhatsApp</h2>
+      <p>Convocatórias, equipas equilibradas, resultados, cartas e vídeos dos jogos.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-signup>Criar conta</button>
+        <button type="button" class="ghost-btn" data-me-login>Entrar</button>
+      </div>
+    </section>
+    <div class="me-paths">
+      <article class="me-path"><strong>Recebi um convite</strong><p>Abre o link que te enviaram no WhatsApp. O grupo aparece logo aqui.</p></article>
+      <article class="me-path"><strong>Quero jogar</strong><p>Cria conta e vê os jogos abertos de grupos que precisam de jogadores.</p></article>
+      <article class="me-path"><strong>Quero organizar</strong><p>Cria conta e depois o teu clube: convocatórias, equipas e pagamentos num só sítio.</p></article>
+    </div>`;
+}
+
+function renderMeNoClub() {
+  const name = currentProfile?.display_name || "";
+  return `
+    <section class="panel me-block">
+      <p class="eyebrow">${name ? `Olá, ${escapeHtml(name)}` : "Olá"}</p>
+      <h2>Ainda não tens clube</h2>
+      <p>Se te enviaram um convite, abre o link no telemóvel. Entretanto podes procurar jogo ou criar o teu clube.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-new-club>Criar o meu clube</button>
+        <button type="button" class="ghost-btn" data-me-go="search">Procurar clubes</button>
+      </div>
+    </section>
+    ${hasAllTraits() ? "" : renderMeTraitsCard()}
+    ${renderOpenGamesRow()}
+    ${renderAvailabilityShortcut()}`;
+}
+
+function renderMeFirstSteps() {
+  if (!isOnboardingNeeded()) return "";
+  return `
+    <section class="panel me-block me-first-steps">
+      <p class="eyebrow">${escapeHtml(getActiveGroup()?.name || "")}</p>
+      <h2>Primeiros passos do teu clube</h2>
+      <p class="hint">Junta os jogadores, envia o link de convite e lança a primeira convocatória.</p>
+      <div class="actions">
+        <button type="button" class="primary-btn" data-me-go="events">Abrir primeiros passos</button>
+        <button type="button" class="ghost-btn" data-me-go="claims">Link de convite</button>
+      </div>
+    </section>`;
+}
+
+function renderMeNoPlayer() {
+  const group = getActiveGroup();
+  const claim = getMyPendingClaim();
+  const claimPlayer = getPendingClaimPlayer();
+  if (claim) {
+    return `
+      ${renderMeFirstSteps()}
+      <section class="panel me-block me-pending">
+        ${claimPlayer ? `<div class="me-card-wrap">${renderPlayerCard(claimPlayer)}</div>` : ""}
+        <div>
+          <p class="eyebrow">${escapeHtml(group?.name || "")}</p>
+          <h2>${escapeHtml(claimPlayer?.name || "A tua carta")}</h2>
+          <span class="metric warn-pill">Por confirmar pelo admin</span>
+          <p class="hint">Já podes responder às convocatórias. Quando o admin confirmar, ficas com o histórico e as cartas desta ficha.</p>
+        </div>
+      </section>
+      <div class="me-now">${renderNextGameCard()}</div>
+      ${hasAllTraits() ? "" : renderMeTraitsCard()}
+      <div class="me-now">${renderOpenGamesRow()}${renderAvailabilityShortcut()}</div>`;
+  }
+  const free = state.players
+    .filter((playerData) => !playerData.linkedUserId)
+    .sort((a, b) => Number(Boolean(a.isGuest)) - Number(Boolean(b.isGuest)) || a.name.localeCompare(b.name));
+  return `
+    ${renderMeFirstSteps()}
+    <section class="panel me-block me-claim">
+      <p class="eyebrow">${escapeHtml(group?.name || "")}</p>
+      <h2>És um destes?</h2>
+      <p class="hint">${free.length ? "O admin já criou cartas para quem joga. Escolhe a tua: podes responder logo às convocatórias e o admin confirma depois." : "Ainda não há cartas livres neste grupo. Cria o teu jogador aqui em baixo."}</p>
+      ${free.length ? `
+        <div class="me-rail me-claim-rail">
+          ${free.map((playerData) => `
+            <button type="button" class="me-claim-card" data-me-claim="${escapeHtml(playerData.id)}" aria-label="Sou eu: ${escapeHtml(playerData.name)}">
+              <span class="me-card-wrap">${renderPlayerCard(playerData)}</span>
+              <span class="ghost-btn">Sou eu</span>
+            </button>`).join("")}
+        </div>` : ""}
+    </section>
+    <section class="panel me-block me-new-player">
+      <p class="eyebrow">Não estás na lista?</p>
+      <h2>Cria o teu jogador</h2>
+      <label class="auth-field"><span>Como te chamam no jogo</span>
+        <input id="me-player-name" maxlength="40" value="${escapeHtml(currentProfile?.display_name || "")}" autocomplete="nickname"></label>
+      ${renderTraitsChips()}
+      <div class="actions"><button type="button" class="primary-btn" data-me-create-player>Criar o meu jogador</button></div>
+      <p class="hint">Começas com a nota média do grupo. O admin acerta depois.</p>
+    </section>
+    <div class="me-now">${renderNextGameCard()}</div>`;
+}
+
+function getMePanelHtml() {
+  if (!remoteEnabled) {
+    return `<section class="panel me-block"><p class="eyebrow">Modo local</p><h2>Sem ligação à base de dados</h2><p class="hint">Podes fazer equipas em Jogos.</p></section>`;
+  }
+  if (pendingInvite) return renderMeInvite();
+  if (!currentSession?.user) return renderMeWelcome();
+  if (groupsLoadedOk && !myGroups.length) return renderMeNoClub();
+  return renderMeNoPlayer();
+}
+
+function renderMePanel() {
+  const panel = document.querySelector("#me-panel");
+  if (!panel) return;
+  if (currentViewName !== "me") {
+    panel.innerHTML = "";
+    return;
+  }
+  panel.innerHTML = getMePanelHtml();
+  bindMeActions(panel);
+}
+
+async function saveTraitsDraft() {
+  if (!supabaseClient || !currentSession?.user || !meTraitsDraft) return true;
+  const row = {
+    user_id: currentSession.user.id,
+    fitness: meTraitsDraft.fitness || null,
+    position: meTraitsDraft.position || null,
+    age_band: meTraitsDraft.age_band || null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabaseClient.from("player_traits").upsert(row);
+  if (error) {
+    alert(`Nao consegui guardar as caracteristicas: ${error.message}`);
+    return false;
+  }
+  myTraits = row;
+  return true;
+}
+
+async function createMePlayer(button) {
+  if (!supabaseClient || !currentSession?.user || !activeGroupId) return;
+  const name = document.querySelector("#me-player-name")?.value.trim() || "";
+  if (name.length < 2) {
+    alert("Escreve o teu nome.");
+    return;
+  }
+  button.disabled = true;
+  const { error } = await supabaseClient.rpc("create_own_player", { p_group_id: activeGroupId, p_name: name });
+  if (error) {
+    button.disabled = false;
+    const message = String(error.message || "");
+    alert(message.includes("claim_pending")
+      ? "Ja tens um pedido pendente. Espera pela aprovacao do admin."
+      : message.includes("already_linked")
+        ? "Ja tens um perfil neste grupo."
+        : `Nao consegui criar o jogador: ${message}`);
+    return;
+  }
+  if (meTraitsDraft && Object.values(meTraitsDraft).some(Boolean)) await saveTraitsDraft();
+  await loadAccountState();
+  await loadRemoteState();
+  updateAccessUi();
+  showView("me");
+  render();
+}
+
+function bindMeActions(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-me-go]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.meGo)));
+  root.querySelectorAll("[data-event-response]").forEach((button) => {
+    button.addEventListener("click", () => saveEventResponse(button.dataset.eventId, button.dataset.eventResponse));
+  });
+  root.querySelectorAll("[data-me-trait]").forEach((button) => button.addEventListener("click", () => {
+    const field = button.dataset.meTrait;
+    meTraitsDraft[field] = meTraitsDraft[field] === button.dataset.value ? "" : button.dataset.value;
+    root.querySelectorAll(`[data-me-trait="${field}"]`).forEach((chip) => {
+      const on = chip.dataset.value === meTraitsDraft[field];
+      chip.classList.toggle("on", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+  }));
+  root.querySelector("[data-me-save-traits]")?.addEventListener("click", async (event) => {
+    event.currentTarget.disabled = true;
+    if (await saveTraitsDraft()) {
+      renderPublicGames();
+      renderTraitsPanel();
+      renderMePanel();
+    } else {
+      event.currentTarget.disabled = false;
+    }
+  });
+  root.querySelector("[data-me-create-player]")?.addEventListener("click", (event) => createMePlayer(event.currentTarget));
+  root.querySelectorAll("[data-me-claim]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    await requestPlayerClaim(button.dataset.meClaim);
+    renderMePanel();
+  }));
+  root.querySelector("[data-me-new-club]")?.addEventListener("click", () => {
+    newGroupFormOpen = true;
+    showView("club");
+    renderNewGroupPanel();
+    requestAnimationFrame(() => document.querySelector("#new-group-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  });
+  root.querySelector("[data-me-signup]")?.addEventListener("click", createAccount);
+  root.querySelector("[data-invite-signup]")?.addEventListener("click", createAccount);
+  root.querySelector("[data-me-login]")?.addEventListener("click", openLoginModal);
+  root.querySelector("[data-invite-login]")?.addEventListener("click", openLoginModal);
+  root.querySelector("[data-invite-accept]")?.addEventListener("click", acceptPendingInvite);
+  root.querySelector("[data-invite-dismiss]")?.addEventListener("click", () => {
+    clearPendingInvite();
+    render();
+  });
+}
+
+// ---- Lupa (2026-11-05): jogadores dos meus clubes e clubes com perfil publico; mais tarde jogos perto ----
+let searchQuery = "";
+let searchResults = null;
+let searchBusy = false;
+let searchTimer = null;
+let searchToken = 0;
+
+function renderSearchPanel() {
+  const panel = document.querySelector("#search-panel");
+  if (!panel) return;
+  if (!remoteEnabled || !currentSession?.user) {
+    panel.innerHTML = `<div class="empty-state">Entra na tua conta para procurar jogadores e clubes.</div>`;
+    return;
+  }
+  panel.innerHTML = `
+    <form class="search-form" data-search-form role="search">
+      <input id="search-q" type="search" name="q" value="${escapeHtml(searchQuery)}" placeholder="Nome de um jogador ou clube" maxlength="40" autocomplete="off" aria-label="Procurar jogadores e clubes">
+      <button class="primary-btn" type="submit">Procurar</button>
+    </form>
+    <div data-search-results>${renderSearchResults()}</div>
+    <p class="hint search-soon">Em breve: jogos perto de ti.</p>`;
+  const form = panel.querySelector("[data-search-form]");
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    runSearch(String(new FormData(form).get("q") || "").trim());
+  });
+  form.querySelector("#search-q").addEventListener("input", (event) => {
+    clearTimeout(searchTimer);
+    const value = event.target.value.trim();
+    searchTimer = setTimeout(() => runSearch(value), 350);
+  });
+  bindSearchResults(panel);
+}
+
+function renderSearchResults() {
+  if (searchBusy && !searchResults) return `<p class="hint">A procurar…</p>`;
+  if (!searchResults) return `<p class="hint">Procura jogadores dos teus clubes e clubes com perfil público.</p>`;
+  const { players, clubs, failed } = searchResults;
+  if (failed) return `<p class="hint warn">Não consegui procurar agora. Tenta outra vez daqui a pouco.</p>`;
+  if (!players.length && !clubs.length) return `<p class="hint">Nada encontrado para "${escapeHtml(searchQuery)}".</p>`;
+  return `
+    ${players.length ? `
+      <section class="search-section">
+        <h3>Jogadores</h3>
+        <div class="search-list">
+          ${players.map((row) => `
+            <button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">
+              <span class="avatar search-avatar">${escapeHtml(groupInitials(row.name))}</span>
+              <span class="search-row-text"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.group_name)}${row.is_guest ? " · convidado" : ""}</small></span>
+              <b class="search-ovr">${row.overall ?? ""}</b>
+            </button>`).join("")}
+        </div>
+      </section>` : ""}
+    ${clubs.length ? `
+      <section class="search-section">
+        <h3>Clubes</h3>
+        <div class="club-list">
+          ${clubs.map((club) => `
+            <div class="club-row">
+              ${renderClubSymbol(club, "club-symbol-md")}
+              <div class="club-row-text"><strong>${escapeHtml(club.name)}</strong>
+                <small>${club.member_count} membros${club.bio ? ` - ${escapeHtml(club.bio)}` : ""}</small></div>
+              ${club.is_member
+                ? (club.id === activeGroupId ? '<small class="hint">O teu clube</small>' : `<button type="button" class="ghost-btn" data-search-switch="${escapeHtml(club.id)}">Abrir</button>`)
+                : club.request_status === "pending" ? '<small class="hint">Pedido enviado</small>'
+                : `<button type="button" class="ghost-btn" data-search-join="${escapeHtml(club.id)}">Pedir para entrar</button>`}
+            </div>`).join("")}
+        </div>
+      </section>` : ""}`;
+}
+
+function updateSearchResults() {
+  const holder = document.querySelector("#search-panel [data-search-results]");
+  if (!holder) return;
+  holder.innerHTML = renderSearchResults();
+  bindSearchResults(holder);
+}
+
+async function runSearch(query) {
+  searchQuery = query;
+  const token = ++searchToken;
+  if (!query) {
+    searchResults = null;
+    searchBusy = false;
+    updateSearchResults();
+    return;
+  }
+  searchBusy = true;
+  updateSearchResults();
+  const [players, clubs] = await Promise.all([
+    supabaseClient.rpc("search_players", { p_query: query }),
+    supabaseClient.rpc("search_clubs", { p_query: query }),
+  ]);
+  if (token !== searchToken) return;
+  searchBusy = false;
+  if (players.error) console.warn("Player search failed. Run supabase/onboarding-migration.sql.", players.error);
+  if (clubs.error) console.warn("Club search failed", clubs.error);
+  searchResults = {
+    players: players.data || [],
+    clubs: (clubs.data || []).map((row) => ({ ...row, logo: row.logo || "" })),
+    failed: Boolean(players.error && clubs.error),
+  };
+  updateSearchResults();
+}
+
+function bindSearchResults(root) {
+  root.querySelectorAll("[data-search-player]").forEach((button) => button.addEventListener("click", async () => {
+    const groupId = button.dataset.searchGroup;
+    if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId);
+    openPlayerProfile(button.dataset.searchPlayer);
+  }));
+  root.querySelectorAll("[data-search-switch]").forEach((button) => button.addEventListener("click", async () => {
+    await switchActiveGroup(button.dataset.searchSwitch);
+    showView("club");
+  }));
+  root.querySelectorAll("[data-search-join]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const { error } = await supabaseClient.rpc("request_join_group", { p_group_id: button.dataset.searchJoin });
+    if (error) {
+      alert(`Nao consegui enviar o pedido: ${error.message}`);
+      button.disabled = false;
+      return;
+    }
+    await runSearch(searchQuery);
+  }));
 }
 
 // ---- Pesquisa de clubes e pedidos de entrada ----
@@ -13245,10 +13886,15 @@ function euro(value) {
   return `${formatted}€`;
 }
 
+// Proximo dia e hora habituais do clube (por defeito, terca as 21:00).
 function defaultEventDate() {
+  const { weekday, time } = getGroupSchedule();
+  const [hours, minutes] = (time || "21:00").split(":").map(Number);
   const date = new Date();
-  date.setDate(date.getDate() + ((2 + 7 - date.getDay()) % 7 || 7));
-  date.setHours(21, 0, 0, 0);
+  let add = ((weekday ?? 2) + 7 - date.getDay()) % 7;
+  date.setHours(hours, minutes, 0, 0);
+  if (add === 0 && date <= new Date()) add = 7;
+  date.setDate(date.getDate() + add);
   return date;
 }
 

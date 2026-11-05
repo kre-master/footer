@@ -246,3 +246,18 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - O grupo original (legacy, Futeboleiros) esta protegido e nao pode ser apagado.
 - Numeros vermelhos em Jogos: "Os meus jogos" conta pedidos para jogar nos jogos do grupo (admins); "Jogos publicos" conta convites e jogos novos de outros grupos. Com pedidos pendentes, "Gerir convocatoria" abre sozinho e os pedidos aparecem logo com Aceitar/Recusar.
 - 2026-11-01: os videos dos jogos passam a ser servidos de casa (NAS: VM com NGINX + Tailscale Funnel, sem portas no router). Jogos antigos ficam no YouTube. Testes do leitor so para o admin da plataforma. Ver [[11 - Leitor de video proprio]].
+
+## Organizacao da app e onboarding (decidido 2026-11-05)
+
+- Barra de baixo: Eu · Jogos · Arquivo · Clube e, a direita, uma lupa (Procurar). Substitui os 6 separadores atuais (Jogador, Jogos, Historico, Galeria, Clube, Admin); cumpre a regra de 15/10 (nao acrescentar separadores).
+  - Eu: sempre visivel (sem ficha mostra "Cria o teu jogador"); carta, proximo jogo com Vou, uma fila de jogos abertos (tambem para quem ja tem grupo), quando posso jogar, stats e cartas. Ecra feito de carrosseis.
+  - Jogos: A minha equipa, Abertos (jogos publicos), Convites; admin tem o + (nova convocatoria) e os botoes dentro de cada jogo.
+  - Arquivo: jogos do grupo, videos e highlights (Galeria), Hall of Fame.
+  - Clube: o meu clube, plantel, os meus clubes, Gerir clube (admin: pagamentos, pedidos, convites), Criar clube; Gerir Footer so para o dono da app.
+  - Lupa: procurar jogadores e clubes; mais tarde jogos perto.
+- Admin deixa de ser separador: passa para Clube > Gerir clube e para dentro de cada jogo; bolinha no avatar quando ha pedidos.
+- Estilo: mantem-se o Holofote, com cartoes e carrosseis.
+- Quem escolhe uma ficha que ja existe pode responder "Vou" logo, com selo "por confirmar"; o admin aprova depois.
+- Caracteristicas (posicao, forma, faixa etaria) sao perguntadas ao criar o jogador, em 3 toques; deixam de estar so na Conta.
+- Dono da app: nao aprova clubes novos (ja e assim desde 28/10); pode apagar clubes (ja existe) e passa a poder eliminar jogadores e contas (por fazer).
+- Desenho de referencia: pagina privada "Planta da App Footer" (ver [[05 - Backlog e proximos passos]]).

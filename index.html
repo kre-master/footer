@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261102-hls2">
+    <link rel="stylesheet" href="styles.css?v=20261105-eu1">
   </head>
   <body>
     <div class="app-shell">
@@ -29,6 +29,7 @@
           <div class="account-menu" id="account-menu">
             <button id="account-menu-btn" class="account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-dropdown">
               <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
+              <span class="tab-badge account-badge hidden" id="account-admin-badge" aria-hidden="true"></span>
               <span class="account-chip-text">
                 <strong id="account-name">Entrar</strong>
                 <small id="data-status">Modo local</small>
@@ -45,52 +46,44 @@
           </div>
         </div>
         <nav class="tabs" aria-label="Seccoes">
-          <button id="my-profile-tab" class="tab hidden" type="button" data-view="player-profile">
+          <button id="my-profile-tab" class="tab active" type="button" data-view="me">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/></svg>
-            <span>Jogador</span>
+            <span>Eu</span>
           </button>
-          <button class="tab active" type="button" data-view="events">
+          <button class="tab" type="button" data-view="events">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/></svg>
             <span>Jogos</span>
             <span class="tab-badge hidden" id="games-tab-badge" aria-hidden="true"></span>
           </button>
           <button class="tab" type="button" data-view="games">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-            <span>Historico</span>
-          </button>
-          <button class="tab" type="button" data-view="gallery">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>
-            <span>Galeria</span>
+            <span>Arquivo</span>
           </button>
           <button id="club-tab" class="tab" type="button" data-view="club">
             <span class="tab-icon" data-club-tab-icon><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span>
             <span>Clube</span>
-          </button>
-          <button class="tab admin-only" type="button" data-view="payments">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>
-            <span>Admin</span>
             <span class="tab-badge hidden" id="admin-tab-badge" aria-hidden="true"></span>
+          </button>
+          <button class="tab tab-search" type="button" data-view="search" aria-label="Procurar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+            <span>Procurar</span>
           </button>
         </nav>
         <nav class="subtabs hidden" data-group="game" aria-label="Jogos">
-          <button class="subtab" type="button" data-view="events">Os meus jogos <span class="subtab-badge hidden" id="mygames-subtab-badge" aria-hidden="true"></span></button>
-          <button class="subtab" type="button" data-view="public-games" id="public-games-subtab"><span data-subtab-label>Jogos publicos</span> <span class="subtab-badge hidden" id="public-subtab-badge" aria-hidden="true"></span></button>
-          <button class="subtab" type="button" data-view="availability">A minha disponibilidade</button>
-          <button class="subtab admin-only" type="button" data-view="new-game">Nova convocatoria</button>
+          <button class="subtab" type="button" data-view="events">A minha equipa <span class="subtab-badge hidden" id="mygames-subtab-badge" aria-hidden="true"></span></button>
+          <button class="subtab" type="button" data-view="public-games" id="public-games-subtab"><span data-subtab-label>Abertos</span> <span class="subtab-badge hidden" id="public-subtab-badge" aria-hidden="true"></span></button>
+          <button class="subtab admin-only" type="button" data-view="new-game">+ Nova convocatoria</button>
         </nav>
-        <nav class="subtabs hidden" data-group="history" aria-label="Historico">
-          <button class="subtab" type="button" data-view="games">Grupo</button>
-          <button class="subtab" type="button" data-view="my-games">Jogador</button>
-        </nav>
-        <nav class="subtabs hidden" data-group="stats" aria-label="Stats">
-          <button class="subtab" type="button" data-view="club">Clube</button>
+        <nav class="subtabs hidden" data-group="history" aria-label="Arquivo">
+          <button class="subtab" type="button" data-view="games">Jogos</button>
+          <button class="subtab" type="button" data-view="gallery">Videos</button>
           <button class="subtab" type="button" data-view="stats">Hall of Fame</button>
-          <button class="subtab" type="button" data-view="players">Jogadores</button>
-          <button class="subtab" type="button" data-view="monthly">O meu mes</button>
         </nav>
-        <nav class="subtabs hidden" data-group="admin" aria-label="Admin">
-          <button class="subtab" type="button" data-view="payments">Pagamentos</button>
-          <button class="subtab" type="button" data-view="claims">Pedidos <span class="subtab-badge hidden" id="claims-subtab-badge" aria-hidden="true"></span></button>
+        <nav class="subtabs hidden" data-group="club" aria-label="Clube">
+          <button class="subtab" type="button" data-view="club">Clube</button>
+          <button class="subtab" type="button" data-view="players">Plantel</button>
+          <button class="subtab admin-only" type="button" data-view="payments">Pagamentos</button>
+          <button class="subtab admin-only" type="button" data-view="claims">Pedidos <span class="subtab-badge hidden" id="claims-subtab-badge" aria-hidden="true"></span></button>
         </nav>
       </header>
 
@@ -100,7 +93,23 @@
       <div id="month-review" class="mr hidden" role="dialog" aria-modal="true" aria-label="Revisao do mes"></div>
 
       <main>
-        <section class="view active" id="view-events">
+        <section class="view active" id="view-me">
+          <div id="me-panel" class="me-panel"></div>
+        </section>
+
+        <section class="view" id="view-search">
+          <section class="panel wide-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Jogadores e clubes</p>
+                <h2>Procurar</h2>
+              </div>
+            </div>
+            <div id="search-panel" class="search-panel"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-events">
           <section class="panel onboarding-panel hidden" id="onboarding-panel"></section>
           <div class="events-grid single">
             <section class="panel">
@@ -263,7 +272,6 @@
             </div>
             <div id="account-panel" class="account-panel"></div>
             <div id="traits-panel" class="traits-panel"></div>
-            <div id="new-group-panel" class="traits-panel"></div>
             <div id="deleted-groups-panel" class="traits-panel"></div>
           </section>
         </section>
@@ -381,6 +389,7 @@
         <section class="view" id="view-club">
           <section class="panel wide-panel">
             <div id="club-panel" class="club-panel"></div>
+            <div id="new-group-panel" class="traits-panel"></div>
           </section>
         </section>
 
@@ -563,9 +572,9 @@
     <script src="player-insights.js?v=20261028-review1"></script>
     <script src="month-review.js?v=20261028-review1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
-    <script src="notifications.js?v=20261030-allhighlights2"></script>
+    <script src="notifications.js?v=20261105-eu1"></script>
     <script src="heart-rate.js?v=20261102-hls2"></script>
     <script src="video-lab.js?v=20261101-casa1"></script>
-    <script src="app.js?v=20261102-hls2"></script>
+    <script src="app.js?v=20261105-eu1"></script>
   </body>
 </html>

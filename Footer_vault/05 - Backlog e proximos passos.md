@@ -103,3 +103,21 @@ Depois de alterar:
 - 2026-10-30 (5.a ronda): cores fixas com troca de lado; sem AUX; lista de cortes e molde 1:1 em PDF na pasta do plano.
 - 2026-10-31: relogio em 3 matrizes 8x8 WS2812 (19,5 x 6,5 cm), com mensagens (GOLO, TROCA, FIM).
 - 2026-10-31: plano v2 limpo (plano.md) e enviado por email ao utilizador; documentos no Google Drive.
+- 2026-11-02: costas da mala com tampa de correr e ventilacao (ventoinha 5 V opcional); frente 15 mm para dentro; manual de montagem v2.
+- 2026-11-02: decidido sem ventoinha para ja; o placard regista temperaturas (chip do Pi e ar da mala) e envia max/media por jogo; ventoinha so se o Pi passar dos 70 C.
+- 2026-11-02 (v3): fundo fixo com janela e tampa de correr so na metade B (ideia do utilizador); frente volta a 20 mm; manual de montagem v3.
+
+## Nova organizacao e onboarding (decidido 2026-11-05)
+
+Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3pdinXZh2KWs7YmAcuT). Regras em [[03 - Decisoes e regras]].
+
+- [x] Barra Eu · Jogos · Arquivo · Clube · lupa (mudar `VIEW_GROUPS`, separadores e mini-separadores).
+- [x] Ecra Eu em carrosseis, sempre visivel; sem ficha mostra "Cria o teu jogador".
+- [x] Admin dentro do Clube (Gerir clube) e dos jogos; bolinha no avatar.
+- [x] Lupa (jogadores e clubes; jogos perto por fazer): procurar jogadores e clubes (precisa de RPC no Supabase que respeite a RLS); jogos perto mais tarde.
+- [x] Onboarding por convite: convite com cara do grupo, conta num ecra, "Es um destes?" em cartas, criar jogador com caracteristicas, Vou logo.
+- [x] "Vou" com ficha por confirmar (mexe no Supabase: respostas de quem tem pedido de associacao pendente).
+- [ ] Encontra jogo (jogador sem grupo): onde, quando, posicao num so ecra.
+- [ ] Dono da app: eliminar jogadores e contas (Gerir Footer), com cuidado RGPD.
+- [ ] Micro-interaccoes (proposta de 2026-11-05: voar para o carrinho, botao que vira visto, listas em cascata, deslizar para responder, virar carta, sino a balancar).
+- [ ] Piloto: enviar o convite ao admin do clube de teste e observar (tempo ate a primeira convocatoria, quem entra sem ajuda).
