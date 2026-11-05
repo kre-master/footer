@@ -1366,6 +1366,7 @@ async function loadRemoteState() {
   await loadHeartRate();
   await loadJoinRequests();
   await loadNoShows();
+  await loadGroupFeedbackAnswers();
   await loadPublicEvents();
   await refreshPendingInvite();
   saveState();
@@ -4019,6 +4020,80 @@ function renderProfileSummary(playerData, period, { isOwnProfile }) {
     </section>`;
 }
 
+// ---- Respostas pos-jogo sem interesse (2026-11-05): ver assessGameFeedback em postgame-feedback.js ----
+const FEEDBACK_REASON_LABELS = { far_from_group: "longe dos colegas", against_running: "contra a corrida do vídeo", all_minimum: "tudo no mínimo", repeated: "sempre a mesma resposta" };
+// Respostas do grupo sem nomes (RPC group_feedback_answers, supabase/feedback-privacy-migration.sql); null = indisponivel.
+let groupFeedbackAnswers = null;
+
+async function loadGroupFeedbackAnswers() {
+  groupFeedbackAnswers = null;
+  if (!supabaseClient || !currentSession?.user || !activeGroupId) return;
+  const { data, error } = await supabaseClient.rpc("group_feedback_answers", { p_group_id: activeGroupId });
+  if (error) {
+    console.warn("Anonymous feedback load failed. Run supabase/feedback-privacy-migration.sql.", error);
+    return;
+  }
+  groupFeedbackAnswers = (data || []).map((row, index) => ({
+    id: `answer-${index}`,
+    gameId: row.game_id,
+    gameIntensity: row.game_intensity,
+    remainingEnergy: row.remaining_energy,
+    isMine: Boolean(row.is_mine),
+    repeated: Boolean(row.repeated),
+  }));
+}
+
+function getGameAnswerRows(gameId) {
+  if (groupFeedbackAnswers) return groupFeedbackAnswers.filter((row) => row.gameId === gameId);
+  return gameFeedback
+    .filter((item) => item.gameId === gameId)
+    .map((item) => ({ ...item, isMine: Boolean(currentSession?.user?.id) && item.userId === currentSession.user.id, repeated: false }));
+}
+
+// Ritmo medio do jogo (m/min) segundo o video publicado.
+function getGameRunPace(gameId) {
+  const entry = getTrackingEntry(gameId);
+  if (!entry?.result?.players || entry.status === "draft") return null;
+  const paces = entry.result.players
+    .map((p) => Number(p.distanceM) / Number(p.validMinutes))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return paces.length ? paces.reduce((sum, value) => sum + value, 0) / paces.length : null;
+}
+
+function getUsualRunPace() {
+  const paces = getFinishedGames().map((game) => getGameRunPace(game.id)).filter((value) => value != null);
+  return paces.length >= 2 && PostgameRules.median ? PostgameRules.median(paces) : null;
+}
+
+function getFeedbackAssessment(gameId) {
+  const rows = getGameAnswerRows(gameId);
+  const verdicts = PostgameRules.assessGameFeedback
+    ? PostgameRules.assessGameFeedback(rows, { gamePace: getGameRunPace(gameId), usualPace: getUsualRunPace() })
+    : rows.map((row) => ({ id: row.id, intensityTrusted: true, energyTrusted: true, reasons: [] }));
+  return verdicts.map((verdict, index) => ({ ...verdict, row: rows[index] }));
+}
+
+// A propria resposta (gameFeedback so tem as da propria conta).
+function getTrustedFeedback(item) {
+  if (!item) return { intensity: null, energy: null, reasons: [] };
+  const verdicts = getFeedbackAssessment(item.gameId);
+  const verdict = verdicts.find((entry) => entry.row.id === item.id)
+    || verdicts.find((entry) => entry.row.isMine && entry.row.gameIntensity === item.gameIntensity && entry.row.remainingEnergy === item.remainingEnergy);
+  return {
+    intensity: !verdict || verdict.intensityTrusted ? item.gameIntensity : null,
+    energy: !verdict || verdict.energyTrusted ? item.remainingEnergy : null,
+    reasons: verdict?.reasons || [],
+  };
+}
+
+// Para as calorias: a intensidade da propria resposta, ou a dos colegas quando a dela nao conta.
+function getEffortIntensity(answer, gameId) {
+  const own = getTrustedFeedback(answer).intensity;
+  if (own != null) return own;
+  const trusted = getFeedbackAssessment(gameId).filter((entry) => entry.intensityTrusted).map((entry) => entry.row.gameIntensity);
+  return trusted.length && PostgameRules.median ? PostgameRules.median(trusted) : undefined;
+}
+
 // So para o proprio: usa o peso privado e as respostas pos-jogo.
 // Estimativas privadas do jogador (peso e respostas pos-jogo); so aparecem no proprio perfil e na revisao do mes.
 function getPeriodEffort(playerData, period) {
@@ -4028,12 +4103,12 @@ function getPeriodEffort(playerData, period) {
     const participation = getPlayerParticipation(game, playerData.id);
     const minutes = row?.minutes ?? FooterMonthly.activeMinutesForSquad(participation ? getGameSidePlayerIds(game, participation.side).length : 5);
     const answer = feedback.find((item) => item.gameId === game.id);
-    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerData.id, game.date), minutes, met: FooterMonthly.metForIntensity(answer?.gameIntensity) });
+    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerData.id, game.date), minutes, met: FooterMonthly.metForIntensity(getEffortIntensity(answer, game.id)) });
   }, 0);
   return {
     calories,
-    energy: FooterMonthly.average(feedback.map((item) => item.remainingEnergy)),
-    intensity: FooterMonthly.average(feedback.map((item) => item.gameIntensity)),
+    energy: FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).energy).filter((value) => value != null)),
+    intensity: FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null)),
   };
 }
 
@@ -7825,13 +7900,17 @@ function renderMvpPanel(game) {
   `;
 }
 
+// Admin: so medias e quantas nao contam. Ninguem ve o que cada jogador respondeu.
 function renderPostgameAdminInsights(game) {
   if (!isAdmin) return "";
-  const rows = gameFeedback.filter((item) => item.gameId === game.id);
-  if (!rows.length) return `<div class="postgame-admin"><strong>Respostas pós-jogo</strong><span>0 respostas</span></div>`;
-  const intensity = FooterMonthly.average(rows.map((item) => item.gameIntensity));
-  const energy = FooterMonthly.average(rows.map((item) => item.remainingEnergy));
-  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${rows.length}</strong><span>Jogo ${intensity.toFixed(1)}/10 · Forma percebida ${energy.toFixed(1)}/10</span><div>${rows.map((item) => `<small>${escapeHtml(findPlayer(item.playerId)?.name || "Jogador")}: jogo ${item.gameIntensity}, forma ${item.remainingEnergy}</small>`).join("")}</div></div>`;
+  const verdicts = getFeedbackAssessment(game.id);
+  if (!verdicts.length) return `<div class="postgame-admin"><strong>Respostas pós-jogo</strong><span>0 respostas</span></div>`;
+  const intensity = FooterMonthly.average(verdicts.filter((entry) => entry.intensityTrusted).map((entry) => entry.row.gameIntensity));
+  const energy = FooterMonthly.average(verdicts.filter((entry) => entry.energyTrusted).map((entry) => entry.row.remainingEnergy));
+  const ignored = verdicts.filter((entry) => !entry.intensityTrusted || !entry.energyTrusted);
+  const reasons = [...new Set(ignored.flatMap((entry) => entry.reasons))].map((reason) => FEEDBACK_REASON_LABELS[reason]).filter(Boolean);
+  const fmt = (value) => (value == null ? "-" : value.toFixed(1));
+  return `<div class="postgame-admin"><strong>Respostas pós-jogo · ${verdicts.length}</strong><span>Jogo ${fmt(intensity)}/10 · Forma percebida ${fmt(energy)}/10</span>${ignored.length ? `<small>${ignored.length === 1 ? "1 resposta não conta" : `${ignored.length} respostas não contam`}: ${escapeHtml(reasons.join(", "))}</small>` : ""}<small>As respostas são anónimas: ninguém vê o que cada um respondeu.</small></div>`;
 }
 
 function getLatestFinishedGame() {
@@ -7890,14 +7969,14 @@ function getMonthlyRecapData(playerId, key) {
     const squadSize = participation ? getGameSidePlayerIds(game, participation.side).length : 5;
     return sum + FooterMonthly.activeMinutesForSquad(squadSize);
   }, 0);
-  const avgIntensity = FooterMonthly.average(feedback.map((item) => item.gameIntensity));
-  const avgEnergy = FooterMonthly.average(feedback.map((item) => item.remainingEnergy));
+  const avgIntensity = FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).intensity).filter((value) => value != null));
+  const avgEnergy = FooterMonthly.average(feedback.map((item) => getTrustedFeedback(item).energy).filter((value) => value != null));
   const calories = games.reduce((sum, game) => {
     const participation = getPlayerParticipation(game, playerId);
     const squadSize = participation ? getGameSidePlayerIds(game, participation.side).length : 5;
     const minutes = FooterMonthly.activeMinutesForSquad(squadSize);
     const answer = feedback.find((item) => item.gameId === game.id);
-    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerId, game.date), minutes, met: FooterMonthly.metForIntensity(answer?.gameIntensity) });
+    return sum + FooterMonthly.estimateCalories({ weightKg: getPlayerWeight(playerId, game.date), minutes, met: FooterMonthly.metForIntensity(getEffortIntensity(answer, game.id)) });
   }, 0);
   const outcomes = games.map((game) => { const participation = getPlayerParticipation(game, playerId); return participation ? getPlayerOutcome(game, participation.side) : "open"; });
   const wins = outcomes.filter((outcome) => outcome === "win").length;
@@ -12880,112 +12959,136 @@ function ensureHeartRateOverlay(section) {
     overlay.className = "hr-overlay hidden";
     overlay.dataset.hrOverlay = "";
     overlay.setAttribute("aria-hidden", "true");
-    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><canvas class="hr-ecg"></canvas>`;
+    overlay.innerHTML = `<span class="hr-overlay-heart">♥</span><strong></strong><canvas class="hr-trace"></canvas>`;
     stage.append(overlay);
   }
   return overlay;
 }
 
-// Traco tipo ECG com os ultimos 2,5 s: um batimento com a forma P-QRS-T ao ritmo dos bpm (e da velocidade do
-// video), a ponta a liderar a direita e a cauda a esbater-se. E uma ilustracao: o relogio so da uma leitura a
-// cada 1-3 s, nao ha curva real de 2,5 s. Parado o video, o traco congela.
-const HEART_RATE_ECG_WINDOW_S = 2.5;
-const HEART_RATE_ECG_SIZE = { width: 56, height: 20 };
-const heartRateEcgs = new Map();
-let heartRateEcgFrame = 0;
-let heartRateEcgLast = 0;
+// Linha de batimentos em direto na pilula do video: os ultimos HEART_RATE_TRACE_WINDOW_S segundos do treino,
+// desenhados ate ao momento do video, com a cor da zona em cada troco e a cauda a esbater-se ate ficar
+// transparente. O relogio so da uma leitura a cada ~3 s (a serie guarda-se de 3 em 3 s), por isso a curva
+// e a interpolacao entre leituras. Parado o video, o traco congela.
+const HEART_RATE_TRACE_WINDOW_S = 30;
+const HEART_RATE_TRACE_SIZE = { width: 55, height: 30 };
+const HEART_RATE_TRACE_MIN_SPAN = 20;
+const heartRateTraces = new Map();
+let heartRateTraceFrame = 0;
 
-function getHeartRateEcg(overlay) {
-  let ecg = heartRateEcgs.get(overlay);
-  if (!ecg) {
-    const canvas = overlay.querySelector(".hr-ecg");
+function getHeartRateTrace(overlay) {
+  let trace = heartRateTraces.get(overlay);
+  if (!trace) {
+    const canvas = overlay.querySelector(".hr-trace");
     const ratio = Math.min(3, window.devicePixelRatio || 1);
-    canvas.width = Math.round(HEART_RATE_ECG_SIZE.width * ratio);
-    canvas.height = Math.round(HEART_RATE_ECG_SIZE.height * ratio);
-    canvas.style.width = `${HEART_RATE_ECG_SIZE.width}px`;
-    canvas.style.height = `${HEART_RATE_ECG_SIZE.height}px`;
-    ecg = { canvas, ctx: canvas.getContext("2d"), ratio, phase: 0, bpm: 0, rate: 0, color: "#fff", active: false, drawn: false };
-    heartRateEcgs.set(overlay, ecg);
+    canvas.width = Math.round(HEART_RATE_TRACE_SIZE.width * ratio);
+    canvas.height = Math.round(HEART_RATE_TRACE_SIZE.height * ratio);
+    canvas.style.width = `${HEART_RATE_TRACE_SIZE.width}px`;
+    canvas.style.height = `${HEART_RATE_TRACE_SIZE.height}px`;
+    trace = { canvas, ctx: canvas.getContext("2d"), ratio, data: null, gameS: 0, at: 0, rate: 0, active: false, drawn: false };
+    heartRateTraces.set(overlay, trace);
   }
-  return ecg;
+  return trace;
 }
 
-function drawHeartRateEcg(ecg) {
-  const { ctx, canvas, ratio } = ecg;
+function drawHeartRateTrace(trace, now) {
+  const { ctx, canvas, ratio, data } = trace;
+  const api = window.FooterHeartRate;
   const width = canvas.width;
   const height = canvas.height;
-  const speed = (ecg.bpm / 60) * (ecg.rate || 1);
-  const base = height * 0.72;
-  const amplitude = height * 0.62;
-  const [red, green, blue] = [1, 3, 5].map((index) => parseInt(ecg.color.slice(index, index + 2), 16) || 255);
-  const fade = ctx.createLinearGradient(0, 0, width, 0);
-  fade.addColorStop(0, `rgba(${red},${green},${blue},0)`);
-  fade.addColorStop(0.5, `rgba(${red},${green},${blue},.3)`);
-  fade.addColorStop(1, `rgba(${red},${green},${blue},1)`);
-  ctx.clearRect(0, 0, width, height);
-  ctx.beginPath();
-  let lastY = base;
+  const gameS = trace.gameS + (trace.rate > 0 ? ((now - trace.at) / 1000) * trace.rate : 0);
+  const points = [];
   for (let x = 0; x < width; x += 1) {
-    const secondsAgo = HEART_RATE_ECG_WINDOW_S * (1 - x / (width - 1));
-    lastY = base - window.FooterHeartRate.ecgWave(ecg.phase - speed * secondsAgo) * amplitude;
-    if (x) ctx.lineTo(x, lastY); else ctx.moveTo(x, lastY);
+    const secondsAgo = HEART_RATE_TRACE_WINDOW_S * (1 - x / (width - 1));
+    points.push(api.smoothHeartRateAt(data.samples, gameS - secondsAgo, data.offset));
   }
-  ctx.strokeStyle = fade;
-  ctx.lineWidth = 1.5 * ratio;
-  ctx.lineJoin = "round";
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(width - 2 * ratio, lastY, 1.8 * ratio, 0, Math.PI * 2);
-  ctx.fillStyle = ecg.color;
-  ctx.shadowColor = ecg.color;
-  ctx.shadowBlur = 5 * ratio;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ecg.drawn = true;
+  const values = points.filter((value) => value != null);
+  ctx.clearRect(0, 0, width, height);
+  if (!values.length) {
+    trace.drawn = true;
+    return;
+  }
+  const mid = (Math.min(...values) + Math.max(...values)) / 2;
+  const half = Math.max(HEART_RATE_TRACE_MIN_SPAN, Math.max(...values) - Math.min(...values)) / 2;
+  const pad = 3 * ratio;
+  const y = (hr) => pad + (1 - (hr - (mid - half)) / (half * 2)) * (height - pad * 2);
+  ctx.lineWidth = 1.8 * ratio;
+  ctx.lineCap = "round";
+  let lastY = null;
+  let lastColor = "#fff";
+  for (let x = 1; x < width; x += 1) {
+    const hr = points[x];
+    const before = points[x - 1];
+    if (hr == null || before == null) continue;
+    const zone = api.zoneFor(Math.round(hr), data.maxHr);
+    const alpha = Math.pow(x / (width - 1), 1.4);
+    const [red, green, blue] = [1, 3, 5].map((index) => parseInt(zone.color.slice(index, index + 2), 16) || 255);
+    ctx.strokeStyle = `rgba(${red},${green},${blue},${alpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(x - 1, y(before));
+    ctx.lineTo(x, y(hr));
+    ctx.stroke();
+    lastY = y(hr);
+    lastColor = zone.color;
+  }
+  if (lastY != null && points[width - 1] != null) {
+    ctx.beginPath();
+    ctx.arc(width - 2 * ratio, lastY, 2 * ratio, 0, Math.PI * 2);
+    ctx.fillStyle = lastColor;
+    ctx.shadowColor = lastColor;
+    ctx.shadowBlur = 5 * ratio;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  trace.drawn = true;
 }
 
-function stepHeartRateEcg(now) {
-  heartRateEcgFrame = 0;
-  const seconds = Math.min(0.1, (now - heartRateEcgLast) / 1000);
-  heartRateEcgLast = now;
-  const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+function stepHeartRateTrace(now) {
+  heartRateTraceFrame = 0;
   let running = false;
-  heartRateEcgs.forEach((ecg, overlay) => {
+  heartRateTraces.forEach((trace, overlay) => {
     if (!overlay.isConnected) {
-      heartRateEcgs.delete(overlay);
+      heartRateTraces.delete(overlay);
       return;
     }
-    if (!ecg.active) return;
+    if (!trace.active || !trace.data) return;
     running = true;
-    if (ecg.drawn && (ecg.rate <= 0 || calm)) return;
-    ecg.phase = (ecg.phase + (ecg.bpm / 60) * ecg.rate * seconds) % 1;
-    drawHeartRateEcg(ecg);
+    if (trace.drawn && trace.rate <= 0) return;
+    drawHeartRateTrace(trace, now);
   });
-  if (running) heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+  if (running) heartRateTraceFrame = requestAnimationFrame(stepHeartRateTrace);
 }
 
-function startHeartRateEcg() {
-  if (heartRateEcgFrame) return;
-  heartRateEcgLast = performance.now();
-  heartRateEcgFrame = requestAnimationFrame(stepHeartRateEcg);
+function startHeartRateTrace() {
+  if (heartRateTraceFrame) return;
+  heartRateTraceFrame = requestAnimationFrame(stepHeartRateTrace);
 }
 
 // Sem leitura neste momento (fora do registo): coracao e "-" a cinzento. `visible` falso esconde tudo.
-function updateHeartRateOverlay(section, bpm, zone, visible, rate = 0) {
+// `source` = { samples, offset, maxHr, gameS } para desenhar a linha; null quando o leitor nao da tempo.
+function updateHeartRateOverlay(section, bpm, zone, visible, rate = 0, source = null) {
   const overlay = ensureHeartRateOverlay(section);
   if (!overlay) return;
   overlay.classList.toggle("hidden", !visible);
   const empty = bpm == null || !zone;
-  const ecg = getHeartRateEcg(overlay);
-  ecg.active = Boolean(visible && !empty);
-  if (ecg.active) {
-    ecg.bpm = bpm;
-    ecg.rate = rate;
-    if (ecg.color !== zone.color) {
-      ecg.color = zone.color;
-      ecg.drawn = false;
+  const trace = getHeartRateTrace(overlay);
+  trace.active = Boolean(visible && !empty && source);
+  if (trace.active) {
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // Parado, so se redesenha se o video saltou ou o ajuste/zona mudou; a mexer, o tempo corre sozinho.
+    const moved = Math.abs(source.gameS - trace.gameS) > 0.05 || trace.data?.offset !== source.offset || trace.data?.maxHr !== source.maxHr;
+    const nowMs = performance.now();
+    // A mexer, o tempo corre sozinho a cada frame; so se corrige quando o relogio do video difere mais de 0,35 s
+    // (salto ou pausa), para a linha nao dar solavancos a cada leitura do leitor.
+    const expected = trace.gameS + (trace.rate > 0 ? ((nowMs - trace.at) / 1000) * trace.rate : 0);
+    const drifted = !(rate > 0 && trace.rate > 0) || Math.abs(expected - source.gameS) > 0.35;
+    trace.data = source;
+    if (drifted) {
+      trace.gameS = source.gameS;
+      trace.at = nowMs;
     }
-    startHeartRateEcg();
+    trace.rate = calm ? 0 : rate;
+    if (moved || rate > 0) trace.drawn = false;
+    startHeartRateTrace();
   }
   if (!visible) return;
   const key = empty ? "empty" : `${bpm}|${zone.zone}`;
@@ -13028,11 +13131,12 @@ function tickHeartRatePanels() {
     const offset = getHeartRateOffset(state.game, entry);
     const maxHr = getHeartRateMax(entry);
     const clock = readHeartRateClock(state.game, state.section);
-    const bpm = clock ? api.heartRateAt(samples, clock.gameS, offset) : null;
+    const smooth = clock ? api.smoothHeartRateAt(samples, clock.gameS, offset) : null;
+    const bpm = smooth == null ? null : Math.round(smooth);
     const zone = bpm == null ? null : api.zoneFor(bpm, maxHr);
     now.textContent = bpm == null ? "--" : String(bpm);
     now.style.color = zone ? zone.color : "";
-    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0);
+    updateHeartRateOverlay(state.section, bpm, zone, readHeartRateSetting("overlay") !== "off", clock?.rate ?? 0, clock ? { samples, offset, maxHr, gameS: clock.gameS } : null);
     const head = state.body.querySelector("[data-hr-head]");
     if (head && clock) {
       const movement = state.body.querySelector("svg[data-hr-timeline]");
@@ -13093,7 +13197,7 @@ function renderGameVideoSection(game) {
           </div>
           ${renderStageControls()}
         </div>
-        <p class="tracking-fineprint">Vídeo não listado no YouTube: só quem tem a ligação o encontra.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
+        <p class="tracking-fineprint">Vídeo no YouTube.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
         ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
         ${renderMomentsBlock(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
