@@ -287,3 +287,7 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Ideia por fazer: assinalar quem responde sempre igual em todos os jogos.
 - 2026-11-05 (2): as respostas pos-jogo passam a ser anonimas para todos, incluindo admins. Cada conta so le as proprias (RLS); medias e regra vem de `group_feedback_answers` (sem quem respondeu). O admin ve so medias, numero de respostas e quantas nao contam (com os motivos agregados). Novo sinal "sempre a mesma resposta": mesma resposta nos ultimos 4 jogos seguidos -> a intensidade nao conta (a forma sim).
 
+## Tema Caderneta (decidido 2026-11-06)
+
+- O tema oficial passa a ser "Caderneta" (substitui o Holofote): papel claro com pontinhos, paineis e cartoes como cromos (contorno a tinta de 2 px e sombra solida), vermelho de destaque, amarelo de autocolante para o que esta seleccionado, letra Lilita One nos titulos e Nunito no texto.
+- Esta num ficheiro a parte, `theme-caderneta.css`, carregado depois de `styles.css`; tirar o `<link>` do index.html volta ao Holofote. Campo, cartas, leitor de video, galeria e revisao do mes em ecra cheio mantem as cores proprias.

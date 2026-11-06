@@ -1,0 +1,259 @@
+/* Tema "Caderneta" (2026-11-06): papel claro com pontinhos, cromos com contorno a tinta e sombra solida,
+   vermelho de destaque e amarelo de autocolante. Carregado depois de styles.css; tirar o <link> volta ao Holofote.
+   Ficam com as cores proprias: campo, cartas, video (leitor, galeria, laboratorio) e a revisao do mes em ecra cheio. */
+:root {
+  color-scheme: light;
+  --bg: #eef1f6;
+  --bg-solid: #ffffff;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-2: #f3f5f9;
+  --surface-opaque: #ffffff;
+  --ink: #1a1f2b;
+  --muted: #586174;
+  --line: rgba(26, 31, 43, .16);
+  --line-strong: rgba(26, 31, 43, .34);
+  --accent: #e63b2e;
+  --accent-2: #ff5a45;
+  --accent-soft: rgba(230, 59, 46, .12);
+  --accent-glow: 2px 2px 0 #1a1f2b;
+  --green: #1d9150;
+  --green-deep: #0d6b39;
+  --green-2: rgba(29, 145, 80, .13);
+  --orange: #d96a00;
+  --orange-2: rgba(217, 106, 0, .13);
+  --red: #d7263d;
+  --amber: #b97900;
+  --glass-blur: none;
+  --shadow: 4px 4px 0 #1a1f2b;
+  --shadow-soft: 3px 3px 0 #1a1f2b;
+  --font-display: "Lilita One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --font-body: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --cad-ink: #1a1f2b;
+  --cad-paper: #ffffff;
+  --cad-yellow: #ffd23c;
+  --cad-yellow-soft: #fff6cf;
+  --cad-blue: #1f5fd6;
+}
+
+/* Lilita One so tem um peso: sem negrito falso. */
+html { font-synthesis: none; }
+
+body {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(26, 31, 43, .09) 1px, transparent 1.6px) 0 0 / 14px 14px,
+    var(--bg);
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+h1, h2, h3, h4 { color: var(--ink); }
+.eyebrow { color: var(--accent); }
+
+/* ---------- Cromos: paineis e cartoes ---------- */
+.panel {
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.panel-head { border-color: var(--line); }
+
+.event-card, .me-card, .me-open-card, .me-shortcut, .me-path, .club-row, .search-row, .claim-row,
+.no-show-row, .join-request-row, .account-card, .award-audit-card, .synergy-card, .profile-section,
+.games-list > *, .public-game-card, .reliability-line, .club-stat, .club-block, .pp-kpi, .postgame-admin,
+.monthly-panel > *, .claim-card, .invite-panel > *, .create-own-player, .availability-panel > * {
+  background: var(--cad-paper);
+  border-color: var(--cad-ink);
+  color: var(--ink);
+}
+.event-card, .me-card, .me-open-card, .me-shortcut, .me-path, .club-row, .search-row, .claim-row,
+.join-request-row, .account-card, .award-audit-card, .synergy-card, .claim-card, .public-game-card {
+  border-width: 2px;
+  border-style: solid;
+  box-shadow: var(--shadow-soft);
+}
+.event-card.selected { box-shadow: 4px 4px 0 var(--accent); }
+.me-open-card:nth-child(even), .me-path:nth-child(even) { transform: rotate(.6deg); }
+.me-open-card:nth-child(odd), .me-path:nth-child(odd) { transform: rotate(-.6deg); }
+.profile-section { border: 0; background: transparent; }
+
+/* Cartas de jogador como autocolantes: sombra solida e ligeira inclinacao nas filas. */
+.player-card { filter: drop-shadow(3px 3px 0 rgba(26, 31, 43, .9)); }
+.me-claim-card:nth-child(odd) .me-card-wrap { transform: rotate(-2.5deg); }
+.me-claim-card:nth-child(even) .me-card-wrap { transform: rotate(2deg); }
+
+/* ---------- Barra de cima e separadores ---------- */
+.brand h1, .topbar h1 { color: var(--ink); }
+.tabs {
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  box-shadow: var(--shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.tab { color: var(--muted); }
+.tab:hover { color: var(--ink); background: var(--surface-2); }
+.tab.active {
+  color: var(--cad-ink);
+  background: var(--cad-yellow);
+  box-shadow: inset 0 0 0 2px var(--cad-ink), 2px 2px 0 var(--cad-ink);
+}
+.subtab { color: var(--muted); }
+.subtab:hover { color: var(--ink); }
+.subtab.active {
+  color: var(--cad-ink);
+  background: var(--cad-yellow);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 2px 2px 0 var(--cad-ink);
+}
+@media (max-width: 760px) {
+  .tabs { background: var(--cad-paper); box-shadow: 0 -2px 0 rgba(26, 31, 43, .06), var(--shadow); }
+}
+
+/* ---------- Botoes ---------- */
+.primary-btn {
+  color: #fff;
+  background: var(--accent);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 3px 3px 0 var(--cad-ink);
+}
+.primary-btn:hover { background: var(--accent-2); }
+.primary-btn:active:not(:disabled), .ghost-btn:active:not(:disabled), .danger-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--cad-ink);
+}
+.ghost-btn, .mini-btn, .file-btn {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 2px 2px 0 var(--cad-ink);
+}
+.ghost-btn:hover, .mini-btn:hover { background: var(--cad-yellow-soft); }
+.ghost-btn.selected {
+  color: var(--cad-ink);
+  background: var(--cad-yellow);
+  border-color: var(--cad-ink);
+}
+.danger-btn {
+  color: #fff;
+  background: var(--red);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 2px 2px 0 var(--cad-ink);
+}
+.primary-btn:disabled, .ghost-btn:disabled { box-shadow: none; opacity: .5; }
+.is-busy, .is-done { box-shadow: 2px 2px 0 var(--cad-ink); }
+.is-busy::after { border-color: rgba(255, 255, 255, .45); border-top-color: #fff; }
+.ghost-btn.is-busy::after { border-color: rgba(26, 31, 43, .2); border-top-color: var(--cad-ink); }
+.ghost-btn.just-saved::after { border-color: var(--green); }
+
+/* ---------- Campos de texto ---------- */
+input, select, textarea,
+.toolbar input, .guest-row input, .score-row input, .player-form input, .event-form input, .event-form select,
+.payments-toolbar input, .payments-form input, .payments-form select, .auth-field input, .moment-form input[type="text"],
+.new-group-form input, .new-group-form textarea, .new-group-form select, .club-editor input, .club-editor textarea, .club-editor select {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border-color: var(--line-strong);
+}
+input:focus, select:focus, textarea:focus { outline-color: var(--accent); border-color: var(--cad-ink); }
+::placeholder { color: #8a93a3; }
+
+/* ---------- Etiquetas, avisos e numeros ---------- */
+.metric { background: var(--surface-2); color: var(--ink); border-color: var(--line-strong); }
+.good-pill { color: var(--green-deep); background: #e3f6ea; border-color: var(--green); }
+.warn-pill { color: #8a4b00; background: var(--cad-yellow-soft); border-color: #d9a300; }
+.hint {
+  color: #4a5262;
+  background: var(--cad-yellow-soft);
+  border: 1.5px dashed rgba(26, 31, 43, .35);
+}
+.hint.warn { color: #8a3a00; background: #ffeedd; border-color: #e0a060; }
+.hint.good { color: var(--green-deep); background: #e8f7ee; }
+.empty-state { color: var(--muted); background: var(--surface-2); border-color: var(--line-strong); }
+.counter { color: var(--ink); background: var(--cad-yellow); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.form-sign.negative { color: var(--red); }
+.form-sign.neutral { color: var(--muted); }
+.rating-badge { color: var(--ink); background: var(--surface-2); border-color: var(--line-strong); }
+.tab-badge, .subtab-badge, .notify-badge { border: 1.5px solid var(--cad-ink); }
+.auth-error { color: var(--red); }
+.menu-danger { color: var(--red); }
+
+/* ---------- Conta, menus, janelas ---------- */
+.account-chip { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.account-avatar, .avatar, .auth-account-avatar { color: var(--cad-ink); background: var(--cad-yellow); border: 1.5px solid var(--cad-ink); }
+.account-dropdown, .notify-panel {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  box-shadow: var(--shadow);
+  backdrop-filter: none;
+}
+.menu-item { color: var(--ink); }
+.menu-item:hover { background: var(--cad-yellow-soft); }
+.auth-card {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 6px 6px 0 var(--cad-ink);
+}
+.auth-modal-backdrop { background: rgba(26, 31, 43, .45); }
+.mvp-gate { background: rgba(26, 31, 43, .45); }
+.mvp-gate-card, .award-reveal-card {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border: 2px solid var(--cad-ink);
+  box-shadow: 6px 6px 0 var(--cad-ink);
+}
+.postgame-scale-options button { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); }
+.postgame-scale-options button.selected { color: var(--cad-ink); background: var(--cad-yellow); }
+.app-toast { background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: 4px 4px 0 var(--cad-ink); color: var(--ink); }
+.group-banner { color: var(--ink); background: var(--cad-yellow-soft); border: 2px solid var(--cad-ink); box-shadow: var(--shadow-soft); }
+
+/* ---------- Eu, lupa e onboarding ---------- */
+.me-date { color: var(--cad-ink); background: var(--cad-yellow); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.me-date small { color: var(--cad-ink); }
+.me-bar { background: #e2e6ee; border: 1px solid rgba(26, 31, 43, .25); }
+.me-bar i { background: var(--accent); box-shadow: none; }
+.me-shortcut svg, .me-facts svg { stroke: var(--accent); }
+.me-chip { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); }
+.me-chip.on { color: var(--cad-ink); background: var(--cad-yellow); box-shadow: 2px 2px 0 var(--cad-ink); }
+.search-avatar { color: var(--cad-ink); background: var(--cad-yellow); border: 1.5px solid var(--cad-ink); }
+.fly-dot-inner { background: var(--accent); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.pp-photo-cta { cursor: pointer; }
+
+/* ---------- Perfil, clube e estatisticas ---------- */
+.pp-kpi, .pp-game-metrics span { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.pp-month.active select { color: var(--cad-ink); background: var(--cad-yellow); }
+.pp-review-open { color: var(--ink); background: var(--cad-yellow-soft); border: 2px solid var(--cad-ink); box-shadow: var(--shadow-soft); }
+.pp-review-eyebrow { color: var(--accent); }
+.pp-review-cta { color: #fff; }
+.monthly-hero { color: var(--ink); background: var(--cad-yellow-soft); border: 2px solid var(--cad-ink); }
+.club-fav.on { color: #b97900; }
+.award-count { color: var(--cad-ink); background: var(--cad-yellow); border: 1.5px solid var(--cad-ink); }
+.team-radar-legend, .team-radar-labels { color: var(--ink); }
+.team-radar-odds .team-a, .team-radar-legend .team-a { color: var(--cad-blue); }
+table th { color: var(--muted); background: var(--surface-2); }
+table td { border-color: var(--line); }
+.table-wrap { background: var(--cad-paper); }
+
+/* ---------- Movimento: o salto do separador fica no amarelo ---------- */
+.brand-logo.ring { filter: drop-shadow(2px 2px 0 var(--cad-ink)); }
+
+/* ---------- Acertos depois da primeira volta pelos ecras ---------- */
+.event-card.selected { background: var(--cad-paper); border-color: var(--cad-ink); }
+.event-roster div, .roster-player-chip, .event-admin-adds, .roster-column, .event-team, .event-recruit, .event-more, .mvp-panel select {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.event-recruit.needs-players { background: var(--cad-yellow-soft); }
+input[type="date"], input[type="time"], input[type="datetime-local"], .game-date-control input, .month-picker select {
+  color: var(--ink);
+  background: var(--cad-paper);
+  border: 1.5px solid var(--line-strong);
+  color-scheme: light;
+}
+.pp-review-cta { color: var(--accent); }

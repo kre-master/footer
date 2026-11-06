@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.26.0",
+      date: "2026-11-06",
+      title: "Novo visual: Caderneta",
+      items: [
+        "A app passa a ter o estilo Caderneta: fundo claro, cartões como cromos com contorno e sombra, vermelho nos botões principais e amarelo no que está escolhido.",
+        "Lê-se melhor ao sol, à porta do campo. O campo, as cartas e os vídeos mantêm as cores de sempre.",
+      ],
+    },
+    {
       version: "1.25.1",
       date: "2026-11-05",
       title: "Batimentos em direto no vídeo",

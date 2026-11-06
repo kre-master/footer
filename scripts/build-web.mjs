@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const files = [
   "index.html",
   "styles.css",
+  "theme-caderneta.css",
   "stats-calculations.js",
   "app.js",
   "postgame-feedback.js",
