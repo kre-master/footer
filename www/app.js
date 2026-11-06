@@ -303,7 +303,17 @@ const els = {
 };
 
 let pendingPhotoDataUrl = null;
+// null = a foto nao foi tocada no formulario; so quando muda (nova ou limpa) e que se grava.
+let pendingPhotoChanged = false;
 const photoCache = new Map();
+// Verdadeiro quando a base ja tem photo_thumb/photo_size (supabase/photo-thumbs-migration.sql): a lista de jogadores
+// chega sem a foto grande e esta so se pede quando faz falta. Falso = comportamento antigo (foto inteira em cada jogador).
+let photoThumbsAvailable = false;
+// Depois de uma tentativa leve falhada (base sem migracao) nao se repete nesta visita.
+let lightPlayersUnsupported = false;
+let lightTrackingUnsupported = false;
+const fullPhotoRequests = new Map();
+let photoBackfillRunning = false;
 const cardAssetCache = new Map();
 const pendingGuestPlayers = new Map();
 
@@ -445,6 +455,8 @@ function normalizePlayerRecord(record, index) {
     physical: clampRating(record.physical ?? fallbackRating),
     overall: fallbackRating,
     photoDataUrl: String(record.photoDataUrl || ""),
+    photoThumb: String(record.photoThumb || ""),
+    photoSize: Number(record.photoSize) || 0,
     linkedUserId: record.linkedUserId || null,
     isGuest: Boolean(record.isGuest),
     guestScore0To10: record.guestScore0To10,
@@ -463,13 +475,17 @@ function playerFromRow(row) {
     physical: row.physical,
     overall: row.overall,
     photoDataUrl: row.photo_data_url,
+    photoThumb: row.photo_thumb,
+    photoSize: row.photo_size,
     linkedUserId: row.linked_user_id,
     isGuest: Boolean(row.is_guest),
     guestScore0To10: row.guest_score_0_to_10,
   }, 0);
 }
 
-function playerToRow(playerData) {
+// As fotos so vao na linha quando a base ainda e a antiga; com miniaturas, gravam-se a parte (writePlayerPhotos),
+// porque um upsert em lote sem a foto grande carregada apagava-a.
+function playerToRow(playerData, { photos = !photoThumbsAvailable } = {}) {
   return {
     id: playerData.id,
     name: playerData.name,
@@ -480,7 +496,7 @@ function playerToRow(playerData) {
     defending: playerData.defending,
     physical: playerData.physical,
     overall: playerData.overall,
-    photo_data_url: playerData.photoDataUrl || "",
+    ...(photos ? { photo_data_url: playerData.photoDataUrl || "" } : {}),
     linked_user_id: playerData.linkedUserId || null,
     is_guest: Boolean(playerData.isGuest),
     guest_score_0_to_10: playerData.guestScore0To10 ?? null,
@@ -809,7 +825,10 @@ function saveState() {
   state.attendanceOverrides = attendanceOverrides;
   state.gameFinanceOverrides = gameFinanceOverrides;
   state.financeSettings = financeSettings;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const persisted = remoteEnabled && photoThumbsAvailable
+    ? { ...state, players: state.players.map((playerData) => (playerData.photoThumb ? { ...playerData, photoDataUrl: "" } : playerData)) }
+    : state;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
 }
 
 async function persistState() {
@@ -843,6 +862,7 @@ async function saveRemoteState() {
     const { error } = await supabaseClient.from("players").upsert(players);
     if (error) throw error;
   }
+  await writePlayerPhotos();
 
   if (games.length) {
     const { error } = await supabaseClient.from("games").upsert(games);
@@ -876,6 +896,21 @@ async function saveRemoteState() {
 
   const { error: financeError } = await supabaseClient.from("finance_settings").upsert(financeSettingsRow);
   if (financeError) throw financeError;
+}
+
+// Grava a foto grande e a miniatura so dos jogadores cuja foto mudou neste dispositivo.
+async function writePlayerPhotos() {
+  if (!photoThumbsAvailable || !supabaseClient) return;
+  const dirty = state.players.filter((playerData) => playerData.photoDirty);
+  for (const playerData of dirty) {
+    const { error } = await supabaseClient
+      .from("players")
+      .update({ photo_data_url: playerData.photoDataUrl || "", photo_thumb: playerData.photoThumb || "" })
+      .eq("id", playerData.id);
+    if (error) throw error;
+    fullPhotoRequests.delete(playerData.id);
+    delete playerData.photoDirty;
+  }
 }
 
 function canWriteOfficialData() {
@@ -1198,11 +1233,8 @@ async function loadAccountState() {
   const groupsLoaded = await loadMyGroups();
   groupsLoadedOk = groupsLoaded;
   isAdmin = groupsLoaded ? isGroupAdminRole(getActiveGroup()?.role) : currentProfile?.role === "admin";
-  await loadGroupMemberRoles();
-  await loadMyTraits();
-  await loadMyAvailability();
-  await loadGroupRequests();
-  await loadPlayerClaims();
+  // Depois de conhecer o grupo ativo e o papel, estes pedidos nao dependem uns dos outros.
+  await Promise.all([loadGroupMemberRoles(), loadMyTraits(), loadMyAvailability(), loadGroupRequests(), loadPlayerClaims()]);
 }
 
 async function hasAnyRemoteProfile(visibleProfiles = []) {
@@ -1234,6 +1266,27 @@ async function loadPlayerClaims() {
   playerClaims = data || [];
 }
 
+const PLAYER_LIGHT_COLUMNS = "id, name, pace, shooting, passing, dribbling, defending, physical, overall, updated_at, linked_user_id, is_guest, guest_score_0_to_10, group_id, photo_thumb, photo_size";
+
+// Jogadores do grupo ativo sem a foto grande. Se a base ainda nao tem as colunas novas, volta a pedir tudo como antes.
+async function fetchGroupPlayers({ ordered = true } = {}) {
+  const read = (columns) => {
+    const query = scopeToActiveGroup(supabaseClient.from("players").select(columns));
+    return ordered ? query.order("name", { ascending: true }) : query;
+  };
+  if (!lightPlayersUnsupported) {
+    const light = await read(PLAYER_LIGHT_COLUMNS);
+    if (!light.error) {
+      photoThumbsAvailable = true;
+      return light;
+    }
+  }
+  photoThumbsAvailable = false;
+  const full = await read("*");
+  if (!full.error) lightPlayersUnsupported = true;
+  return full;
+}
+
 async function loadRemoteState() {
   if (!remoteEnabled) return;
   if (!currentSession?.user) {
@@ -1258,7 +1311,7 @@ async function loadRemoteState() {
     { data: rolloutRows, error: rolloutError },
     { data: privateMetricRows, error: privateMetricError },
   ] = await Promise.all([
-    scopeToActiveGroup(supabaseClient.from("players").select("*")).order("name", { ascending: true }),
+    fetchGroupPlayers(),
     scopeToActiveGroup(supabaseClient.from("games").select("*")).order("date", { ascending: false }),
     scopeToActiveGroup(supabaseClient.from("events").select("*")).order("starts_at", { ascending: true }),
     supabaseClient.from("event_responses").select("*").order("updated_at", { ascending: false }),
@@ -1359,17 +1412,22 @@ async function loadRemoteState() {
   financeSettings = state.financeSettings || financeSettings;
   currentEventId = getNextEvent()?.id || state.events[0]?.id || null;
   currentGameId = null;
-  await loadRemoteTracking();
-  await loadRemoteVideos();
-  await loadHomeVideoIndex();
-  await loadRemoteBookmarks();
-  await loadHeartRate();
-  await loadJoinRequests();
-  await loadNoShows();
-  await loadGroupFeedbackAnswers();
-  await loadPublicEvents();
+  // Todos dependem so do estado ja carregado acima (jogos, eventos, grupo ativo), por isso correm em paralelo.
+  // O indice de videos de casa (NAS) nao bloqueia: os jogos mostram o YouTube e passam ao video de casa quando ele chega.
+  loadHomeVideoIndexInBackground();
+  await Promise.all([
+    loadRemoteTracking(),
+    loadRemoteVideos(),
+    loadRemoteBookmarks(),
+    loadHeartRate(),
+    loadJoinRequests(),
+    loadNoShows(),
+    loadGroupFeedbackAnswers(),
+    loadPublicEvents(),
+  ]);
   await refreshPendingInvite();
   saveState();
+  loadMissingPhotosInBackground();
 }
 
 function capturePendingInviteFromUrl() {
@@ -3641,7 +3699,8 @@ async function handleOwnPlayerPhotoSelection(event) {
 async function updateOwnPlayerPhoto(playerId, photoDataUrl) {
   const playerIndex = state.players.findIndex((playerData) => playerData.id === playerId);
   if (playerIndex < 0) return;
-  const updatedPlayer = { ...state.players[playerIndex], photoDataUrl };
+  const photoThumb = photoThumbsAvailable && photoDataUrl ? await makePhotoThumb(photoDataUrl) : "";
+  const updatedPlayer = { ...state.players[playerIndex], photoDataUrl, photoThumb, photoSize: photoDataUrl.length };
   state.players[playerIndex] = updatedPlayer;
   saveState();
 
@@ -3650,10 +3709,12 @@ async function updateOwnPlayerPhoto(playerId, photoDataUrl) {
       .from("players")
       .update({
         photo_data_url: photoDataUrl,
+        ...(photoThumbsAvailable ? { photo_thumb: photoThumb } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", playerId);
     if (error) throw error;
+    fullPhotoRequests.delete(playerId);
   }
 
   render();
@@ -3936,7 +3997,7 @@ function renderProfileHero(playerData, form, variant) {
           ${ratingsVisible() ? `<span class="pp-ovr"><b>${rating}</b> OVR</span>` : ""}
         </div>
         ${renderClubBadge(getActiveGroup())}
-        ${isOwn ? `<label class="ghost-btn pp-photo-cta">${playerData.photoDataUrl ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
+        ${isOwn ? `<label class="ghost-btn pp-photo-cta">${hasPlayerPhoto(playerData) ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
       </div>
     </section>`;
 }
@@ -7536,7 +7597,7 @@ async function createOrReuseGuestPlayer(rawName, rawScore) {
     let players = state.players;
     if (remoteEnabled) {
       if (!supabaseClient) throw new Error("Sem ligacao ao Supabase. Tenta novamente.");
-      const { data, error } = await scopeToActiveGroup(supabaseClient.from("players").select("*"));
+      const { data, error } = await fetchGroupPlayers({ ordered: false });
       if (error) throw error;
       players = (data || []).map(playerFromRow);
     }
@@ -8609,9 +8670,40 @@ function renderPlayerCard(playerData, options = {}) {
   `;
 }
 
+// Miniatura (ou a foto inteira, na base antiga) para ecra; a foto grande so se pede para exportar imagens.
+function getPlayerPhotoSrc(playerData) {
+  return photoUrlForDisplay(playerData.photoThumb || playerData.photoDataUrl || "");
+}
+
+// Cada foto aparece em varias cartas, listas e avatares; como texto (data:) repetia-se no HTML (MB de marcacao por desenho).
+// Como URL de objecto cria-se uma vez e o HTML so leva o endereco curto.
+const photoDisplayUrls = new Map();
+function photoUrlForDisplay(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith("data:") || typeof URL?.createObjectURL !== "function") return dataUrl;
+  let url = photoDisplayUrls.get(dataUrl);
+  if (!url) {
+    try {
+      const comma = dataUrl.indexOf(",");
+      const mime = /^data:([^;,]+)/.exec(dataUrl)?.[1] || "image/jpeg";
+      const binary = atob(dataUrl.slice(comma + 1));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch {
+      return dataUrl;
+    }
+    photoDisplayUrls.set(dataUrl, url);
+  }
+  return url;
+}
+
+function hasPlayerPhoto(playerData) {
+  return Boolean(playerData.photoThumb || playerData.photoDataUrl || playerData.photoSize > 0);
+}
+
 function renderPlayerCardPhoto(playerData) {
-  if (playerData.photoDataUrl) {
-    return `<img src="${escapeHtml(playerData.photoDataUrl)}" alt="">`;
+  if (getPlayerPhotoSrc(playerData)) {
+    return `<img src="${escapeHtml(getPlayerPhotoSrc(playerData))}" alt="">`;
   }
   return `<span>${escapeHtml(initials(playerData.name))}</span>`;
 }
@@ -8667,8 +8759,8 @@ function renderBenchCards(label, players, teamClass, game = null) {
 }
 
 function renderAvatar(playerData) {
-  if (playerData.photoDataUrl) {
-    return `<img class="avatar" src="${escapeHtml(playerData.photoDataUrl)}" alt="">`;
+  if (getPlayerPhotoSrc(playerData)) {
+    return `<img class="avatar" src="${escapeHtml(getPlayerPhotoSrc(playerData))}" alt="">`;
   }
   return `<span class="avatar avatar-fallback">${escapeHtml(initials(playerData.name))}</span>`;
 }
@@ -8904,14 +8996,17 @@ async function handlePhotoSelection(event) {
   if (!file) return;
   try {
     pendingPhotoDataUrl = await resizePhoto(file);
+    pendingPhotoChanged = true;
   } catch (error) {
     alert("Nao consegui carregar essa foto.");
     pendingPhotoDataUrl = null;
+    pendingPhotoChanged = false;
   }
 }
 
 function clearPendingPhoto() {
   pendingPhotoDataUrl = "";
+  pendingPhotoChanged = true;
   if (els.formPhoto) els.formPhoto.value = "";
 }
 
@@ -9022,10 +9117,18 @@ async function savePlayerFromForm(event) {
     defending: clampRating(els.formDefending.value),
     physical: clampRating(els.formPhysical.value),
     overall: clampRating(els.formOverall.value),
-    photoDataUrl: pendingPhotoDataUrl || "",
     isGuest: false,
   };
   if (!values.name) return;
+  // Com miniaturas a foto grande pode nao estar carregada: so se mexe nela quando o formulario a mudou ou limpou.
+  if (!photoThumbsAvailable) {
+    values.photoDataUrl = pendingPhotoDataUrl || "";
+  } else if (pendingPhotoChanged || !state.players.some((p) => p.id === values.id)) {
+    values.photoDataUrl = pendingPhotoDataUrl || "";
+    values.photoThumb = values.photoDataUrl ? await makePhotoThumb(values.photoDataUrl) : "";
+    values.photoSize = values.photoDataUrl.length;
+    values.photoDirty = Boolean(pendingPhotoChanged);
+  }
 
   const index = state.players.findIndex((p) => p.id === values.id);
   if (index >= 0) {
@@ -9052,7 +9155,8 @@ function editPlayer(playerId) {
   els.formPhysical.value = p.physical;
   els.formOverall.value = p.overall;
   updateOverallFromPartialRatings();
-  pendingPhotoDataUrl = p.photoDataUrl || "";
+  pendingPhotoDataUrl = photoThumbsAvailable ? null : p.photoDataUrl || "";
+  pendingPhotoChanged = false;
   showView("players");
 }
 
@@ -9112,6 +9216,7 @@ function clearPlayerForm() {
   if (els.playerForm) els.playerForm.reset();
   if (els.playerId) els.playerId.value = "";
   pendingPhotoDataUrl = null;
+  pendingPhotoChanged = false;
 }
 
 function renderGamesList() {
@@ -10864,14 +10969,32 @@ function trackingEntryFromRow(row) {
   };
 }
 
+// Percursos (timeline.path) ja pedidos a base, por "idDaLinha|etiqueta"; pesam ~40 KB por jogador e so se veem ao abrir a analise.
+const trackingPathCache = new Map();
+const trackingPathRequests = new Map();
+
 async function loadRemoteTracking() {
   if (!window.FooterTracking || !remoteEnabled || !supabaseClient || !currentSession?.user) return;
   const statuses = isAdmin ? ["draft", "published"] : ["published"];
-  const { data, error } = await supabaseClient
-    .from("game_tracking_results")
-    .select("*")
-    .in("status", statuses)
-    .order("revision", { ascending: false });
+  // Sem os percursos (supabase/photo-thumbs-migration.sql): a lista chega 85% mais pequena. Sem a migracao, pede tudo como antes.
+  let light = !lightTrackingUnsupported;
+  let data = null;
+  let error = null;
+  if (light) {
+    ({ data, error } = await supabaseClient
+      .rpc("tracking_results_light")
+      .in("status", statuses)
+      .order("revision", { ascending: false }));
+  }
+  if (!light || error) {
+    light = false;
+    ({ data, error } = await supabaseClient
+      .from("game_tracking_results")
+      .select("*")
+      .in("status", statuses)
+      .order("revision", { ascending: false }));
+    if (!error) lightTrackingUnsupported = true;
+  }
   if (error) {
     console.warn("Tracking load failed. Run supabase/tracking-migration.sql.", error);
     trackingRemote = false;
@@ -10881,6 +11004,7 @@ async function loadRemoteTracking() {
   const remote = {};
   const live = {};
   (data || []).filter(isActiveGroupGameRow).forEach((row) => {
+    if (light) markTrackingPathRefs(row);
     // Admins see the newest revision (draft or published); everyone else only the published one.
     if (!remote[row.game_id]) remote[row.game_id] = trackingEntryFromRow(row);
     if (row.status === "published" && !live[row.game_id]) live[row.game_id] = { revision: row.revision, publishedAt: row.published_at };
@@ -10888,6 +11012,88 @@ async function loadRemoteTracking() {
   // What the group sees, even while an admin looks at a newer draft.
   Object.entries(remote).forEach(([gameId, entry]) => { entry.live = live[gameId] || null; });
   trackingStore = remote;
+}
+
+// Marca cada jogador sem percurso com a referencia para o pedir depois (ou repoe o que ja foi pedido).
+function markTrackingPathRefs(row) {
+  (row.result?.players || []).forEach((p) => {
+    if (!p.timeline || p.timeline.path !== undefined) return;
+    const ref = `${row.id}|${p.label}`;
+    if (trackingPathCache.has(ref)) p.timeline.path = trackingPathCache.get(ref);
+    else p.timeline.pathRef = ref;
+  });
+}
+
+function findTrackingTimelineByRef(ref) {
+  const [rowId, label] = ref.split("|");
+  for (const entry of Object.values(trackingStore)) {
+    if (entry.id !== rowId) continue;
+    return (entry.result?.players || []).find((p) => p.label === label)?.timeline || null;
+  }
+  return null;
+}
+
+async function loadTrackingPath(ref) {
+  if (trackingPathCache.has(ref)) return trackingPathCache.get(ref);
+  if (!trackingPathRequests.has(ref)) {
+    const [rowId, label] = ref.split("|");
+    trackingPathRequests.set(ref, supabaseClient.rpc("tracking_player_path", { p_result_id: rowId, p_label: label })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const path = Array.isArray(data) ? data : [];
+        trackingPathCache.set(ref, path);
+        return path;
+      })
+      .catch((error) => {
+        console.warn("Tracking path load failed", error);
+        return null;
+      })
+      .finally(() => trackingPathRequests.delete(ref)));
+  }
+  const path = await trackingPathRequests.get(ref);
+  const tl = findTrackingTimelineByRef(ref);
+  if (path && tl) tl.path = path;
+  return path ? tl : null;
+}
+
+async function hydrateTrackingPathSlot(slot) {
+  const ref = slot.dataset.pathRef;
+  const tl = ref ? await loadTrackingPath(ref) : null;
+  document.querySelectorAll("[data-path-slot]").forEach((element) => {
+    if (element.dataset.pathRef !== ref) return;
+    element.outerHTML = tl
+      ? renderPlayerPath(tl, Number(element.dataset.pathFrom), Number(element.dataset.pathTo))
+      : `<p class="tracking-fineprint">Nao consegui carregar o percurso.</p>`;
+  });
+}
+
+// O percurso so se pede quando o espaco dele aparece no ecra (por exemplo ao abrir "Analise completa do jogo").
+const pathSlotObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      pathSlotObserver.unobserve(entry.target);
+      hydrateTrackingPathSlot(entry.target);
+    });
+  }, { rootMargin: "600px" })
+  : null;
+let pathSlotWatchQueued = false;
+
+function watchTrackingPathSlots() {
+  pathSlotWatchQueued = false;
+  document.querySelectorAll("[data-path-slot]:not([data-path-watched])").forEach((slot) => {
+    slot.dataset.pathWatched = "1";
+    if (pathSlotObserver) pathSlotObserver.observe(slot);
+    else hydrateTrackingPathSlot(slot);
+  });
+}
+
+if (typeof MutationObserver === "function" && document.body) {
+  new MutationObserver(() => {
+    if (pathSlotWatchQueued) return;
+    pathSlotWatchQueued = true;
+    requestAnimationFrame(watchTrackingPathSlots);
+  }).observe(document.body, { childList: true, subtree: true });
 }
 
 async function importTrackingResult(game, result, mapping, fileName) {
@@ -11198,6 +11404,10 @@ function renderSprintVideoLinks(tl, from, to, videoGameId) {
 
 function renderPlayerPath(tl, from, to) {
   // Path sampled every 2 s; a gap > 4 s is a stretch not seen by the camera and stays unlinked.
+  if (!Array.isArray(tl.path)) {
+    if (!tl.pathRef) return `<p class="tracking-fineprint">Sem percurso neste período.</p>`;
+    return `<div data-path-slot data-path-ref="${escapeHtml(tl.pathRef)}" data-path-from="${from}" data-path-to="${to}"><p class="tracking-fineprint">A carregar o percurso…</p></div>`;
+  }
   const pts = tl.path.filter(([t]) => t >= from && t < to);
   if (pts.length < 2) return `<p class="tracking-fineprint">Sem percurso neste período.</p>`;
   const H = 19.5;
@@ -11821,6 +12031,15 @@ let homeVideoIndex = {};
 
 // Motivo da ultima falha ao ler a lista de videos de casa (vazio = correu bem); aparece na pagina do jogo.
 let homeVideoIndexError = "";
+
+// Arranca a leitura da lista sem esperar por ela e, se chegar, redesenha o que depende do video de casa.
+function loadHomeVideoIndexInBackground() {
+  loadHomeVideoIndex().then(() => {
+    if (homeVideoIndexError) return;
+    renderHistoryGameDetail();
+    renderGallery();
+  }).catch(() => {});
+}
 
 async function loadHomeVideoIndex({ retry = true } = {}) {
   if (!currentSession?.user) return;
@@ -13944,9 +14163,10 @@ async function drawPlayerDot(ctx, playerData, pos, color, game = null) {
   ctx.save();
   roundRect(ctx, photo.x, photo.y, photo.w, photo.h, Math.max(6, width * 0.05));
   ctx.clip();
-  if (playerData.photoDataUrl) {
+  const cardPhotoSrc = hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
+  if (cardPhotoSrc) {
     try {
-      const img = await loadPhoto(playerData.photoDataUrl);
+      const img = await loadPhoto(cardPhotoSrc);
       drawSoftImageCover(ctx, img, photo.x, photo.y, photo.w, photo.h, 6);
     } catch (error) {
       drawInitials(ctx, playerData.name, photo.x + photo.w / 2, photo.y + photo.h / 2, Math.min(photo.w, photo.h));
@@ -14082,9 +14302,10 @@ async function drawPlayerPhoto(ctx, playerData, x, y, size) {
   ctx.arc(x, y, size / 2, 0, Math.PI * 2);
   ctx.clip();
 
-  if (playerData.photoDataUrl) {
+  const dotPhotoSrc = hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
+  if (dotPhotoSrc) {
     try {
-      const img = await loadPhoto(playerData.photoDataUrl);
+      const img = await loadPhoto(dotPhotoSrc);
       ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
     } catch (error) {
       drawInitials(ctx, playerData.name, x, y, size);
@@ -14111,6 +14332,75 @@ function drawInitials(ctx, name, x, y, size) {
   ctx.fillText(initials(name), x, y + 1);
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
+}
+
+// Foto grande de um jogador, pedida so quando faz falta (exportar imagem). Cai na miniatura se a rede falhar.
+async function getFullPhotoSrc(playerData) {
+  if (playerData.photoDataUrl) return playerData.photoDataUrl;
+  if (!photoThumbsAvailable || !supabaseClient || !playerData.photoSize) return playerData.photoThumb || "";
+  if (!fullPhotoRequests.has(playerData.id)) {
+    fullPhotoRequests.set(playerData.id, supabaseClient.from("players").select("photo_data_url").eq("id", playerData.id).maybeSingle()
+      .then(({ data }) => {
+        const src = data?.photo_data_url || "";
+        const index = state.players.findIndex((item) => item.id === playerData.id);
+        if (src && index >= 0) state.players[index] = { ...state.players[index], photoDataUrl: src };
+        return src;
+      })
+      .catch(() => ""));
+  }
+  const src = await fullPhotoRequests.get(playerData.id);
+  if (!src) fullPhotoRequests.delete(playerData.id);
+  return src || playerData.photoThumb || "";
+}
+
+// Reduz uma foto para a miniatura que segue na lista de jogadores (lado maior 300 px, JPEG).
+function makePhotoThumb(src, maxSide = 300, quality = 0.7) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onerror = () => resolve("");
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = src;
+  });
+}
+
+// Jogadores com foto mas sem miniatura (antes da migracao ou fotos antigas): busca-se a foto grande depois do primeiro
+// desenho e, quem pode escrever (admin do grupo ou o proprio jogador), grava a miniatura para as proximas visitas.
+async function loadMissingPhotosInBackground() {
+  if (!photoThumbsAvailable || !supabaseClient || !currentSession?.user || photoBackfillRunning) return;
+  const missing = state.players.filter((playerData) => playerData.photoSize > 0 && !playerData.photoThumb && !playerData.photoDataUrl);
+  if (!missing.length) return;
+  photoBackfillRunning = true;
+  try {
+    const { data, error } = await supabaseClient.from("players").select("id, photo_data_url").in("id", missing.map((playerData) => playerData.id));
+    if (error) return;
+    const full = new Map((data || []).filter((row) => row.photo_data_url).map((row) => [row.id, row.photo_data_url]));
+    if (!full.size) return;
+    state.players = state.players.map((playerData) => (full.has(playerData.id) ? { ...playerData, photoDataUrl: full.get(playerData.id) } : playerData));
+    render();
+    for (const playerData of state.players.filter((item) => full.has(item.id))) {
+      if (!isAdmin && playerData.linkedUserId !== currentSession.user.id) continue;
+      const photoThumb = await makePhotoThumb(full.get(playerData.id));
+      if (!photoThumb) continue;
+      const { error: writeError } = await supabaseClient.from("players").update({ photo_thumb: photoThumb }).eq("id", playerData.id);
+      if (writeError) {
+        console.warn("Thumbnail save failed", writeError);
+        break;
+      }
+      const index = state.players.findIndex((item) => item.id === playerData.id);
+      if (index >= 0) state.players[index] = { ...state.players[index], photoThumb };
+    }
+  } catch (error) {
+    console.warn("Photo backfill failed", error);
+  } finally {
+    photoBackfillRunning = false;
+  }
 }
 
 function loadPhoto(src) {
