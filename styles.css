@@ -8351,3 +8351,48 @@ body.mr-open {
 .reliability-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin: 0 0 14px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 14px; font-size: 14px; }
 .reliability-line small { color: var(--muted); }
 .postgame-admin small.feedback-ignored { opacity: .6; text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* Papeis: laranja = admin do grupo, roxo = dono da app. So quem tem o papel as ve. */
+:root {
+  --role-admin: #ffa94d;
+  --role-admin-soft: rgba(255, 169, 77, .14);
+  --role-owner: #b388ff;
+  --role-owner-soft: rgba(179, 136, 255, .16);
+}
+
+.eyebrow.role-admin { color: var(--role-admin); }
+.eyebrow.role-owner { color: var(--role-owner); }
+
+.panel:has(> .panel-head .role-admin) { border-left: 3px solid var(--role-admin); }
+.panel.admin-only { border-left: 3px solid var(--role-admin); }
+.panel.owner-panel,
+.panel:has(> .panel-head .role-owner) { border-color: rgba(179, 136, 255, .45); border-left: 3px solid var(--role-owner); }
+
+.admin-mode .subtab.admin-only,
+.admin-mode button.admin-only {
+  color: var(--role-admin);
+  border-color: rgba(255, 169, 77, .45);
+  background: var(--role-admin-soft);
+}
+
+.admin-mode:not(.visitor-mode) .account-chip { border-color: rgba(255, 169, 77, .55); }
+.admin-mode:not(.visitor-mode) #data-status { color: var(--role-admin); }
+.owner-mode .account-chip { border-color: rgba(179, 136, 255, .65); }
+.owner-mode #data-status { color: var(--role-owner); }
+
+.menu-item.role-owner-item {
+  color: var(--role-owner);
+  background: var(--role-owner-soft);
+}
+.menu-item.role-owner-item:hover { background: rgba(179, 136, 255, .28); }
+
+.owner-search {
+  width: calc(100% - 36px);
+  margin: 14px 18px 4px;
+  padding: 10px 14px;
+  border: 1px solid rgba(179, 136, 255, .4);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+}
+#all-players-list { padding: 10px 18px 18px; }

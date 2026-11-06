@@ -207,6 +207,61 @@
     return nearest && Math.abs(nearest.t - target) <= MAX_GAP_S ? nearest.hr : null;
   }
 
+  // FC suave no segundo t: o relogio so da uma leitura a cada ~3 s, e os segundos entre leituras sao estimados
+  // com uma curva (cubica monotona: segue a tendencia e nunca passa acima do pico nem abaixo do vale das
+  // leituras vizinhas). Valor decimal; null se nao ha leituras perto (falhas do sensor ficam vazias).
+  function smoothHeartRateAt(samples, t, offsetS = 0) {
+    if (!samples?.length || !Number.isFinite(t)) return null;
+    const target = t + offsetS;
+    let low = 0;
+    let high = samples.length - 1;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (samples[mid].t < target) low = mid + 1;
+      else high = mid;
+    }
+    const b = low;
+    const a = b > 0 && samples[b].t > target ? b - 1 : b;
+    if (a === b || samples[b].t === target) {
+      const exact = samples[b];
+      return Math.abs(exact.t - target) <= MAX_GAP_S ? exact.hr : null;
+    }
+    const p0 = samples[a];
+    const p1 = samples[b];
+    const h = p1.t - p0.t;
+    if (h > MAX_GAP_S) return Math.abs(target - p0.t) <= Math.abs(p1.t - target) && target - p0.t <= MAX_GAP_S ? p0.hr : p1.t - target <= MAX_GAP_S ? p1.hr : null;
+    const slope = (from, to) => (to.hr - from.hr) / (to.t - from.t);
+    const d = slope(p0, p1);
+    const tangent = (index, own) => {
+      const prev = samples[index - 1];
+      const next = samples[index + 1];
+      const before = prev && samples[index].t - prev.t <= MAX_GAP_S ? slope(prev, samples[index]) : null;
+      const after = next && next.t - samples[index].t <= MAX_GAP_S ? slope(samples[index], next) : null;
+      if (before == null || after == null) return own;
+      if (before * after <= 0) return 0;
+      return (before + after) / 2;
+    };
+    let m0 = tangent(a, d);
+    let m1 = tangent(b, d);
+    if (d === 0) {
+      m0 = 0;
+      m1 = 0;
+    } else {
+      const alpha = m0 / d;
+      const beta = m1 / d;
+      const sum = alpha * alpha + beta * beta;
+      if (sum > 9) {
+        const scale = 3 / Math.sqrt(sum);
+        m0 *= scale;
+        m1 *= scale;
+      }
+    }
+    const u = (target - p0.t) / h;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * p0.hr + (u3 - 2 * u2 + u) * h * m0 + (-2 * u3 + 3 * u2) * p1.hr + (u3 - u2) * h * m1;
+  }
+
   // Zonas de esforco pela percentagem da frequencia maxima do jogador (escala habitual de 5 zonas).
   const ZONES = [
     { zone: 1, label: "Leve", from: 0, color: "#59b0ff" },
@@ -268,5 +323,5 @@
     return [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([key, bucket]) => ({ t: key * stepS, hr: Math.round(bucket.sum / bucket.count) }));
   }
 
-  return { parseWorkout, sliceForWindow, summarize, heartRateAt, downsample, zoneFor, zoneSeconds, ZONES, ecgWave, MAX_GAP_S };
+  return { parseWorkout, sliceForWindow, summarize, heartRateAt, smoothHeartRateAt, downsample, zoneFor, zoneSeconds, ZONES, ecgWave, MAX_GAP_S };
 });

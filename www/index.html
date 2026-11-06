@@ -3,15 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#05080f">
+    <meta name="theme-color" content="#eef1f6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Footer">
     <title>Footer</title>
     <link rel="manifest" href="manifest.webmanifest?v=20261010-holofote1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261105-anon1">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
+    <link rel="stylesheet" href="styles.css?v=20261105-owner1">
+    <link rel="stylesheet" href="theme-caderneta.css?v=20261106-cad1">
   </head>
   <body>
     <div class="app-shell">
@@ -38,6 +39,7 @@
             <div class="account-dropdown hidden" id="account-dropdown" role="menu">
               <div class="menu-group hidden" id="group-switcher" role="group" aria-label="Grupo"></div>
               <button class="menu-item" type="button" role="menuitem" data-view="account">Conta</button>
+              <button id="owner-menu-item" class="menu-item role-owner-item hidden" type="button" role="menuitem" data-view="owner">Painel do dono</button>
               <button id="switch-account" class="menu-item hidden" type="button" role="menuitem">Trocar conta</button>
               <button id="admin-login" class="menu-item" type="button" role="menuitem">Entrar</button>
               <button id="account-signup" class="menu-item" type="button" role="menuitem">Criar conta</button>
@@ -129,7 +131,7 @@
             <section class="panel new-game-panel admin-only">
               <div class="panel-head">
                 <div>
-                  <p class="eyebrow">Admin</p>
+                  <p class="eyebrow role-admin">Admin</p>
                   <h2>Nova convocatoria</h2>
                 </div>
               </div>
@@ -337,39 +339,53 @@
           </section>
         </section>
 
-        <section class="view" id="view-claims">
-          <section class="panel wide-panel">
+        <section class="view" id="view-owner">
+          <section class="panel wide-panel owner-panel hidden" id="group-requests-section">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Admin</p>
-                <h2>Convidar jogadores</h2>
-              </div>
-            </div>
-            <div id="invite-panel" class="invite-panel"></div>
-          </section>
-          <section class="panel wide-panel hidden" id="group-requests-section">
-            <div class="panel-head">
-              <div>
-                <p class="eyebrow">Dono da app</p>
+                <p class="eyebrow role-owner">Dono da app</p>
                 <h2>Pedidos de grupos novos</h2>
               </div>
             </div>
             <div id="group-requests-list" class="group-requests-list"></div>
           </section>
-          <section class="panel wide-panel hidden" id="all-groups-section">
+          <section class="panel wide-panel owner-panel hidden" id="all-groups-section">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Dono da app</p>
+                <p class="eyebrow role-owner">Dono da app</p>
                 <h2>Todos os grupos</h2>
               </div>
             </div>
             <p class="hint">Um grupo apagado desaparece logo para todos e pode ser recuperado durante 30 dias. Depois é apagado de vez.</p>
             <div id="all-groups-list" class="club-list"></div>
           </section>
+          <section class="panel wide-panel owner-panel" id="all-players-section">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow role-owner">Dono da app</p>
+                <h2>Todos os jogadores</h2>
+              </div>
+              <span class="metric" id="all-players-count"></span>
+            </div>
+            <input id="all-players-search" class="owner-search" type="search" placeholder="Procurar jogador ou clube" aria-label="Procurar jogador ou clube">
+            <div id="all-players-list" class="club-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-claims">
           <section class="panel wide-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Admin</p>
+                <p class="eyebrow role-admin">Admin</p>
+                <h2>Convidar jogadores</h2>
+              </div>
+            </div>
+            <div id="invite-panel" class="invite-panel"></div>
+          </section>
+          <section class="panel wide-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow role-admin">Admin</p>
                 <h2>Pedidos de associacao</h2>
               </div>
             </div>
@@ -378,7 +394,7 @@
           <section class="panel wide-panel accounts-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Admin</p>
+                <p class="eyebrow role-admin">Admin</p>
                 <h2>Contas criadas</h2>
               </div>
             </div>
@@ -419,7 +435,7 @@
           <section class="panel wide-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Admin</p>
+                <p class="eyebrow role-admin">Admin</p>
                 <h2>Pagamentos</h2>
               </div>
             </div>
@@ -572,9 +588,9 @@
     <script src="player-insights.js?v=20261028-review1"></script>
     <script src="month-review.js?v=20261028-review1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
-    <script src="notifications.js?v=20261105-hr12"></script>
+    <script src="notifications.js?v=20261106-owner2"></script>
     <script src="heart-rate.js?v=20261105-hr9"></script>
     <script src="video-lab.js?v=20261101-casa1"></script>
-    <script src="app.js?v=20261105-ytexto1"></script>
+    <script src="app.js?v=20261105-owner1"></script>
   </body>
 </html>

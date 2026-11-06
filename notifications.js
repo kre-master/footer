@@ -8,6 +8,15 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.26.1",
+      date: "2026-11-06",
+      title: "Painel do dono e cores dos papéis",
+      items: [
+        "O dono da app tem um Painel do dono no menu da conta: pedidos de grupos novos, todos os clubes e todos os jogadores de todos os clubes, com pesquisa.",
+        "Os títulos e botões de admin aparecem a laranja e os do dono da app a roxo, só para quem tem esse papel.",
+      ],
+    },
+    {
       version: "1.26.0",
       date: "2026-11-06",
       title: "Novo visual: Caderneta",

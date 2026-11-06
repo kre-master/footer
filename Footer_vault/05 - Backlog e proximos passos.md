@@ -127,3 +127,8 @@ Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3p
 - [ ] Correr `supabase/no-shows-migration.sql` no projeto "kre-master's Project" e marcar a falta do jogo de 3/11 na pagina do jogo.
 - [ ] Correr `supabase/feedback-privacy-migration.sql` (respostas pos-jogo anonimas).
 - Atencao: ha outra sessao (autor "Maestro") a trabalhar na mesma pasta `~/maestro/footer`; antes de enviar, confirmar `git status` e o cache-buster de `index.html`.
+
+## Pendentes do painel do dono (2026-11-05)
+- Pintar a laranja os botoes de admin gerados por JS (acoes nas linhas de jogadores, etc.).
+- Dono da app poder eliminar jogadores e contas a partir do painel (ver nota 03).
+- Testar o painel no navegador com a conta do dono.

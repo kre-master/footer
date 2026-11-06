@@ -1813,6 +1813,8 @@ async function loadGroupRequests() {
     return;
   }
   isPlatformAdmin = Boolean(platformAdmin);
+  document.body.classList.toggle("owner-mode", isPlatformAdmin);
+  document.querySelector("#owner-menu-item")?.classList.toggle("hidden", !isPlatformAdmin);
   const { data, error } = await supabaseClient.from("group_requests").select("*").order("created_at", { ascending: false });
   if (error) {
     console.warn("Group requests load failed", error);
@@ -2264,6 +2266,7 @@ function updateAccessUi(message) {
   let defaultMode = "Modo local";
   if (remoteEnabled) {
     if (!currentSession) defaultMode = "Online: visitante";
+    else if (isPlatformAdmin) defaultMode = "Online: dono da app";
     else if (isAdmin) defaultMode = "Online: admin";
     else if (linkedPlayer) defaultMode = `Online: ${linkedPlayer.name}`;
     else defaultMode = "Online: conta sem perfil";
@@ -2275,6 +2278,8 @@ function updateAccessUi(message) {
   document.body.classList.toggle("admin-mode", canWriteOfficialData());
   document.body.classList.toggle("non-admin-mode", !canWriteOfficialData());
   document.body.classList.toggle("no-ratings", !ratingsVisible());
+  document.body.classList.toggle("owner-mode", isPlatformAdmin);
+  document.querySelector("#owner-menu-item")?.classList.toggle("hidden", !isPlatformAdmin);
   document.querySelectorAll("#player-form input[type=number]").forEach((input) => { input.required = ratingsVisible(); });
   if (els.adminLogin) els.adminLogin.classList.toggle("hidden", Boolean(currentSession));
   if (els.accountSignup) els.accountSignup.classList.toggle("hidden", Boolean(currentSession) || !remoteEnabled);
@@ -2760,6 +2765,7 @@ const VIEW_GROUPS = {
 let currentTabGroup = "me";
 
 function showView(viewName, options = {}) {
+  if (viewName === "owner" && !isPlatformAdmin) viewName = "me";
   // "O meu mes" vive agora no perfil do proprio jogador, no periodo deste mes.
   const linkedForMonthly = viewName === "monthly" ? getLinkedPlayer() : null;
   if (linkedForMonthly) {
@@ -2794,6 +2800,7 @@ function showView(viewName, options = {}) {
   if (viewName === "club") renderClubPanel();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
+  if (viewName === "owner") loadOwnerPanel();
   if (viewName === "me") renderMePanel();
   if (viewName === "search") renderSearchPanel();
   renderGroupBanner();
@@ -2852,6 +2859,7 @@ function bindNavigation() {
     }
     showView(item.dataset.view);
   }));
+  on(document.querySelector("#all-players-search"), "input", renderAllPlayersList);
   on(document.querySelector("#switch-account"), "click", async () => {
     await adminLogout();
     openLoginModal();
@@ -10558,11 +10566,52 @@ async function loadAllGroups() {
   renderAllGroupsList();
 }
 
+// Painel do dono: grupos, pedidos e todos os jogadores de todos os clubes.
+let allPlayers = [];
+
+async function loadOwnerPanel() {
+  renderGroupRequestsList();
+  await Promise.all([loadAllGroups(), loadAllPlayers()]);
+}
+
+async function loadAllPlayers() {
+  if (!isPlatformAdmin || !supabaseClient) {
+    allPlayers = [];
+  } else {
+    const { data, error } = await supabaseClient.rpc("list_all_players");
+    if (error) console.warn("Players list failed. Run supabase/platform-panel-migration.sql.", error);
+    allPlayers = error ? [] : data || [];
+  }
+  renderAllPlayersList();
+}
+
+function renderAllPlayersList() {
+  const list = document.querySelector("#all-players-list");
+  if (!list) return;
+  const fold = (text) => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const term = fold(document.querySelector("#all-players-search")?.value || "");
+  const rows = allPlayers.filter((item) => !term || fold(`${item.name} ${item.group_name} ${item.account_name || ""}`).includes(term));
+  const count = document.querySelector("#all-players-count");
+  if (count) count.textContent = `${rows.length} ${rows.length === 1 ? "jogador" : "jogadores"}`;
+  list.innerHTML = rows.length ? rows.map((item) => `
+    <div class="club-row">
+      <div class="club-row-text">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.group_name)}${item.is_guest ? " · convidado" : ""}${item.account_name ? ` · conta ${escapeHtml(item.account_name)}` : " · sem conta"}</small>
+      </div>
+      ${item.is_guest ? "" : `<span class="metric">OVR ${item.overall}</span>`}
+    </div>`).join("") : `<div class="empty-state">Nenhum jogador encontrado.</div>`;
+}
+
 function renderAllGroupsList() {
   const section = document.querySelector("#all-groups-section");
   const list = document.querySelector("#all-groups-list");
   if (!section || !list) return;
-  section.classList.toggle("hidden", !isPlatformAdmin || !allGroups.length);
+  section.classList.toggle("hidden", !isPlatformAdmin);
+  if (!allGroups.length) {
+    list.innerHTML = `<div class="empty-state">Nao ha grupos.</div>`;
+    return;
+  }
   list.innerHTML = allGroups.map((item) => `
     <div class="club-row">
       <div class="club-row-text">

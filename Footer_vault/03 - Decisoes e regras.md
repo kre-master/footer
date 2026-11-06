@@ -287,6 +287,11 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Ideia por fazer: assinalar quem responde sempre igual em todos os jogos.
 - 2026-11-05 (2): as respostas pos-jogo passam a ser anonimas para todos, incluindo admins. Cada conta so le as proprias (RLS); medias e regra vem de `group_feedback_answers` (sem quem respondeu). O admin ve so medias, numero de respostas e quantas nao contam (com os motivos agregados). Novo sinal "sempre a mesma resposta": mesma resposta nos ultimos 4 jogos seguidos -> a intensidade nao conta (a forma sim).
 
+
+## Papeis visiveis (2026-11-05)
+- Laranja = admin do grupo; roxo = dono da app. Etiquetas, barras laterais e o cartao da conta usam a cor do papel; so quem tem o papel as ve.
+- O dono da app tem um Painel do dono proprio no menu da conta (clubes, pedidos, todos os jogadores de todos os clubes), em vez de paineis soltos dentro de Clube.
+
 ## Tema Caderneta (decidido 2026-11-06)
 
 - O tema oficial passa a ser "Caderneta" (substitui o Holofote): papel claro com pontinhos, paineis e cartoes como cromos (contorno a tinta de 2 px e sombra solida), vermelho de destaque, amarelo de autocolante para o que esta seleccionado, letra Lilita One nos titulos e Nunito no texto.

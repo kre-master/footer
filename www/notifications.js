@@ -8,6 +8,94 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.26.1",
+      date: "2026-11-06",
+      title: "Painel do dono e cores dos papéis",
+      items: [
+        "O dono da app tem um Painel do dono no menu da conta: pedidos de grupos novos, todos os clubes e todos os jogadores de todos os clubes, com pesquisa.",
+        "Os títulos e botões de admin aparecem a laranja e os do dono da app a roxo, só para quem tem esse papel.",
+      ],
+    },
+    {
+      version: "1.26.0",
+      date: "2026-11-06",
+      title: "Novo visual: Caderneta",
+      items: [
+        "A app passa a ter o estilo Caderneta: fundo claro, cartões como cromos com contorno e sombra, vermelho nos botões principais e amarelo no que está escolhido.",
+        "Lê-se melhor ao sol, à porta do campo. O campo, as cartas e os vídeos mantêm as cores de sempre.",
+      ],
+    },
+    {
+      version: "1.25.1",
+      date: "2026-11-05",
+      title: "Batimentos em direto no vídeo",
+      items: [
+        "Em cima do vídeo, a pilula dos batimentos mostra agora a tua curva real dos últimos 30 segundos, com a cor da zona e a cauda a esbater-se.",
+        "Podes carregar o treino do relógio logo depois do jogo, mesmo sem vídeo. Quando houver vídeo, liga-se pela hora do jogo.",
+      ],
+    },
+    {
+      version: "1.25.0",
+      date: "2026-11-05",
+      title: "Respostas pós-jogo anónimas",
+      items: [
+        "Ninguém, nem o admin, vê o que cada jogador respondeu no questionário pós-jogo. O admin vê só as médias do jogo e quantas respostas não contaram.",
+        "Quem dá exactamente a mesma resposta em 4 jogos seguidos deixa de contar para a intensidade do jogo.",
+      ],
+    },
+    {
+      version: "1.24.0",
+      date: "2026-11-05",
+      title: "Respostas pós-jogo mais justas",
+      items: [
+        "Respostas ao questionário pós-jogo dadas sem interesse deixam de contar para a média do jogo: intensidade muito longe da dos colegas, ao contrário do que o vídeo mostra da corrida, ou 1 e 1 em tudo.",
+        "Nas calorias, quando a tua intensidade não conta, usa-se a dos colegas.",
+        "O admin vê no jogo quais respostas não contaram e porquê.",
+      ],
+    },
+    {
+      version: "1.23.0",
+      date: "2026-11-05",
+      title: "Faltas (só admins)",
+      items: [
+        "Quando um admin tira das equipas alguém que tinha dito Vou, a app pergunta se faltou.",
+        "Na página de um jogo fechado, o admin vê quem disse Vou e não jogou, e marca ou desfaz a falta.",
+        "No perfil, os admins veem quantas vezes o jogador disse Vou e apareceu. Os jogadores não veem isto.",
+      ],
+    },
+    {
+      version: "1.22.1",
+      date: "2026-11-05",
+      title: "Convocatória fechada não volta",
+      items: [
+        "Uma convocatória cujo jogo já tem resultado deixa de aparecer em Jogos, mesmo que as equipas não tenham sido exactamente os que disseram Vou.",
+      ],
+    },
+    {
+      version: "1.22.0",
+      date: "2026-11-05",
+      title: "Pequenos movimentos e clubes sem notas",
+      items: [
+        "Os botões que gravam mostram uma roda e acabam num visto; o Vou dá um pequeno salto.",
+        "Ao pedir para jogar, uma bola voa até Jogos. As listas chegam em cascata, o símbolo das novidades balança quando há coisas novas e a tua carta vira quando a crias.",
+        "Nos Pedidos, desliza para a direita para aprovar e para a esquerda para rejeitar.",
+        "Nos clubes novos não há notas: no lugar do número a carta mostra o emblema do clube, todos começam iguais e as equipas equilibram-se pela forma.",
+        "No teu perfil há um botão para pores a tua foto.",
+      ],
+    },
+    {
+      version: "1.21.0",
+      date: "2026-11-05",
+      title: "Barra nova e entrada mais fácil",
+      items: [
+        "A barra passa a ser Eu, Jogos, Arquivo, Clube e uma lupa. O Arquivo junta os jogos, os vídeos e o Hall of Fame; o Admin passa para dentro do Clube (Pagamentos e Pedidos).",
+        "No Eu vês logo o próximo jogo para responder, os jogos abertos de outros grupos e quando podes jogar.",
+        "A lupa procura jogadores dos teus clubes e clubes com perfil público.",
+        "Quem entra por convite vê a cara do grupo, cria conta e entra logo, escolhe a sua carta e pode responder às convocatórias enquanto o admin confirma.",
+        "Ao criar um clube escolhes o dia e a hora habituais: a convocatória seguinte já vem preenchida.",
+      ],
+    },
+    {
       version: "1.20.1",
       date: "2026-11-02",
       title: "Vídeo mais fluido",
