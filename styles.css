@@ -8396,3 +8396,33 @@ body.mr-open {
   background: var(--surface);
 }
 #all-players-list { padding: 10px 18px 18px; }
+
+/* Dono da app: eliminar jogadores e contas (2026-11-06) */
+#all-accounts-list { padding: 10px 18px 18px; }
+#all-accounts-section .hint { margin: 12px 18px 0; }
+#all-players-list .club-row, .owner-account-row { flex-wrap: wrap; }
+#all-players-list .club-row-text, .owner-account-row .club-row-text { flex: 1 1 180px; min-width: 0; }
+.owner-account-row .club-row-text small { overflow-wrap: anywhere; }
+.ghost-btn.owner-danger { color: var(--red); }
+.owner-confirm {
+  flex: 1 1 100%;
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1.5px dashed var(--red);
+  border-radius: 12px;
+  background: rgba(255, 93, 102, .08);
+}
+.owner-confirm p { margin: 0; font-size: 14px; }
+.owner-confirm .actions { margin: 0; }
+
+/* Botoes de admin gerados pela app (convocatoria, equipas, historico) tambem a laranja */
+.admin-mode .admin-actions :is(.ghost-btn, .mini-btn):not(.danger-btn),
+.admin-mode #edit-tools :is(.ghost-btn, .mini-btn),
+.admin-mode .history-roster-section :is(.ghost-btn, .mini-btn),
+.admin-mode .event-roster .mini-btn {
+  color: var(--role-admin);
+  border-color: rgba(255, 169, 77, .55);
+  background: var(--role-admin-soft);
+}

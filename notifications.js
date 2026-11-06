@@ -8,6 +8,17 @@
   // Cada push com mudancas para os jogadores acrescenta uma entrada no topo, em linguagem simples.
   const CHANGELOG = [
     {
+      version: "1.27.0",
+      date: "2026-11-06",
+      title: "Dono da app: eliminar jogadores e contas",
+      items: [
+        "No Painel do dono há um botão Eliminar em cada jogador e uma lista nova com todas as contas.",
+        "Um jogador que já jogou fica como \"Jogador removido\" (sem foto nem conta) para não estragar resultados e pagamentos; sem jogos, é apagado.",
+        "Uma conta eliminada é apagada de vez; as fichas de jogador ficam no clube. Contas donas de um clube ou da app não se eliminam aqui.",
+        "Os botões só de admin dentro das convocatórias e das equipas aparecem a laranja.",
+      ],
+    },
+    {
       version: "1.26.1",
       date: "2026-11-06",
       title: "Painel do dono e cores dos papéis",

@@ -2860,6 +2860,7 @@ function bindNavigation() {
     showView(item.dataset.view);
   }));
   on(document.querySelector("#all-players-search"), "input", renderAllPlayersList);
+  on(document.querySelector("#all-accounts-search"), "input", renderAllAccountsList);
   on(document.querySelector("#switch-account"), "click", async () => {
     await adminLogout();
     openLoginModal();
@@ -10571,7 +10572,7 @@ let allPlayers = [];
 
 async function loadOwnerPanel() {
   renderGroupRequestsList();
-  await Promise.all([loadAllGroups(), loadAllPlayers()]);
+  await Promise.all([loadAllGroups(), loadAllPlayers(), loadAllAccounts()]);
 }
 
 async function loadAllPlayers() {
@@ -10600,7 +10601,153 @@ function renderAllPlayersList() {
         <small>${escapeHtml(item.group_name)}${item.is_guest ? " · convidado" : ""}${item.account_name ? ` · conta ${escapeHtml(item.account_name)}` : " · sem conta"}</small>
       </div>
       ${item.is_guest ? "" : `<span class="metric">OVR ${item.overall}</span>`}
+      ${item.name === "Jogador removido" ? "" : `<button type="button" class="ghost-btn owner-danger" data-owner-player="${escapeHtml(item.id)}">Eliminar</button>`}
+      ${ownerConfirm?.kind === "player" && ownerConfirm.id === item.id ? renderOwnerConfirm(ownerConfirm) : ""}
     </div>`).join("") : `<div class="empty-state">Nenhum jogador encontrado.</div>`;
+  list.querySelectorAll("[data-owner-player]").forEach((button) => button.addEventListener("click", () => askDeletePlayer(button.dataset.ownerPlayer)));
+  bindOwnerConfirm(list);
+}
+
+// ---- Dono da app: eliminar jogadores e contas (supabase/platform-delete-migration.sql) ----
+let allAccounts = [];
+let ownerConfirm = null;
+const OWNER_DELETE_ERRORS = {
+  cannot_delete_self: "Nao podes eliminar a tua propria conta aqui.",
+  cannot_delete_platform_admin: "Esta conta e dona da app. Nao pode ser eliminada aqui.",
+  owns_groups: "Esta conta e dona de um clube. Apaga o clube ou passa-o a outra pessoa primeiro.",
+  player_not_found: "Este jogador ja nao existe.",
+  account_not_found: "Esta conta ja nao existe.",
+  platform_admin_required: "So o dono da app pode fazer isto.",
+};
+
+function ownerErrorMessage(error) {
+  const key = Object.keys(OWNER_DELETE_ERRORS).find((code) => String(error?.message || "").includes(code));
+  return key ? OWNER_DELETE_ERRORS[key] : `Nao consegui: ${error?.message || "erro inesperado"}.`;
+}
+
+async function loadAllAccounts() {
+  if (!isPlatformAdmin || !supabaseClient) {
+    allAccounts = [];
+  } else {
+    const { data, error } = await supabaseClient.rpc("list_all_accounts");
+    if (error) console.warn("Accounts list failed. Run supabase/platform-delete-migration.sql.", error);
+    allAccounts = error ? [] : data || [];
+  }
+  renderAllAccountsList();
+}
+
+function getAccountBlockReason(account) {
+  if (account.id === currentSession?.user?.id) return "a tua conta";
+  if (account.is_platform_admin) return "dona da app";
+  if (account.owned_groups) return "dona de um clube";
+  return "";
+}
+
+function renderAllAccountsList() {
+  const list = document.querySelector("#all-accounts-list");
+  if (!list) return;
+  const fold = (text) => String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const term = fold(document.querySelector("#all-accounts-search")?.value || "");
+  const rows = allAccounts.filter((item) => !term || fold(`${item.display_name} ${item.username} ${item.email} ${item.groups || ""}`).includes(term));
+  const count = document.querySelector("#all-accounts-count");
+  if (count) count.textContent = `${rows.length} ${rows.length === 1 ? "conta" : "contas"}`;
+  list.innerHTML = rows.length ? rows.map((item) => {
+    const blocked = getAccountBlockReason(item);
+    return `
+      <div class="club-row owner-account-row">
+        <div class="club-row-text">
+          <strong>${escapeHtml(item.display_name || item.username || "Conta")}</strong>
+          <small>${escapeHtml(item.email || "")}${item.username ? ` · ${escapeHtml(item.username)}` : ""}</small>
+          <small>${item.groups ? escapeHtml(item.groups) : "Sem clube"} · ultima entrada ${item.last_sign_in_at ? formatDate(item.last_sign_in_at) : "nunca"}</small>
+        </div>
+        ${blocked
+          ? `<span class="metric">${escapeHtml(blocked)}</span>`
+          : `<button type="button" class="ghost-btn owner-danger" data-owner-account="${escapeHtml(item.id)}">Eliminar</button>`}
+        ${ownerConfirm?.kind === "account" && ownerConfirm.id === item.id ? renderOwnerConfirm(ownerConfirm) : ""}
+      </div>`;
+  }).join("") : `<div class="empty-state">Nenhuma conta encontrada.</div>`;
+  list.querySelectorAll("[data-owner-account]").forEach((button) => button.addEventListener("click", () => askDeleteAccount(button.dataset.ownerAccount)));
+  bindOwnerConfirm(list);
+}
+
+function renderOwnerConfirm(confirmData) {
+  return `
+    <div class="owner-confirm" role="group" aria-label="Confirmar eliminacao">
+      <p>${confirmData.text}</p>
+      <div class="actions">
+        <button type="button" class="danger-btn" data-owner-confirm>${escapeHtml(confirmData.action)}</button>
+        <button type="button" class="ghost-btn" data-owner-cancel>Cancelar</button>
+      </div>
+    </div>`;
+}
+
+function bindOwnerConfirm(root) {
+  root.querySelector("[data-owner-cancel]")?.addEventListener("click", () => {
+    ownerConfirm = null;
+    renderAllPlayersList();
+    renderAllAccountsList();
+  });
+  root.querySelector("[data-owner-confirm]")?.addEventListener("click", (event) => runOwnerDelete(event.currentTarget));
+}
+
+async function askDeletePlayer(playerId) {
+  const item = allPlayers.find((row) => row.id === playerId);
+  if (!item) return;
+  const { data, error } = await supabaseClient.rpc("platform_player_impact", { p_player_id: playerId });
+  if (error) {
+    alert(ownerErrorMessage(error));
+    return;
+  }
+  const impact = data?.[0] || { games: 0, payments: 0, has_account: false };
+  const name = `<strong>${escapeHtml(item.name)}</strong> (${escapeHtml(item.group_name)})`;
+  ownerConfirm = {
+    kind: "player",
+    id: playerId,
+    action: impact.games ? "Tornar anonimo" : "Eliminar jogador",
+    text: impact.games
+      ? `${name} jogou ${impact.games} ${impact.games === 1 ? "jogo" : "jogos"}. Para nao estragar resultados e pagamentos, a ficha fica como "Jogador removido", sem foto${impact.has_account ? " e sem ligacao a conta" : ""}.`
+      : `${name} nao tem jogos. A ficha e apagada de vez${impact.payments ? `, com ${impact.payments} ${impact.payments === 1 ? "registo de pagamento" : "registos de pagamento"}` : ""}.`,
+  };
+  renderAllPlayersList();
+  renderAllAccountsList();
+}
+
+function askDeleteAccount(userId) {
+  const item = allAccounts.find((row) => row.id === userId);
+  if (!item || getAccountBlockReason(item)) return;
+  const parts = [
+    item.groups ? `sai de ${escapeHtml(item.groups)}` : "",
+    item.linked_players ? `${item.linked_players} ${item.linked_players === 1 ? "ficha de jogador fica" : "fichas de jogador ficam"} no clube, sem conta` : "",
+    item.moments ? `${item.moments} ${item.moments === 1 ? "momento marcado e apagado" : "momentos marcados sao apagados"}` : "",
+  ].filter(Boolean);
+  ownerConfirm = {
+    kind: "account",
+    id: userId,
+    action: "Eliminar conta",
+    text: `A conta <strong>${escapeHtml(item.display_name || item.email || "")}</strong> e apagada de vez e a pessoa deixa de conseguir entrar.${parts.length ? ` Tambem: ${parts.join("; ")}.` : ""}`,
+  };
+  renderAllPlayersList();
+  renderAllAccountsList();
+}
+
+async function runOwnerDelete(button) {
+  const target = ownerConfirm;
+  if (!target || !supabaseClient) return;
+  let failure = null;
+  await runWithButton(button, async () => {
+    const { error } = target.kind === "player"
+      ? await supabaseClient.rpc("platform_delete_player", { p_player_id: target.id })
+      : await supabaseClient.rpc("platform_delete_account", { p_user_id: target.id });
+    failure = error;
+    return !error;
+  });
+  if (failure) {
+    alert(ownerErrorMessage(failure));
+    return;
+  }
+  ownerConfirm = null;
+  await Promise.all([loadAllPlayers(), loadAllAccounts()]);
+  if (target.kind === "player") await loadRemoteState().then(render).catch(() => {});
 }
 
 function renderAllGroupsList() {

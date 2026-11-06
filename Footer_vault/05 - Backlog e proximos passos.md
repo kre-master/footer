@@ -123,12 +123,12 @@ Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3p
 - [x] Micro-interaccoes (feitas na 1.22.0; proposta de 2026-11-05: voar para o carrinho, botao que vira visto, listas em cascata, deslizar para responder, virar carta, sino a balancar).
 - [ ] Piloto: enviar o convite ao admin do clube de teste e observar (tempo ate a primeira convocatoria, quem entra sem ajuda).
 - [ ] Notas nos clubes novos: pensar numa forma justa e pouco trabalhosa (por agora escondidas; todos iguais e equilibrio pela forma).
-- [ ] Dono da app: eliminar jogadores e contas (migracao para o utilizador correr).
+- [x] Dono da app: eliminar jogadores e contas (1.27.0).
 - [ ] Correr `supabase/no-shows-migration.sql` no projeto "kre-master's Project" e marcar a falta do jogo de 3/11 na pagina do jogo.
 - [ ] Correr `supabase/feedback-privacy-migration.sql` (respostas pos-jogo anonimas).
 - Atencao: ha outra sessao (autor "Maestro") a trabalhar na mesma pasta `~/maestro/footer`; antes de enviar, confirmar `git status` e o cache-buster de `index.html`.
 
 ## Pendentes do painel do dono (2026-11-05)
-- Pintar a laranja os botoes de admin gerados por JS (acoes nas linhas de jogadores, etc.).
-- Dono da app poder eliminar jogadores e contas a partir do painel (ver nota 03).
+- [x] Pintar a laranja os botoes de admin gerados por JS (1.27.0).
+- [x] Dono da app poder eliminar jogadores e contas a partir do painel (1.27.0; falta correr `supabase/platform-delete-migration.sql`).
 - Testar o painel no navegador com a conta do dono.

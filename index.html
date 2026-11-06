@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261105-owner1">
-    <link rel="stylesheet" href="theme-caderneta.css?v=20261106-cad1">
+    <link rel="stylesheet" href="styles.css?v=20261106-owner3">
+    <link rel="stylesheet" href="theme-caderneta.css?v=20261106-owner3">
   </head>
   <body>
     <div class="app-shell">
@@ -370,6 +370,18 @@
             <input id="all-players-search" class="owner-search" type="search" placeholder="Procurar jogador ou clube" aria-label="Procurar jogador ou clube">
             <div id="all-players-list" class="club-list"></div>
           </section>
+          <section class="panel wide-panel owner-panel" id="all-accounts-section">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow role-owner">Dono da app</p>
+                <h2>Todas as contas</h2>
+              </div>
+              <span class="metric" id="all-accounts-count"></span>
+            </div>
+            <p class="hint">Eliminar uma conta apaga-a de vez. As fichas de jogador ficam no clube, sem conta. Contas donas de um clube ou da app nao se eliminam aqui.</p>
+            <input id="all-accounts-search" class="owner-search" type="search" placeholder="Procurar nome, email ou clube" aria-label="Procurar conta">
+            <div id="all-accounts-list" class="club-list owner-list"></div>
+          </section>
         </section>
 
         <section class="view" id="view-claims">
@@ -588,9 +600,9 @@
     <script src="player-insights.js?v=20261028-review1"></script>
     <script src="month-review.js?v=20261028-review1"></script>
     <script src="tracking-metrics.js?v=20261012-vel2s"></script>
-    <script src="notifications.js?v=20261106-owner2"></script>
+    <script src="notifications.js?v=20261106-owner3"></script>
     <script src="heart-rate.js?v=20261105-hr9"></script>
     <script src="video-lab.js?v=20261101-casa1"></script>
-    <script src="app.js?v=20261105-owner1"></script>
+    <script src="app.js?v=20261106-owner3"></script>
   </body>
 </html>

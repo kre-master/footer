@@ -296,3 +296,9 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 
 - O tema oficial passa a ser "Caderneta" (substitui o Holofote): papel claro com pontinhos, paineis e cartoes como cromos (contorno a tinta de 2 px e sombra solida), vermelho de destaque, amarelo de autocolante para o que esta seleccionado, letra Lilita One nos titulos e Nunito no texto.
 - Esta num ficheiro a parte, `theme-caderneta.css`, carregado depois de `styles.css`; tirar o `<link>` do index.html volta ao Holofote. Campo, cartas, leitor de video, galeria e revisao do mes em ecra cheio mantem as cores proprias.
+
+## Dono da app: eliminar jogadores e contas (2026-11-06)
+
+- So o dono da app (private.platform_admins), no Painel do dono, com confirmacao que diz o que vai acontecer.
+- Jogador que ja jogou nao e apagado: fica anonimo ("Jogador removido", sem foto, sem conta, sem pedidos de associacao nem metricas privadas), para nao estragar resultados, estatisticas dos outros e pagamentos. Jogador sem jogos e apagado (com os pagamentos que tiver).
+- Conta eliminada e apagada de vez (perfil, grupos, caracteristicas, disponibilidade, momentos marcados); as fichas de jogador ficam no clube, sem conta. Nao se eliminam: a propria conta, outros donos da app e donos de clubes (apagar ou passar o clube primeiro).

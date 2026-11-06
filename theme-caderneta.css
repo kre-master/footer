@@ -257,3 +257,28 @@ input[type="date"], input[type="time"], input[type="datetime-local"], .game-date
   color-scheme: light;
 }
 .pp-review-cta { color: var(--accent); }
+
+/* ---------- Papeis no tema claro: laranja e roxo mais escuros para se lerem no papel ---------- */
+:root {
+  --role-admin: #b85400;
+  --role-admin-soft: #fff0e0;
+  --role-owner: #6a3fd0;
+  --role-owner-soft: #f1ebff;
+}
+.panel.owner-panel, .panel:has(> .panel-head .role-owner) { border-color: var(--cad-ink); border-left: 6px solid var(--role-owner); }
+.panel.admin-only, .panel:has(> .panel-head .role-admin) { border-left: 6px solid var(--role-admin); }
+.admin-mode .subtab.admin-only, .admin-mode button.admin-only,
+.admin-mode .admin-actions :is(.ghost-btn, .mini-btn):not(.danger-btn),
+.admin-mode #edit-tools :is(.ghost-btn, .mini-btn),
+.admin-mode .history-roster-section :is(.ghost-btn, .mini-btn),
+.admin-mode .event-roster .mini-btn {
+  color: var(--role-admin);
+  background: var(--role-admin-soft);
+  border-color: var(--cad-ink);
+}
+.admin-mode .subtab.admin-only.active { background: var(--cad-yellow); color: var(--cad-ink); }
+.owner-search { border: 2px solid var(--cad-ink); background: var(--cad-paper); }
+.owner-mode .account-chip { border-color: var(--role-owner); }
+.admin-mode:not(.visitor-mode) .account-chip { border-color: var(--role-admin); }
+.owner-mode.admin-mode .account-chip { border-color: var(--role-owner); }
+.owner-confirm { background: #fff1f1; border-color: var(--red); }
