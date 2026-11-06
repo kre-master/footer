@@ -8426,3 +8426,21 @@ body.mr-open {
   border-color: rgba(255, 169, 77, .55);
   background: var(--role-admin-soft);
 }
+
+/* Arranque a quente: barra fina enquanto a app actualiza os dados por tras (os toques ficam em espera). */
+body.boot-refreshing::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  height: 3px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--accent, #3b8cff), transparent) 0 0 / 40% 100% no-repeat;
+  animation: boot-refresh-bar 1s linear infinite;
+}
+@keyframes boot-refresh-bar { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  body.boot-refreshing::before { animation: none; background-size: 100% 100%; opacity: .6; }
+}

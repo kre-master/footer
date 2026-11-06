@@ -1,4 +1,16 @@
 const STORAGE_KEY = "five-a-side-balancer-state-v1";
+// Ultima copia dos dados da conta e do grupo, para desenhar logo ao abrir e actualizar por tras (ver warmStart).
+const BOOT_CACHE_KEY = "footer-boot-cache-v1";
+const BOOT_CACHE_VERSION = 1;
+const BOOT_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+// Se a actualizacao por tras nao acabar neste tempo (rede pendurada), volta-se a copia e libertam-se os toques.
+const BOOT_REFRESH_TIMEOUT_MS = 8000;
+// Declaradas aqui, antes de initApp(), porque render() e saveState() as leem.
+let bootCacheReady = false;
+let bootCacheTimer = null;
+let bootRefreshActive = false;
+let bootRefreshDirty = false;
+let bootRefreshPendingClick = null;
 const PostgameRules = window.FooterPostgame || {
   isScaleValue: (value) => Number.isInteger(value) && value >= 1 && value <= 10,
   isCheckinRequired: ({ hasVote = false, hasFeedback = false, isTransitionGame = false, isAfterRollout = false, isBeforeRollout = false } = {}) => !hasFeedback && !isBeforeRollout && (isTransitionGame ? !hasVote : Boolean(isAfterRollout)),
@@ -825,10 +837,15 @@ function saveState() {
   state.attendanceOverrides = attendanceOverrides;
   state.gameFinanceOverrides = gameFinanceOverrides;
   state.financeSettings = financeSettings;
-  const persisted = remoteEnabled && photoThumbsAvailable
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(getPersistableState()));
+  scheduleBootCacheSave();
+}
+
+// Com miniaturas, a copia local nao leva a foto grande.
+function getPersistableState() {
+  return remoteEnabled && photoThumbsAvailable
     ? { ...state, players: state.players.map((playerData) => (playerData.photoThumb ? { ...playerData, photoDataUrl: "" } : playerData)) }
     : state;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
 }
 
 async function persistState() {
@@ -973,10 +990,190 @@ function bindEvents() {
 
 async function initApp() {
   capturePendingInviteFromUrl();
+  // Com a copia da ultima visita desenha-se logo e a rede actualiza por tras; sem ela, espera-se pelos dados como antes.
+  if (await warmStart()) {
+    updateAccessUi();
+    applyLandingRoute();
+    render();
+    setupNavigationHistory();
+    await refreshAfterWarmStart();
+    return;
+  }
   await initRemote();
   applyLandingRoute();
   render();
   setupNavigationHistory();
+}
+
+// ---- Arranque a quente ----
+// Tudo o que o primeiro desenho precisa e que normalmente vem da rede.
+function captureBootVars() {
+  return {
+    account: { currentProfile, knownProfiles, playerClaims, myGroups, activeGroupId, groupsLoadedOk, isAdmin, isPlatformAdmin, groupRequests, groupMemberRoles: [...groupMemberRoles], myTraits, myAvailability, myWeeklyAvailability, myAvailabilitySettings },
+    remote: {
+      state: getPersistableState(), eventResponses, gameMvpVotes, gameFeedback, featureRollouts, privateWeightHistory, mvpVoteCounts,
+      payments, attendanceOverrides, gameFinanceOverrides, financeSettings, currentEventId, trackingStore, gameVideos, videoBookmarks,
+      heartRateEntries, joinRequests, requesterTraits: [...requesterTraits], eventNoShows, noShowsAvailable, groupFeedbackAnswers, publicEvents, homeVideoIndex,
+    },
+    flags: { trackingRemote, gameVideosRemote, videoBookmarksRemote, heartRateRemote, photoThumbsAvailable },
+  };
+}
+
+function applyBootVars(vars, { fromDisk }) {
+  const { account: a, remote: r, flags: f } = vars;
+  currentProfile = a.currentProfile || null;
+  knownProfiles = a.knownProfiles || [];
+  playerClaims = a.playerClaims || [];
+  myGroups = a.myGroups || [];
+  activeGroupId = a.activeGroupId || null;
+  groupsLoadedOk = Boolean(a.groupsLoadedOk);
+  isAdmin = Boolean(a.isAdmin);
+  isPlatformAdmin = Boolean(a.isPlatformAdmin);
+  groupRequests = a.groupRequests || [];
+  groupMemberRoles = new Map(a.groupMemberRoles || []);
+  myTraits = a.myTraits || null;
+  myAvailability = a.myAvailability || [];
+  myWeeklyAvailability = a.myWeeklyAvailability || [];
+  myAvailabilitySettings = a.myAvailabilitySettings || null;
+  photoThumbsAvailable = Boolean(f.photoThumbsAvailable);
+  state = fromDisk ? migrateState(r.state, { allowSample: false }) : r.state;
+  eventResponses = r.eventResponses || [];
+  gameMvpVotes = r.gameMvpVotes || [];
+  gameFeedback = r.gameFeedback || [];
+  featureRollouts = r.featureRollouts || [];
+  privateWeightHistory = r.privateWeightHistory || [];
+  mvpVoteCounts = r.mvpVoteCounts || [];
+  payments = r.payments || [];
+  attendanceOverrides = r.attendanceOverrides || [];
+  gameFinanceOverrides = r.gameFinanceOverrides || [];
+  financeSettings = r.financeSettings || financeSettings;
+  currentEventId = r.currentEventId || null;
+  currentGameId = null;
+  trackingStore = r.trackingStore || {};
+  gameVideos = r.gameVideos || {};
+  videoBookmarks = r.videoBookmarks || [];
+  heartRateEntries = r.heartRateEntries || {};
+  joinRequests = r.joinRequests || [];
+  requesterTraits = new Map(r.requesterTraits || []);
+  eventNoShows = r.eventNoShows || [];
+  noShowsAvailable = Boolean(r.noShowsAvailable);
+  groupFeedbackAnswers = r.groupFeedbackAnswers || null;
+  publicEvents = r.publicEvents || [];
+  homeVideoIndex = r.homeVideoIndex || {};
+  trackingRemote = Boolean(f.trackingRemote);
+  gameVideosRemote = Boolean(f.gameVideosRemote);
+  videoBookmarksRemote = Boolean(f.videoBookmarksRemote);
+  heartRateRemote = Boolean(f.heartRateRemote);
+  document.body.classList.toggle("owner-mode", isPlatformAdmin);
+  document.querySelector("#owner-menu-item")?.classList.toggle("hidden", !isPlatformAdmin);
+}
+
+function saveBootCache() {
+  if (!remoteEnabled || !bootCacheReady || bootRefreshActive || !currentSession?.user) return;
+  try {
+    localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify({ v: BOOT_CACHE_VERSION, at: Date.now(), userId: currentSession.user.id, ...captureBootVars() }));
+  } catch {
+    // Armazenamento cheio: sem copia, a proxima visita carrega como antes.
+    clearBootCache();
+  }
+}
+
+function scheduleBootCacheSave() {
+  if (!bootCacheReady) return;
+  clearTimeout(bootCacheTimer);
+  bootCacheTimer = setTimeout(saveBootCache, 1200);
+}
+
+function clearBootCache() {
+  bootCacheReady = false;
+  clearTimeout(bootCacheTimer);
+  try {
+    window.localStorage.removeItem(BOOT_CACHE_KEY);
+  } catch {
+    // Sem armazenamento local: nada a apagar.
+  }
+}
+
+// Devolve verdadeiro se a copia serve a conta que tem sessao neste dispositivo e ja foi aplicada.
+async function warmStart() {
+  const hasConfig = Boolean(config.supabaseUrl && config.supabaseAnonKey);
+  if (!hasConfig || !window.supabase?.createClient) return false;
+  let raw = null;
+  try {
+    raw = window.localStorage.getItem(BOOT_CACHE_KEY);
+  } catch {
+    return false;
+  }
+  // Convite por abrir: o fluxo de entrada precisa dos dados frescos.
+  if (!raw || readPendingInviteCode()) return false;
+  supabaseClient = supabaseClient || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  remoteEnabled = true;
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    const session = data?.session;
+    const snapshot = JSON.parse(raw);
+    const valid = session?.user && snapshot?.v === BOOT_CACHE_VERSION && snapshot.userId === session.user.id
+      && Date.now() - snapshot.at < BOOT_CACHE_MAX_AGE_MS && Array.isArray(snapshot.remote?.state?.players) && snapshot.account && snapshot.flags;
+    if (!valid) {
+      if (snapshot?.userId !== session?.user?.id) clearBootCache();
+      return false;
+    }
+    currentSession = session;
+    applyBootVars(snapshot, { fromDisk: true });
+    return true;
+  } catch (error) {
+    console.warn("Boot cache ignored", error);
+    clearBootCache();
+    return false;
+  }
+}
+
+// Durante a actualizacao as variaveis passam por estados vazios; ate acabar ignoram-se toques e nao se redesenha.
+function swallowDuringBootRefresh(event) {
+  event.stopImmediatePropagation();
+  event.preventDefault();
+  if (event.type === "click") bootRefreshPendingClick = event.target?.closest?.("button, a, summary, label, [data-view]") || null;
+}
+
+async function refreshAfterWarmStart() {
+  // Sem rede (modo aviao): fica a copia, sem bloquear nada. O cliente do Supabase repetiria as ligacoes durante segundos.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  const backup = captureBootVars();
+  const before = JSON.stringify(backup);
+  bootRefreshActive = true;
+  document.body.classList.add("boot-refreshing");
+  ["click", "submit", "change"].forEach((name) => document.addEventListener(name, swallowDuringBootRefresh, true));
+  let ok = false;
+  try {
+    let timer = null;
+    const timedOut = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("refresh timeout")), BOOT_REFRESH_TIMEOUT_MS); });
+    try {
+      await Promise.race([initRemote(), timedOut]);
+    } finally {
+      clearTimeout(timer);
+    }
+    // Sem sessao (terminada noutro sitio) a resposta e legitima; com sessao mas sem dados, volta-se a copia.
+    ok = !currentSession?.user || (remoteEnabled && Boolean(currentProfile) && (groupsLoadedOk || !backup.account.groupsLoadedOk));
+  } catch (error) {
+    console.warn("Warm refresh failed", error);
+  }
+  if (!ok) {
+    applyBootVars(backup, { fromDisk: false });
+    remoteEnabled = true;
+    console.warn("A mostrar a ultima copia dos dados; nao foi possivel actualizar.");
+  }
+  ["click", "submit", "change"].forEach((name) => document.removeEventListener(name, swallowDuringBootRefresh, true));
+  document.body.classList.remove("boot-refreshing");
+  bootRefreshActive = false;
+  updateAccessUi();
+  // Se nada mudou desde a copia, o ecra ja esta certo.
+  if (bootRefreshDirty || JSON.stringify(captureBootVars()) !== before) render();
+  bootRefreshDirty = false;
+  scheduleBootCacheSave();
+  // O ultimo toque ignorado repete-se se o elemento continua no ecra (por exemplo um separador da barra).
+  const pendingClick = bootRefreshPendingClick;
+  bootRefreshPendingClick = null;
+  if (pendingClick?.isConnected) pendingClick.click();
 }
 
 // ---- Partilhar momentos: link da app com ?momento=<id>, que abre esse pedaco do video ----
@@ -1051,7 +1248,7 @@ async function initRemote() {
     return;
   }
 
-  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  supabaseClient = supabaseClient || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
   remoteEnabled = true;
   await loadAccountState();
   await loadRemoteState();
@@ -1194,13 +1391,20 @@ async function loadAccountState() {
   if (!currentSession?.user) return;
 
   const user = currentSession.user;
-  const { data: profiles, error: profilesError } = await supabaseClient
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: true });
+  // O perfil, os grupos e o resto da conta nao dependem uns dos outros: pedem-se juntos.
+  const [{ data: profiles, error: profilesError }, groupsLoaded] = await Promise.all([
+    supabaseClient.from("profiles").select("*").order("created_at", { ascending: true }),
+    loadMyGroups(),
+    loadMyTraits(),
+    loadMyAvailability(),
+    loadGroupRequests(),
+    loadPlayerClaims(),
+  ]);
 
   if (profilesError) {
     console.warn("Profile load failed", profilesError);
+    groupsLoadedOk = groupsLoaded;
+    isAdmin = groupsLoaded ? isGroupAdminRole(getActiveGroup()?.role) : false;
     return;
   }
 
@@ -1230,11 +1434,9 @@ async function loadAccountState() {
     }
   }
 
-  const groupsLoaded = await loadMyGroups();
   groupsLoadedOk = groupsLoaded;
   isAdmin = groupsLoaded ? isGroupAdminRole(getActiveGroup()?.role) : currentProfile?.role === "admin";
-  // Depois de conhecer o grupo ativo e o papel, estes pedidos nao dependem uns dos outros.
-  await Promise.all([loadGroupMemberRoles(), loadMyTraits(), loadMyAvailability(), loadGroupRequests(), loadPlayerClaims()]);
+  await loadGroupMemberRoles();
 }
 
 async function hasAnyRemoteProfile(visibleProfiles = []) {
@@ -1428,6 +1630,8 @@ async function loadRemoteState() {
   await refreshPendingInvite();
   saveState();
   loadMissingPhotosInBackground();
+  bootCacheReady = true;
+  scheduleBootCacheSave();
 }
 
 function capturePendingInviteFromUrl() {
@@ -2784,6 +2988,7 @@ async function unlinkOwnPlayerProfile() {
 }
 
 async function adminLogout() {
+  clearBootCache();
   if (supabaseClient) await supabaseClient.auth.signOut();
   isAdmin = false;
   currentSession = null;
@@ -3491,6 +3696,10 @@ function handleNavigationPopState(event) {
 }
 
 function render() {
+  if (bootRefreshActive) {
+    bootRefreshDirty = true;
+    return;
+  }
   ensureGameDateInput();
   renderPlayerList();
   renderPlayersTable();
@@ -12035,7 +12244,8 @@ let homeVideoIndexError = "";
 // Arranca a leitura da lista sem esperar por ela e, se chegar, redesenha o que depende do video de casa.
 function loadHomeVideoIndexInBackground() {
   loadHomeVideoIndex().then(() => {
-    if (homeVideoIndexError) return;
+    // Durante a actualizacao a copia o desenho final ja usa o indice.
+    if (homeVideoIndexError || bootRefreshActive) return;
     renderHistoryGameDetail();
     renderGallery();
   }).catch(() => {});

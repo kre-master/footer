@@ -15,6 +15,7 @@
     "test:notifications": "node --test tests/notifications.test.mjs",
     "test:review": "node --test tests/month-review.test.mjs",
     "test:photos": "node --test tests/photo-thumbs.test.mjs",
+    "test:boot": "node --test tests/boot-cache.test.mjs",
     "build:web": "node scripts/build-web.mjs",
     "cap:sync": "npm run build:web && npx cap sync",
     "cap:sync:android": "npm run build:web && npx cap sync android",
