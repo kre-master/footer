@@ -11,6 +11,11 @@ let bootCacheTimer = null;
 let bootRefreshActive = false;
 let bootRefreshDirty = false;
 let bootRefreshPendingClick = null;
+// Tambem lidas por clearSignedOutData(), que pode correr no arranque.
+let archiveGames = null; // jogos terminados dos outros clubes: [{ game, groupId }]
+let archivePlayers = new Map(); // "grupo:jogador" -> { id, name, photoThumb }
+let archiveLoading = false;
+let myGamesAll = null;
 const PostgameRules = window.FooterPostgame || {
   isScaleValue: (value) => Number.isInteger(value) && value >= 1 && value <= 10,
   isCheckinRequired: ({ hasVote = false, hasFeedback = false, isTransitionGame = false, isAfterRollout = false, isBeforeRollout = false } = {}) => !hasFeedback && !isBeforeRollout && (isTransitionGame ? !hasVote : Boolean(isAfterRollout)),
@@ -1492,6 +1497,7 @@ async function fetchGroupPlayers({ ordered = true } = {}) {
 async function loadRemoteState() {
   if (!remoteEnabled) return;
   if (!currentSession?.user) {
+    clearSignedOutData();
     eventResponses = [];
     gameMvpVotes = [];
     gameFeedback = [];
@@ -2987,6 +2993,45 @@ async function unlinkOwnPlayerProfile() {
   await unlinkPlayerProfile(linkedPlayer.id);
 }
 
+// Sem sessao nao ha dados do clube no ecra: a copia local de uma sessao anterior (jogadores, jogos,
+// grupos) nao pode ficar a vista nem ser lida outra vez no arranque.
+function clearSignedOutData() {
+  if (!remoteEnabled) return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Sem armazenamento local: nada a apagar.
+  }
+  state = migrateState({
+    players: [],
+    games: [],
+    events: [],
+    gameMvpVotes: [],
+    payments: [],
+    attendanceOverrides: [],
+    gameFinanceOverrides: [],
+    financeSettings: { ...defaultFinanceSettings, playerBalances: { ...defaultFinanceSettings.playerBalances } },
+  });
+  eventResponses = [];
+  eventNoShows = [];
+  joinRequests = [];
+  publicEvents = [];
+  myTraits = null;
+  myAvailability = [];
+  myWeeklyAvailability = [];
+  myGroups = [];
+  activeGroupId = null;
+  archiveGames = null;
+  archivePlayers = new Map();
+  myGamesAll = null;
+  selectedIds.clear();
+  previewGame = null;
+  currentGameId = null;
+  currentHistoryGameId = null;
+  currentEventId = null;
+  currentSuggestions = [];
+}
+
 async function adminLogout() {
   clearBootCache();
   if (supabaseClient) await supabaseClient.auth.signOut();
@@ -2995,7 +3040,9 @@ async function adminLogout() {
   currentProfile = null;
   knownProfiles = [];
   playerClaims = [];
+  clearSignedOutData();
   updateAccessUi();
+  showView("me");
   render();
 }
 
@@ -9583,9 +9630,6 @@ function clearPlayerForm() {
 
 // Historico: um carrossel de jogos por mes; cada jogo mostra so as duas equipas, o resultado, o MVP e se tem video.
 // O Arquivo junta os jogos de todos os clubes do jogador (com o simbolo do clube); dentro do clube so os desse clube.
-let archiveGames = null; // jogos terminados dos outros clubes: [{ game, groupId }]
-let archivePlayers = new Map(); // "grupo:jogador" -> { id, name, photoThumb }
-let archiveLoading = false;
 
 async function loadArchiveGames() {
   if (archiveLoading || !remoteEnabled || !supabaseClient || !currentSession?.user || myGroups.length < 2) return;
@@ -11330,7 +11374,6 @@ function renderAllGroupsList() {
 }
 
 // Historico do jogador: jogos de todos os grupos a que pertence (o RLS ja limita aos seus grupos).
-let myGamesAll = null;
 let myGamesLoading = false;
 
 async function loadMyGames() {
