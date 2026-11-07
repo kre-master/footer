@@ -16,6 +16,7 @@ let archiveGames = null; // jogos terminados dos outros clubes: [{ game, groupId
 let archivePlayers = new Map(); // "grupo:jogador" -> { id, name, photoThumb }
 let archiveLoading = false;
 let myGamesAll = null;
+let otherClubEvents = []; // convocatorias abertas dos outros clubes do jogador
 const PostgameRules = window.FooterPostgame || {
   isScaleValue: (value) => Number.isInteger(value) && value >= 1 && value <= 10,
   isCheckinRequired: ({ hasVote = false, hasFeedback = false, isTransitionGame = false, isAfterRollout = false, isBeforeRollout = false } = {}) => !hasFeedback && !isBeforeRollout && (isTransitionGame ? !hasVote : Boolean(isAfterRollout)),
@@ -3024,6 +3025,7 @@ function clearSignedOutData() {
   archiveGames = null;
   archivePlayers = new Map();
   myGamesAll = null;
+  otherClubEvents = [];
   selectedIds.clear();
   previewGame = null;
   currentGameId = null;
@@ -3108,6 +3110,7 @@ function showView(viewName, options = {}) {
   if (viewName === "public-games") markPublicGamesSeen();
   if (viewName === "my-games") loadMyGames();
   if (viewName === "games") loadArchiveGames();
+  if (viewName === "events") loadOtherClubEvents();
   if (viewName === "club") renderClubPanel();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
@@ -6361,7 +6364,7 @@ function renderPaymentsHistory(monthPayments) {
               <strong>${escapeHtml(playerData?.name || "Jogador removido")} - ${isDebt ? "Divida" : "Pagamento"} ${euro(payment.amount)}</strong>
               <span>${formatDate(payment.paidAt)}${visibleNote ? ` - ${escapeHtml(visibleNote)}` : ""}</span>
             </div>
-            <button class="mini-btn" data-edit-payment="${payment.id}" type="button">Editar</button>
+            <button class="mini-btn pencil-btn" data-edit-payment="${payment.id}" type="button" aria-label="Editar" title="Editar">✎</button>
           </article>
         `;
       }).join("")}
@@ -6773,6 +6776,42 @@ function isEventFullForPlayer(eventData, playerId) {
   return getEventGoingCount(eventData.id, playerId) >= eventData.maxPlayers;
 }
 
+// Convocatorias abertas dos outros clubes do jogador: so um resumo; para responder muda-se para esse clube.
+async function loadOtherClubEvents() {
+  if (!remoteEnabled || !supabaseClient || !currentSession?.user || myGroups.length < 2) return;
+  const otherIds = myGroups.filter((group) => group.id !== activeGroupId).map((group) => group.id);
+  const since = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  const { data: rows, error } = await supabaseClient.from("events").select("*").in("group_id", otherIds).eq("status", "open").gte("starts_at", since).order("starts_at", { ascending: true });
+  if (error) {
+    console.warn("Other club events load failed", error);
+    return;
+  }
+  const going = new Map();
+  const ids = (rows || []).map((row) => row.id);
+  if (ids.length) {
+    const { data: responses } = await supabaseClient.from("event_responses").select("event_id, status").in("event_id", ids);
+    (responses || []).filter((row) => row.status === "going").forEach((row) => going.set(row.event_id, (going.get(row.event_id) || 0) + 1));
+  }
+  otherClubEvents = (rows || []).map((row) => ({ ...eventFromRow(row), groupId: row.group_id, going: going.get(row.id) || 0 }));
+  if (currentViewName === "events") renderEventsList();
+}
+
+function renderOtherClubEventCard(eventData) {
+  const group = myGroups.find((item) => item.id === eventData.groupId);
+  const date = new Date(eventData.startsAt);
+  const when = `${date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "")} · ${date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`;
+  return `
+    <article class="event-card other-club-event" role="button" tabindex="0" data-open-club-event="${escapeHtml(eventData.groupId)}" aria-label="Abrir o clube ${escapeHtml(group?.name || "")}">
+      ${renderClubSymbol(group, "club-symbol-md")}
+      <div class="other-club-text">
+        <strong>${escapeHtml(group?.name || "Clube")}</strong>
+        <small>${escapeHtml(when)}${eventData.location ? ` · ${escapeHtml(eventData.location)}` : ""}</small>
+        <small>${eventData.going} de ${eventData.maxPlayers} confirmados</small>
+      </div>
+      <span class="other-club-go" aria-hidden="true">›</span>
+    </article>`;
+}
+
 function renderEventsList() {
   if (!els.eventsList) return;
   if (els.eventDate && !els.eventDate.value) {
@@ -6786,12 +6825,26 @@ function renderEventsList() {
   const events = [...(state.events || [])]
     .filter((eventData) => eventData.status !== "completed" && !getFinishedGameAtEventTime(eventData))
     .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
-  if (!events.length) {
+  const others = myGroups.length > 1 ? otherClubEvents : [];
+  if (!events.length && !others.length) {
     els.eventsList.innerHTML = `<div class="empty-state">Ainda nao ha convocatorias. O admin pode lancar o proximo jogo.</div>`;
     return;
   }
 
-  els.eventsList.innerHTML = events.map((eventData) => renderEventCard(eventData)).join("");
+  els.eventsList.innerHTML = (events.length ? events.map((eventData) => renderEventCard(eventData)).join("") : `<div class="empty-state">Ainda nao ha convocatorias neste clube.</div>`)
+    + (others.length ? `<h3 class="events-other-title">Noutros clubes</h3>${others.map(renderOtherClubEventCard).join("")}` : "");
+  els.eventsList.querySelectorAll("[data-open-club-event]").forEach((card) => {
+    const open = async () => {
+      await switchActiveGroup(card.dataset.openClubEvent);
+      showView("events");
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (event) => {
+      if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      open();
+    });
+  });
 
   els.eventsList.querySelectorAll("details[data-event-details]").forEach((details) => {
     details.addEventListener("toggle", () => {
@@ -9461,7 +9514,7 @@ function renderPlayersTable() {
         <td class="stat-col">${p.physical}</td>
         <td class="admin-only">${renderLinkedAccountCell(p)}</td>
         <td class="admin-only">
-          <button class="mini-btn" data-edit-player="${p.id}">Editar</button>
+          <button class="mini-btn pencil-btn" data-edit-player="${p.id}" aria-label="Editar" title="Editar">✎</button>
           ${p.linkedUserId ? `<button class="mini-btn" data-unlink-player="${p.id}">Desassociar</button>` : ""}
           <button class="mini-btn" data-delete-player="${p.id}">Apagar</button>
         </td>
@@ -9967,15 +10020,23 @@ function renderClubPanel() {
   const canEdit = isGroupAdminRole(group.role) && remoteEnabled;
   const roster = state.players.filter((item) => !item.isGuest).slice().sort((a, b) => (b.overall || 0) - (a.overall || 0));
   const finished = getFinishedGames().length;
+  const clubIndex = myGroups.findIndex((item) => item.id === group.id);
+  const clubSwitcher = myGroups.length > 1 ? `
+    <nav class="club-switcher" aria-label="Trocar de clube">
+      <button type="button" class="ghost-btn club-arrow" data-club-step="-1" aria-label="Clube anterior">‹</button>
+      <span>${clubIndex + 1} de ${myGroups.length}</span>
+      <button type="button" class="ghost-btn club-arrow" data-club-step="1" aria-label="Clube seguinte">›</button>
+    </nav>` : "";
   panel.innerHTML = `
+    ${clubSwitcher}
     <section class="club-hero">
       ${renderClubSymbol(group, "club-symbol-xl")}
       <div class="club-hero-text">
         <h3>${escapeHtml(group.name)}</h3>
       </div>
-      ${canEdit && !clubEditing ? '<button type="button" class="ghost-btn" data-edit-club>Editar</button>' : ""}
+      ${canEdit && !clubEditing ? '<button type="button" class="ghost-btn pencil-btn" data-edit-club aria-label="Editar o clube" title="Editar">✎</button>' : ""}
     </section>
-    ${clubEditing && canEdit ? renderClubEditor(group) : (group.bio ? `<p class="club-bio">${escapeHtml(group.bio)}</p>` : (canEdit ? '<p class="hint">Sem bio ainda. Usa Editar para escrever uma.</p>' : ""))}
+    ${clubEditing && canEdit ? renderClubEditor(group) : (group.bio ? `<p class="club-bio">${escapeHtml(group.bio)}</p>` : (canEdit ? '<p class="hint">Sem bio ainda. Usa o lápis ✎ para escrever uma.</p>' : ""))}
     <section class="club-stats">
       <div class="club-stat"><b>${finished}</b><span>jogos</span></div>
       <div class="club-stat"><b>${roster.length}</b><span>jogadores</span></div>
@@ -9987,15 +10048,21 @@ function renderClubPanel() {
     <div class="actions club-after"><button type="button" class="ghost-btn" data-club-hof>Hall of Fame</button></div>
     <section class="club-block club-after">
       <h4>Os meus clubes</h4>
-      <div class="club-list">
-        ${myGroups.map((item) => `
+      <div class="club-list club-mine">
+        ${myGroups.map((item) => {
+          const canSwitch = item.id !== group.id;
+          const canLeave = item.role !== "owner" && remoteEnabled;
+          return `
           <div class="club-row ${item.id === group.id ? "active" : ""}">
             ${renderClubSymbol(item, "club-symbol-md")}
-            <div class="club-row-text"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(ROLE_LABELS[item.role] || "jogador")}${item.id === group.id ? " - ativo" : ""}</small></div>
+            <div class="club-row-text"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(ROLE_LABELS[item.role] || "jogador")}${item.id === group.id ? " · ativo" : ""}${item.isFavorite ? " · favorito" : ""}</small></div>
             ${remoteEnabled ? `<button type="button" class="club-fav ${item.isFavorite ? "on" : ""}" data-club-fav="${escapeHtml(item.id)}" aria-pressed="${item.isFavorite}" aria-label="${item.isFavorite ? "Clube favorito" : "Definir como favorito"}">${item.isFavorite ? "★" : "☆"}</button>` : ""}
-            ${item.id !== group.id ? `<button type="button" class="ghost-btn" data-club-switch="${escapeHtml(item.id)}">Mudar</button>` : ""}
-            ${item.role !== "owner" && remoteEnabled ? `<button type="button" class="ghost-btn danger" data-club-leave="${escapeHtml(item.id)}">Sair</button>` : ""}
-          </div>`).join("")}
+            ${canSwitch || canLeave ? `<div class="club-row-actions">
+              ${canSwitch ? `<button type="button" class="ghost-btn" data-club-switch="${escapeHtml(item.id)}">Mudar</button>` : ""}
+              ${canLeave ? `<button type="button" class="ghost-btn danger" data-club-leave="${escapeHtml(item.id)}">Sair</button>` : ""}
+            </div>` : ""}
+          </div>`;
+        }).join("")}
       </div>
     </section>
     ${canEdit ? '<section class="club-block club-after" id="club-join-requests"></section>' : ""}
@@ -10017,6 +10084,10 @@ function renderClubPanel() {
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
   panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
   bindGameCards(panel);
+  panel.querySelectorAll("[data-club-step]").forEach((button) => button.addEventListener("click", () => {
+    const next = myGroups[(clubIndex + Number(button.dataset.clubStep) + myGroups.length) % myGroups.length];
+    if (next) switchActiveGroup(next.id);
+  }));
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
   panel.querySelectorAll("[data-club-leave]").forEach((button) => button.addEventListener("click", () => leaveClub(button.dataset.clubLeave)));
@@ -11076,7 +11147,7 @@ async function setFavoriteClub(groupId) {
 
 async function leaveClub(groupId) {
   const group = myGroups.find((item) => item.id === groupId);
-  if (!group || !confirm(`Sair de ${group.name}? Perdes o acesso aos jogos e dados deste grupo e o teu perfil de jogador deixa de estar ligado a esta conta.`)) return;
+  if (!group || !confirm(`ATENÇÃO: vais sair do clube ${group.name}.\n\n• Perdes o acesso aos jogos, às convocatórias e aos dados deste clube.\n• O teu perfil de jogador deixa de estar ligado a esta conta.\n• Para voltares, tens de pedir de novo a entrada.\n\nQueres mesmo sair?`)) return;
   const { error } = await supabaseClient.rpc("leave_group", { p_group_id: groupId });
   if (error) {
     alert(String(error.message || "").includes("owner_cannot_leave") ? "O dono do grupo nao pode sair." : `Nao consegui sair: ${error.message}`);

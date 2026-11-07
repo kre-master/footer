@@ -8544,3 +8544,17 @@ body.boot-refreshing::before {
 #new-group-panel { order: 5; margin-top: 0; }
 .club-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .club-hero-text h3 { font-size: clamp(28px, 7vw, 40px); }
+
+/* Clube: setas para trocar, "Os meus clubes" sem cortes, lapis de edicao, convocatorias dos outros clubes. */
+.pencil-btn { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; font-size: 16px; line-height: 1; }
+.club-switcher { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.club-arrow { width: 40px; min-width: 40px; height: 36px; min-height: 36px; padding: 0; border-radius: 999px; font-size: 24px; line-height: 1; display: inline-grid; place-items: center; }
+.club-mine .club-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 10px; min-width: 0; }
+.club-mine .club-row-text { min-width: 0; }
+.club-mine .club-row-text strong { overflow-wrap: anywhere; }
+.club-row-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.events-other-title { margin: 14px 0 4px; font-family: var(--font-display); font-size: 20px; text-transform: uppercase; }
+.other-club-event { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; cursor: pointer; padding: 12px; margin-top: 8px; }
+.other-club-text { display: grid; gap: 2px; min-width: 0; }
+.other-club-text small { color: var(--muted); font-size: 12.5px; }
+.other-club-go { font-size: 26px; color: var(--muted); }
