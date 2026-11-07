@@ -3011,7 +3011,7 @@ function clearSignedOutData() {
     attendanceOverrides: [],
     gameFinanceOverrides: [],
     financeSettings: { ...defaultFinanceSettings, playerBalances: { ...defaultFinanceSettings.playerBalances } },
-  });
+  }, { allowSample: false });
   eventResponses = [];
   eventNoShows = [];
   joinRequests = [];
