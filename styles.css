@@ -8583,3 +8583,13 @@ body.boot-refreshing::before {
 .search-tabs { display: flex; gap: 4px; margin: 4px 0 10px; }
 .search-tabs .subtab small { color: inherit; opacity: .7; font-size: 11px; }
 .search-row-static { cursor: default; }
+
+/* Procurar: caixa de texto sozinha, com o mesmo feitio dos outros campos. */
+.search-form { grid-template-columns: minmax(0, 1fr); }
+.search-form input {
+  width: 100%; box-sizing: border-box; min-height: 46px; padding: 0 16px; border-radius: 999px;
+  border: 2px solid var(--cad-ink, var(--line-strong)); background: var(--cad-paper, var(--surface)); color: var(--ink);
+}
+.search-section .club-row { min-width: 0; }
+.search-section .club-row .club-row-text small { overflow-wrap: anywhere; }
+.search-tabs { margin-top: 0; }

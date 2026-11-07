@@ -11058,7 +11058,7 @@ function renderSearchResults() {
   if (searchTab === "players") {
     if (!players.length) return `${tabs}<p class="hint">${searchQuery ? `Nenhum jogador encontrado para "${escapeHtml(searchQuery)}".` : "Ainda não há jogadores públicos. Cada jogador escolhe na sua conta se quer aparecer aqui."}</p>`;
     return `${tabs}
-      <div class="search-list">
+      <section class="search-section"><div class="search-list">
         ${players.map((row) => {
           const outsider = row.is_member === false;
           const sub = `${escapeHtml(row.group_name || "Jogador público")}${row.is_guest ? " · convidado" : ""}`;
@@ -11071,11 +11071,11 @@ function renderSearchResults() {
             ? `<div class="search-row search-row-static">${inner}</div>`
             : `<button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">${inner}</button>`;
         }).join("")}
-      </div>`;
+      </div></section>`;
   }
   if (!clubs.length) return `${tabs}<p class="hint">${searchQuery ? `Nenhum clube encontrado para "${escapeHtml(searchQuery)}".` : "Ainda não há clubes públicos."}</p>`;
   return `${tabs}
-    <div class="club-list">
+    <section class="search-section"><div class="club-list">
       ${clubs.map((club) => `
         <div class="club-row">
           ${renderClubSymbol(club, "club-symbol-md")}
@@ -11086,7 +11086,7 @@ function renderSearchResults() {
             : club.request_status === "pending" ? '<small class="hint">Pedido enviado</small>'
             : `<button type="button" class="ghost-btn" data-search-join="${escapeHtml(club.id)}">Pedir para entrar</button>`}
         </div>`).join("")}
-    </div>`;
+    </div></section>`;
 }
 
 function updateSearchResults() {
