@@ -93,6 +93,9 @@ Quando for preciso actualizar a copia web/mobile, usar build/sync apropriado e r
 
 ## Cartas e premios
 
+- Clarificacao de conceito (2026-11-07): cartas e equipamentos metalicos sao apenas uma familia estetica entre varias; glow e opcional e varia independentemente do material. Preferencia por gerar os recursos localmente com ComfyUI no desktop Windows / RTX 5080. Ver [[12 - Cartas evolutivas e equipamento RPG]]; os bonus RPG continuam por decidir.
+- Producao de imagens da gamificacao (2026-11-07): todos os recursos novos de cartas e itens sao gerados/editados localmente no ComfyUI do desktop RTX 5080, a partir do Maestro (`python3 /home/joao/maestro/infra/bin/footer-comfy start`). A IA cria assets reutilizaveis, nunca a carta final a cada uso; a app compoe camadas e desenha textos e numeros.
+- Raridade, nivel de evolucao, familia estetica e glow sao dimensoes separadas. A progressao virtual (itens, niveis, eventuais bonus) nunca altera a avaliacao desportiva real nem as estatisticas dos jogos.
 - A pagina de jogador deve comecar pela carta.
 - Uma conta ligada a um jogador deve ter o separador `Meu perfil`, que abre diretamente a pagina do proprio jogador; o separador fica oculto sem perfil ligado.
 - Templates novos vivem em `assets/new cards template`.

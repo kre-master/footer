@@ -25,6 +25,20 @@ Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas 
 
 ### Cartas
 
+- [x] Validar acesso privado ao ComfyUI do desktop Windows / RTX 5080: Wake-on-LAN, API e SSH confirmados em 2026-11-07; Tailscale Serve persistente na porta 18188, destino local 8188. O utilizador tem Parsec, e o assistente ja consegue iniciar o motor sem a janela.
+- [x] Validar o primeiro teste de geracao local: chuteira em tecido e carta em papel, a partir dos originais, no FLUX.2 Klein Base 4B FP8. Previas em `/home/joao/maestro/output/footer-comfy-pilot-2026-11-07/`, sem glow e com fundo opaco.
+- [ ] Preparar transparencias/camadas e testar familias visuais adicionais e glow independente antes de integrar. Conceito em [[12 - Cartas evolutivas e equipamento RPG]].
+- [x] Concluir arranque remoto do ComfyUI a pedido do utilizador: SSH com chave do servidor verificada, servico do Maestro instalado e teste isolado de arranque com RTX 5080 CUDA concluido. Usar `python3 /home/joao/maestro/infra/bin/footer-comfy start`; nao exige repetir guioes nem abrir Parsec.
+- [x] Preparar Markdown de passagem para o Claude, com infraestrutura reutilizavel e plano para as cartas/itens: `/home/joao/maestro/output/Footer_Cartas_Equipamento_RPG_Conceito.md`.
+- [x] Conciliar contexto/plano com a secao 8 da nota 12 e validar o acesso pelo Claude (2026-11-07): `footer-comfy status` devolveu `ready`, ComfyUI 0.44.2, RTX 5080 CUDA. Fluxo oficial para produzir as imagens da gamificacao (cartas, molduras, fundos, auras, chuteiras, bolas, camisolas, calcoes, galhardetes).
+- Plano das cartas evolutivas / equipamento RPG (por etapas, a acordar com o utilizador):
+  1. [ ] Definir composicao modular e catalogo: fundo, foto, moldura, ornamentacao, aura e equipamento com identificadores independentes; familia estetica, raridade, evolucao e glow como dimensoes distintas.
+  2. [ ] Padronizar recursos: dimensoes, escala, perspetiva, transparencia, nomes e metadados; guardar referencias, modelo, prompt, seed e workflow de cada lote; conservar originais.
+  3. [ ] Produzir e rever recursos no sistema local (`footer-comfy start` + API ComfyUI + workflows do piloto); comecar por poucas pecas e familias nao metalicas; bases sem glow quando o glow deva ser independente.
+  4. [ ] Prototipar a personalizacao na app: combinar camadas, escolher presenca/cor/intensidade do glow, legibilidade e desempenho em telemovel; textos e numeros desenhados pela app.
+  5. [ ] Planear inventario e equipamento: slots, equipado/guardado, variantes e marcos de evolucao (ex.: niveis 1, 5, 10).
+  6. [ ] Decidir progressao antes de qualquer bonus: 100% cosmetico, progressao propria, atributos virtuais ou hibrido (ver nota 12, sec. 7). Estatisticas reais intocaveis.
+  7. [ ] Integrar por etapas: pequeno conjunto aprovado, transparencias/camadas, validar interface e so depois ampliar catalogo e progressao.
 - Consolidar templates em `assets/new cards template`.
 - Garantir que as cartas variam correctamente por contexto: base, forma, vitorias, MVP e premios.
 - Confirmar que a pagina de jogador comeca pela carta.
