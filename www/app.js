@@ -9449,51 +9449,92 @@ function clearPlayerForm() {
   pendingPhotoChanged = false;
 }
 
+// Historico: um carrossel de jogos por mes; cada jogo mostra so as duas equipas, o resultado, o MVP e se tem video.
+function renderGameTeamColumn(side, players, mvpIds) {
+  return `
+    <div class="gh-team gh-team-${side}">
+      ${players.map((playerData) => {
+        const src = getPlayerPhotoSrc(playerData);
+        const label = initials(playerData.name);
+        return `
+          <span class="gh-player">
+            <i class="gh-bubble">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : escapeHtml(label)}</i>
+            <b>${escapeHtml(label)}</b>${mvpIds.has(playerData.id) ? '<em class="gh-mvp" title="MVP" aria-label="MVP">★</em>' : ""}
+          </span>`;
+      }).join("")}
+    </div>`;
+}
+
+function renderGameHistoryCard(game) {
+  const teamA = hydrate([...(game.teamA || []), ...(getBenchA(game) || [])]);
+  const teamB = hydrate([...(game.teamB || []), ...(getBenchB(game) || [])]);
+  const mvpIds = getOfficialMvpIdsForGame(game);
+  const hasScore = game.scoreA != null && game.scoreB != null;
+  const date = new Date(game.date);
+  const dateLabel = `${date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "")} · ${date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`;
+  const hasVideo = getGameVideoParts(game.id).length > 0;
+  return `
+    <article class="game-card gh-card" role="button" tabindex="0" data-open-game="${game.id}" aria-label="Abrir o jogo de ${escapeHtml(dateLabel)}">
+      <div class="gh-head">
+        <span class="gh-date">${escapeHtml(dateLabel)}</span>
+        ${hasVideo ? '<span class="gh-video" title="Tem vídeo" aria-label="Tem vídeo">▶</span>' : ""}
+      </div>
+      <div class="gh-score">
+        <b class="gh-a">${hasScore ? game.scoreA : "–"}</b><i>:</i><b class="gh-b">${hasScore ? game.scoreB : "–"}</b>
+      </div>
+      <div class="gh-teams">
+        ${renderGameTeamColumn("a", teamA, mvpIds)}
+        ${renderGameTeamColumn("b", teamB, mvpIds)}
+      </div>
+      <button class="danger-btn admin-only gh-delete" data-delete-game="${game.id}">Apagar</button>
+    </article>`;
+}
+
 function renderGamesList() {
   if (!state.games.length) {
     els.gamesList.innerHTML = `<div class="empty-state">Ainda nao ha jogos confirmados.</div>`;
     return;
   }
 
-  els.gamesList.innerHTML = state.games.map((game) => {
-    const teamA = hydrate([...(game.teamA || []), ...(getBenchA(game) || [])]);
-    const teamB = hydrate([...(game.teamB || []), ...(getBenchB(game) || [])]);
-    const result = game.scoreA == null || game.scoreB == null ? "Resultado em aberto" : `${game.scoreA} - ${game.scoreB}`;
-    const gameTitle = getGameTitle(game);
-    return `
-      <article class="game-card">
-        <div>
-          <p class="eyebrow">${escapeHtml(gameTitle)}</p>
-          <strong>${formatDate(game.date)} - ${result}</strong>
-          <span>A ${getTeamStats(teamA).total} vs B ${getTeamStats(teamB).total} - ${game.status === "finished" ? "finalizado" : "em aberto"}</span>
-          ${renderTeamRadarChart(teamA, teamB, { compact: true, inlineOdds: true })}
-        </div>
-        <div class="game-actions">
-          <button class="primary-btn" data-open-game="${game.id}">Abrir</button>
-          <button class="danger-btn admin-only" data-delete-game="${game.id}">Apagar</button>
-        </div>
-      </article>
-    `;
-  }).join("");
+  const months = new Map();
+  [...state.games].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((game) => {
+    const key = monthKey(game.date);
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(game);
+  });
+  els.gamesList.innerHTML = [...months].map(([key, games]) => `
+    <section class="games-month">
+      <h3>${escapeHtml(formatMonthLabel(key))} <small>${games.length} ${games.length === 1 ? "jogo" : "jogos"}</small></h3>
+      <div class="games-rail">${games.map(renderGameHistoryCard).join("")}</div>
+    </section>`).join("");
 
-  els.gamesList.querySelectorAll("[data-open-game]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const game = state.games.find((item) => item.id === button.dataset.openGame);
-      if (isFinishedGame(game)) {
-        currentHistoryGameId = game.id;
-        currentGameId = null;
-        showView("history-game");
-        renderHistoryGameDetail();
-        return;
-      }
-      currentGameId = game?.id || button.dataset.openGame;
-      currentHistoryGameId = null;
-      showView("today");
-      renderCurrentGame();
+  const openGame = (gameId) => {
+    const game = state.games.find((item) => item.id === gameId);
+    if (isFinishedGame(game)) {
+      currentHistoryGameId = game.id;
+      currentGameId = null;
+      showView("history-game");
+      renderHistoryGameDetail();
+      return;
+    }
+    currentGameId = game?.id || gameId;
+    currentHistoryGameId = null;
+    showView("today");
+    renderCurrentGame();
+  };
+  els.gamesList.querySelectorAll("[data-open-game]").forEach((card) => {
+    card.addEventListener("click", () => openGame(card.dataset.openGame));
+    card.addEventListener("keydown", (event) => {
+      if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      openGame(card.dataset.openGame);
     });
   });
   els.gamesList.querySelectorAll("[data-delete-game]").forEach((button) => {
-    button.addEventListener("click", () => deleteGame(button.dataset.deleteGame));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteGame(button.dataset.deleteGame);
+    });
   });
 }
 
