@@ -3081,6 +3081,7 @@ const VIEW_GROUPS = {
   gallery: "history",
   stats: "history",
   club: "club",
+  "club-games": "club",
   players: "club",
   monthly: "club",
   payments: "club",
@@ -3125,6 +3126,7 @@ function showView(viewName, options = {}) {
   if (viewName === "games") loadArchiveGames();
   if (viewName === "events") loadOtherClubEvents();
   if (viewName === "club") renderClubPanel();
+  if (viewName === "club-games") renderClubGames();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
   if (viewName === "owner") loadOwnerPanel();
@@ -3769,6 +3771,7 @@ function render() {
   renderPlayersTable();
   renderCurrentGame();
   renderGamesList();
+  if (currentViewName === "club-games") renderClubGames();
   renderHistoryGameDetail();
   renderClubTab();
   prefillEventLocation();
@@ -6802,8 +6805,11 @@ function prefillEventForm() {
     title.dataset.auto = nextEventTitle();
     title.value = title.dataset.auto;
   }
-  if (els.eventDate && !els.eventDate.value) {
-    els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
+  if (els.eventDate && document.activeElement !== els.eventDate) {
+    // Segue o dia e hora habituais do clube enquanto o admin nao os mudar (o clube pode carregar depois do ecra).
+    const auto = toDateTimeLocalInput(defaultEventDate());
+    if (!els.eventDate.value || els.eventDate.value === els.eventDate.dataset.auto) els.eventDate.value = auto;
+    els.eventDate.dataset.auto = auto;
   }
   if (els.eventMaxPlayers && !els.eventMaxPlayers.dataset.touched) {
     const last = [...(state.events || [])].sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt))[0];
@@ -7512,6 +7518,8 @@ async function saveEventFromForm(event) {
   if (els.eventPublicSpots) els.eventPublicSpots.value = "1";
   els.eventLocation.value = "";
   els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
+  els.eventDate.dataset.auto = els.eventDate.value;
+  delete els.eventLocation.dataset.auto;
   render();
   showView("events");
 }
@@ -9854,6 +9862,18 @@ function bindGameCards(container) {
   });
 }
 
+// Separador "Jogos" dentro do Clube: so os jogos deste clube, em carrossel por mes.
+function renderClubGames() {
+  const list = document.querySelector("#club-games-list");
+  if (!list) return;
+  if (!state.games.length) {
+    list.innerHTML = `<div class="empty-state">Ainda nao ha jogos neste clube.</div>`;
+    return;
+  }
+  list.innerHTML = renderGameMonths(state.games.map((game) => ({ game, groupId: activeGroupId })));
+  bindGameCards(list);
+}
+
 function renderGamesList() {
   const items = state.games.map((game) => ({ game, groupId: activeGroupId }));
   if (!items.length && !archiveGames?.length) {
@@ -9958,8 +9978,9 @@ async function bindPitchPicker(picker, input) {
 function prefillEventLocation() {
   const field = els.eventLocation;
   const habitual = getActiveGroup()?.defaultLocation;
-  if (field && habitual && !field.value && document.activeElement !== field) {
+  if (field && habitual && document.activeElement !== field && (!field.value || field.value === field.dataset.auto)) {
     field.value = habitual;
+    field.dataset.auto = habitual;
     document.querySelector("#pitch-picker")?.syncFromText?.(habitual);
   }
 }
@@ -10107,10 +10128,6 @@ function renderClubPanel() {
       <div class="club-stat"><b>${finished}</b><span>jogos</span></div>
       <div class="club-stat"><b>${roster.length}</b><span>jogadores</span></div>
     </section>
-    <section class="club-block club-games">
-      <h4>Jogos do clube</h4>
-      ${state.games.length ? renderGameMonths(state.games.map((game) => ({ game, groupId: activeGroupId }))) : '<p class="hint">Ainda não há jogos.</p>'}
-    </section>
     <div class="actions club-after"><button type="button" class="ghost-btn" data-club-hof>Hall of Fame</button></div>
     <section class="club-block club-after">
       <h4>Os meus clubes</h4>
@@ -10149,7 +10166,6 @@ function renderClubPanel() {
   });
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
   panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
-  bindGameCards(panel);
   panel.querySelectorAll("[data-club-step]").forEach((button) => button.addEventListener("click", () => {
     const next = myGroups[(clubIndex + Number(button.dataset.clubStep) + myGroups.length) % myGroups.length];
     if (next) switchActiveGroup(next.id, { stay: true });

@@ -8563,3 +8563,11 @@ body.boot-refreshing::before {
 .event-field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .event-public-options { display: grid; gap: 8px; }
 .event-public-options.hidden { display: none; }
+
+/* Separadores mais justos: cabem todos no telemovel sem cortar o ultimo. */
+.subtabs { gap: 2px; }
+.subtab { padding: 0 10px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 760px) {
+  .subtabs { padding-top: 2px; }
+  .subtab { padding: 0 9px; }
+}
