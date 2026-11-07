@@ -3060,6 +3060,7 @@ function showView(viewName, options = {}) {
   document.querySelectorAll(".subtab").forEach((button) => button.classList.toggle("active", button.dataset.view === activeSubtab));
   if (viewName === "public-games") markPublicGamesSeen();
   if (viewName === "my-games") loadMyGames();
+  if (viewName === "games") loadArchiveGames();
   if (viewName === "club") renderClubPanel();
   if (viewName === "account") loadDeletedGroups();
   if (viewName === "claims") loadAllGroups();
@@ -3896,7 +3897,8 @@ async function handleOwnPlayerPhotoSelection(event) {
     return;
   }
   try {
-    const photoDataUrl = await resizePhoto(file);
+    const photoDataUrl = await cropPhoto(file);
+    if (!photoDataUrl) return;
     await updateOwnPlayerPhoto(linkedPlayer.id, photoDataUrl);
   } catch (error) {
     alert(`Nao consegui atualizar a foto: ${error.message}`);
@@ -9225,7 +9227,12 @@ async function handlePhotoSelection(event) {
   const file = event.target.files[0];
   if (!file) return;
   try {
-    pendingPhotoDataUrl = await resizePhoto(file);
+    const cropped = await cropPhoto(file);
+    if (!cropped) {
+      event.target.value = "";
+      return;
+    }
+    pendingPhotoDataUrl = cropped;
     pendingPhotoChanged = true;
   } catch (error) {
     alert("Nao consegui carregar essa foto.");
@@ -9240,26 +9247,151 @@ function clearPendingPhoto() {
   if (els.formPhoto) els.formPhoto.value = "";
 }
 
-function resizePhoto(file) {
+// Editor de enquadramento: mostra a foto inteira com a area que fica na carta; arrastar, zoom (slider, roda ou beliscar) e rodar.
+// Devolve o JPEG ja recortado, ou null se o utilizador cancelar.
+const PHOTO_FRAME_RATIO = 0.829; // largura/altura da janela da foto na carta (ver .card-photo)
+function cropPhoto(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
     reader.onload = () => {
       const img = new Image();
       img.onerror = reject;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxSide = 720;
-        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
+      img.onload = () => openPhotoCropper(img, resolve);
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+function openPhotoCropper(img, done) {
+  const stageW = Math.min(320, window.innerWidth - 48);
+  const frameW = Math.round(stageW * 0.7);
+  const frameH = Math.round(frameW / PHOTO_FRAME_RATIO);
+  const stageH = frameH + 40;
+  const modal = document.createElement("div");
+  modal.className = "auth-modal photo-crop-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Enquadrar a foto");
+  modal.innerHTML = `
+    <div class="auth-modal-backdrop"></div>
+    <div class="photo-crop-body">
+      <h3>Enquadra a tua foto</h3>
+      <p class="hint">Arrasta para mover. A zona clara é a que fica na carta.</p>
+      <canvas class="photo-crop-stage" width="${stageW}" height="${stageH}" style="width:${stageW}px;height:${stageH}px"></canvas>
+      <label class="photo-crop-zoom"><span>Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"></label>
+      <div class="actions">
+        <button type="button" class="ghost-btn" data-crop-rotate="-1" aria-label="Rodar para a esquerda">↺</button>
+        <button type="button" class="ghost-btn" data-crop-rotate="1" aria-label="Rodar para a direita">↻</button>
+        <button type="button" class="ghost-btn" data-crop-cancel>Cancelar</button>
+        <button type="button" class="primary-btn" data-crop-ok>Usar foto</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const canvas = modal.querySelector("canvas");
+  const slider = modal.querySelector("input[type=range]");
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = stageW * dpr;
+  canvas.height = stageH * dpr;
+  const ctx = canvas.getContext("2d");
+  let rot = 0;
+  let zoom = 1;
+  let ox = 0;
+  let oy = 0;
+
+  const dims = () => (rot % 2 ? [img.height, img.width] : [img.width, img.height]);
+  const baseScale = () => { const [w, h] = dims(); return Math.max(frameW / w, frameH / h); };
+  const clamp = () => {
+    const [w, h] = dims();
+    const scale = baseScale() * zoom;
+    const maxX = Math.max(0, (w * scale - frameW) / 2);
+    const maxY = Math.max(0, (h * scale - frameH) / 2);
+    ox = Math.min(maxX, Math.max(-maxX, ox));
+    oy = Math.min(maxY, Math.max(-maxY, oy));
+  };
+  const paint = (target, width, height, k, withOverlay) => {
+    target.clearRect(0, 0, width, height);
+    target.save();
+    target.translate(width / 2 + ox * k, height / 2 + oy * k);
+    target.rotate((rot * Math.PI) / 2);
+    target.scale(baseScale() * zoom * k, baseScale() * zoom * k);
+    target.drawImage(img, -img.width / 2, -img.height / 2);
+    target.restore();
+    if (!withOverlay) return;
+    const fx = (width - frameW * k) / 2;
+    const fy = (height - frameH * k) / 2;
+    target.fillStyle = "rgba(10, 14, 28, .62)";
+    target.beginPath();
+    target.rect(0, 0, width, height);
+    target.roundRect(fx, fy, frameW * k, frameH * k, frameW * k * 0.07);
+    target.fill("evenodd");
+    target.strokeStyle = "#fff";
+    target.lineWidth = 2 * k;
+    target.beginPath();
+    target.roundRect(fx, fy, frameW * k, frameH * k, frameW * k * 0.07);
+    target.stroke();
+  };
+  const draw = () => { clamp(); paint(ctx, canvas.width, canvas.height, dpr, true); };
+  draw();
+
+  const pointers = new Map();
+  let pinchStart = null;
+  canvas.addEventListener("pointerdown", (event) => {
+    canvas.setPointerCapture(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom };
+    }
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    const prev = pointers.get(event.pointerId);
+    if (!prev) return;
+    const next = { x: event.clientX, y: event.clientY };
+    pointers.set(event.pointerId, next);
+    if (pointers.size === 2 && pinchStart) {
+      const [a, b] = [...pointers.values()];
+      zoom = Math.min(4, Math.max(1, pinchStart.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinchStart.dist)));
+      slider.value = zoom;
+    } else if (pointers.size === 1) {
+      ox += next.x - prev.x;
+      oy += next.y - prev.y;
+    }
+    draw();
+  });
+  const release = (event) => { pointers.delete(event.pointerId); pinchStart = null; };
+  canvas.addEventListener("pointerup", release);
+  canvas.addEventListener("pointercancel", release);
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    zoom = Math.min(4, Math.max(1, zoom * (event.deltaY < 0 ? 1.08 : 0.93)));
+    slider.value = zoom;
+    draw();
+  }, { passive: false });
+  slider.addEventListener("input", () => { zoom = Number(slider.value); draw(); });
+  modal.querySelectorAll("[data-crop-rotate]").forEach((button) => button.addEventListener("click", () => {
+    rot = (rot + Number(button.dataset.cropRotate) + 4) % 4;
+    ox = 0;
+    oy = 0;
+    draw();
+  }));
+
+  const close = (result) => {
+    modal.remove();
+    window.removeEventListener("keydown", onKey);
+    done(result);
+  };
+  const onKey = (event) => { if (event.key === "Escape") close(null); };
+  window.addEventListener("keydown", onKey);
+  modal.querySelector(".auth-modal-backdrop").addEventListener("click", () => close(null));
+  modal.querySelector("[data-crop-cancel]").addEventListener("click", () => close(null));
+  modal.querySelector("[data-crop-ok]").addEventListener("click", () => {
+    const out = document.createElement("canvas");
+    out.width = 600;
+    out.height = Math.round(600 / PHOTO_FRAME_RATIO);
+    paint(out.getContext("2d"), out.width, out.height, out.width / frameW, false);
+    close(out.toDataURL("image/jpeg", 0.85));
   });
 }
 
@@ -9450,6 +9582,32 @@ function clearPlayerForm() {
 }
 
 // Historico: um carrossel de jogos por mes; cada jogo mostra so as duas equipas, o resultado, o MVP e se tem video.
+// O Arquivo junta os jogos de todos os clubes do jogador (com o simbolo do clube); dentro do clube so os desse clube.
+let archiveGames = null; // jogos terminados dos outros clubes: [{ game, groupId }]
+let archivePlayers = new Map(); // "grupo:jogador" -> { id, name, photoThumb }
+let archiveLoading = false;
+
+async function loadArchiveGames() {
+  if (archiveLoading || !remoteEnabled || !supabaseClient || !currentSession?.user || myGroups.length < 2) return;
+  archiveLoading = true;
+  try {
+    const groupIds = myGroups.map((group) => group.id);
+    const [{ data: gameRows, error: gameError }, { data: playerRows, error: playerError }] = await Promise.all([
+      supabaseClient.from("games").select("*").eq("status", "finished").in("group_id", groupIds).order("date", { ascending: false }),
+      supabaseClient.from("players").select(photoThumbsAvailable ? "id, name, photo_thumb, group_id" : "id, name, group_id").in("group_id", groupIds),
+    ]);
+    if (gameError || playerError) throw gameError || playerError;
+    archivePlayers = new Map((playerRows || []).map((row) => [`${row.group_id}:${row.id}`, { id: row.id, name: row.name, photoThumb: row.photo_thumb || "" }]));
+    archiveGames = (gameRows || []).filter((row) => row.group_id !== activeGroupId).map((row) => ({ game: gameFromRow(row), groupId: row.group_id }));
+  } catch (error) {
+    console.warn("Archive load failed", error);
+    archiveGames = null;
+  } finally {
+    archiveLoading = false;
+    if (currentViewName === "games") renderGamesList();
+  }
+}
+
 function renderGameTeamColumn(side, players, mvpIds) {
   return `
     <div class="gh-team gh-team-${side}">
@@ -9465,17 +9623,24 @@ function renderGameTeamColumn(side, players, mvpIds) {
     </div>`;
 }
 
-function renderGameHistoryCard(game) {
-  const teamA = hydrate([...(game.teamA || []), ...(getBenchA(game) || [])]);
-  const teamB = hydrate([...(game.teamB || []), ...(getBenchB(game) || [])]);
-  const mvpIds = getOfficialMvpIdsForGame(game);
+// groupId: clube do jogo (so com showClub); jogos de outros clubes nao tem MVP nem video carregados.
+function renderGameHistoryCard(game, { groupId = activeGroupId, showClub = false } = {}) {
+  const own = groupId === activeGroupId;
+  const lookup = own
+    ? hydrate
+    : (ids) => (ids || []).map((id) => archivePlayers.get(`${groupId}:${id}`)).filter(Boolean);
+  const teamA = lookup([...(game.teamA || []), ...(getBenchA(game) || [])]);
+  const teamB = lookup([...(game.teamB || []), ...(getBenchB(game) || [])]);
+  const mvpIds = own ? getOfficialMvpIdsForGame(game) : new Set();
   const hasScore = game.scoreA != null && game.scoreB != null;
   const date = new Date(game.date);
   const dateLabel = `${date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "")} · ${date.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}`;
-  const hasVideo = getGameVideoParts(game.id).length > 0;
+  const hasVideo = own && getGameVideoParts(game.id).length > 0;
+  const group = showClub ? myGroups.find((item) => item.id === groupId) : null;
   return `
-    <article class="game-card gh-card" role="button" tabindex="0" data-open-game="${game.id}" aria-label="Abrir o jogo de ${escapeHtml(dateLabel)}">
+    <article class="game-card gh-card" role="button" tabindex="0" data-open-game="${escapeHtml(game.id)}" data-game-group="${escapeHtml(groupId || "")}" aria-label="Abrir o jogo de ${escapeHtml(dateLabel)}${group ? ` (${escapeHtml(group.name)})` : ""}">
       <div class="gh-head">
+        ${group ? `<span class="gh-club" title="${escapeHtml(group.name)}">${renderClubSymbol(group, "club-symbol-sm")}</span>` : ""}
         <span class="gh-date">${escapeHtml(dateLabel)}</span>
         ${hasVideo ? '<span class="gh-video" title="Tem vídeo" aria-label="Tem vídeo">▶</span>' : ""}
       </div>
@@ -9486,56 +9651,68 @@ function renderGameHistoryCard(game) {
         ${renderGameTeamColumn("a", teamA, mvpIds)}
         ${renderGameTeamColumn("b", teamB, mvpIds)}
       </div>
-      <button class="danger-btn admin-only gh-delete" data-delete-game="${game.id}">Apagar</button>
+      ${own ? `<button class="danger-btn admin-only gh-delete" data-delete-game="${escapeHtml(game.id)}">Apagar</button>` : ""}
     </article>`;
 }
 
-function renderGamesList() {
-  if (!state.games.length) {
-    els.gamesList.innerHTML = `<div class="empty-state">Ainda nao ha jogos confirmados.</div>`;
+// items: [{ game, groupId }]; um carrossel por mes.
+function renderGameMonths(items, { showClub = false } = {}) {
+  const months = new Map();
+  [...items].sort((a, b) => new Date(b.game.date) - new Date(a.game.date)).forEach((item) => {
+    const key = monthKey(item.game.date);
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(item);
+  });
+  return [...months].map(([key, list]) => `
+    <section class="games-month">
+      <h3>${escapeHtml(formatMonthLabel(key))} <small>${list.length} ${list.length === 1 ? "jogo" : "jogos"}</small></h3>
+      <div class="games-rail">${list.map((item) => renderGameHistoryCard(item.game, { groupId: item.groupId, showClub })).join("")}</div>
+    </section>`).join("");
+}
+
+async function openGameFromHistory(gameId, groupId) {
+  if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId);
+  const game = state.games.find((item) => item.id === gameId);
+  if (isFinishedGame(game)) {
+    currentHistoryGameId = game.id;
+    currentGameId = null;
+    showView("history-game");
+    renderHistoryGameDetail();
     return;
   }
+  currentGameId = game?.id || gameId;
+  currentHistoryGameId = null;
+  showView("today");
+  renderCurrentGame();
+}
 
-  const months = new Map();
-  [...state.games].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((game) => {
-    const key = monthKey(game.date);
-    if (!months.has(key)) months.set(key, []);
-    months.get(key).push(game);
-  });
-  els.gamesList.innerHTML = [...months].map(([key, games]) => `
-    <section class="games-month">
-      <h3>${escapeHtml(formatMonthLabel(key))} <small>${games.length} ${games.length === 1 ? "jogo" : "jogos"}</small></h3>
-      <div class="games-rail">${games.map(renderGameHistoryCard).join("")}</div>
-    </section>`).join("");
-
-  const openGame = (gameId) => {
-    const game = state.games.find((item) => item.id === gameId);
-    if (isFinishedGame(game)) {
-      currentHistoryGameId = game.id;
-      currentGameId = null;
-      showView("history-game");
-      renderHistoryGameDetail();
-      return;
-    }
-    currentGameId = game?.id || gameId;
-    currentHistoryGameId = null;
-    showView("today");
-    renderCurrentGame();
-  };
-  els.gamesList.querySelectorAll("[data-open-game]").forEach((card) => {
-    card.addEventListener("click", () => openGame(card.dataset.openGame));
+function bindGameCards(container) {
+  container.querySelectorAll("[data-open-game]").forEach((card) => {
+    const open = () => openGameFromHistory(card.dataset.openGame, card.dataset.gameGroup);
+    card.addEventListener("click", open);
     card.addEventListener("keydown", (event) => {
       if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) return;
       event.preventDefault();
-      openGame(card.dataset.openGame);
+      open();
     });
   });
-  els.gamesList.querySelectorAll("[data-delete-game]").forEach((button) => {
+  container.querySelectorAll("[data-delete-game]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       deleteGame(button.dataset.deleteGame);
     });
   });
+}
+
+function renderGamesList() {
+  const items = state.games.map((game) => ({ game, groupId: activeGroupId }));
+  if (!items.length && !archiveGames?.length) {
+    els.gamesList.innerHTML = `<div class="empty-state">Ainda nao ha jogos confirmados.</div>`;
+    return;
+  }
+  const showClub = myGroups.length > 1;
+  els.gamesList.innerHTML = renderGameMonths(showClub && archiveGames ? [...items, ...archiveGames] : items, { showClub });
+  bindGameCards(els.gamesList);
 }
 
 // ---- Clube: simbolo, bio, plantel e os meus clubes ----
@@ -9768,6 +9945,10 @@ function renderClubPanel() {
       ${roster.length ? `<div class="club-roster">${roster.map((item) => `
         <button type="button" class="club-player" data-club-player="${escapeHtml(item.id)}"><strong>${escapeHtml(item.name)}</strong><small>${item.overall ?? "-"}</small></button>`).join("")}</div>` : '<p class="hint">Sem jogadores.</p>'}
     </section>
+    <section class="club-block club-games">
+      <h4>Jogos do clube</h4>
+      ${state.games.length ? renderGameMonths(state.games.map((game) => ({ game, groupId: activeGroupId }))) : '<p class="hint">Ainda não há jogos.</p>'}
+    </section>
     <div class="actions"><button type="button" class="ghost-btn" data-club-hof>Ver Hall of Fame</button></div>
     <section class="club-block">
       <h4>Os meus clubes</h4>
@@ -9801,6 +9982,7 @@ function renderClubPanel() {
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
   panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
   panel.querySelectorAll("[data-club-player]").forEach((button) => button.addEventListener("click", () => openPlayerProfile(button.dataset.clubPlayer)));
+  bindGameCards(panel);
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
   panel.querySelectorAll("[data-club-leave]").forEach((button) => button.addEventListener("click", () => leaveClub(button.dataset.clubLeave)));
