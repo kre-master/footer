@@ -316,6 +316,9 @@ const els = {
   eventDate: document.querySelector("#event-date"),
   eventLocation: document.querySelector("#event-location"),
   eventMaxPlayers: document.querySelector("#event-max-players"),
+  eventPublic: document.querySelector("#event-public"),
+  eventPublicOptions: document.querySelector("#event-public-options"),
+  eventPublicNeeds: document.querySelector("#event-public-needs"),
   eventsList: document.querySelector("#events-list"),
   loadEventGoing: document.querySelector("#load-event-going"),
 };
@@ -990,6 +993,8 @@ function bindEvents() {
   bindSignupModal();
   bindNavigation();
   on(els.eventForm, "submit", saveEventFromForm);
+  on(els.eventMaxPlayers, "input", () => { els.eventMaxPlayers.dataset.touched = "1"; });
+  on(els.eventPublic, "change", () => els.eventPublicOptions?.classList.toggle("hidden", !els.eventPublic.checked));
   on(els.loadEventGoing, "click", loadCurrentEventGoingPlayers);
   on(els.monthlyMonth, "change", () => { currentMonthlyMonth = els.monthlyMonth.value; renderMonthlyRecap(); });
 }
@@ -6777,6 +6782,28 @@ function isEventFullForPlayer(eventData, playerId) {
   return getEventGoingCount(eventData.id, playerId) >= eventData.maxPlayers;
 }
 
+// Nova convocatoria: tudo vem preenchido (jogo seguinte, dia e hora habituais, vagas do ultimo jogo) e continua editavel.
+function nextEventTitle() {
+  const titles = [...(state.events || []).map((item) => item.title), ...state.games.map((game) => game.title || game.name)];
+  const numbers = titles.map((title) => /^\s*(\d+)/.exec(String(title || ""))?.[1]).filter(Boolean).map(Number);
+  return numbers.length ? `Jogo ${Math.max(...numbers) + 1}` : (getActiveGroup()?.name || "");
+}
+
+function prefillEventForm() {
+  const title = els.eventTitle;
+  if (title && document.activeElement !== title && (!title.value || title.value === title.dataset.auto)) {
+    title.dataset.auto = nextEventTitle();
+    title.value = title.dataset.auto;
+  }
+  if (els.eventDate && !els.eventDate.value) {
+    els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
+  }
+  if (els.eventMaxPlayers && !els.eventMaxPlayers.dataset.touched) {
+    const last = [...(state.events || [])].sort((a, b) => new Date(b.startsAt) - new Date(a.startsAt))[0];
+    els.eventMaxPlayers.value = clampNumber(Number(last?.maxPlayers) || 12, 10, 12);
+  }
+}
+
 // Convocatorias abertas dos outros clubes do jogador: so um resumo; para responder muda-se para esse clube.
 async function loadOtherClubEvents() {
   if (!remoteEnabled || !supabaseClient || !currentSession?.user || myGroups.length < 2) return;
@@ -6815,12 +6842,7 @@ function renderOtherClubEventCard(eventData) {
 
 function renderEventsList() {
   if (!els.eventsList) return;
-  if (els.eventDate && !els.eventDate.value) {
-    els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
-  }
-  if (els.eventTitle && !els.eventTitle.value && getActiveGroup()) {
-    els.eventTitle.value = getActiveGroup().name;
-  }
+  prefillEventForm();
 
   document.body.classList.toggle("player-linked", Boolean(getLinkedPlayer()));
   const events = [...(state.events || [])]
@@ -7434,7 +7456,13 @@ async function saveEventFromForm(event) {
   const startsAt = fromDateTimeLocalInput(els.eventDate.value);
   const location = els.eventLocation.value.trim();
   const maxPlayers = clampNumber(Number(els.eventMaxPlayers.value || 12), 10, 12);
+  const isPublic = Boolean(els.eventPublic?.checked);
+  const publicNeeds = isPublic ? els.eventPublicNeeds?.value || "" : "";
   if (!title || !startsAt) return;
+  if (isPublic && !publicNeeds) {
+    alert("Escolhe o jogador tipo que precisas para o jogo aberto ao público.");
+    return;
+  }
 
   const eventData = normalizeEventRecord({
     id: `e-${Date.now()}-${slug(title)}`,
@@ -7445,6 +7473,8 @@ async function saveEventFromForm(event) {
     minPlayers: 10,
     maxPlayers,
     status: "open",
+    visibility: isPublic ? "public" : "group",
+    publicNeeds: publicNeeds || null,
     createdBy: currentSession?.user?.id || null,
   });
 
@@ -7459,6 +7489,9 @@ async function saveEventFromForm(event) {
   }
   saveState();
   els.eventForm.reset();
+  delete els.eventMaxPlayers.dataset.touched;
+  els.eventPublicOptions?.classList.add("hidden");
+  els.eventLocation.value = "";
   els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
   render();
   showView("events");
@@ -9890,13 +9923,26 @@ async function bindPitchPicker(picker, input) {
     if (!pitch) return;
     input.value = (pitch.name ? `${pitch.name}, ${pitch.municipality}` : `Campo em ${pitch.municipality}`).slice(0, 80);
   });
+  // Escolhe concelho e campo que correspondem ao texto do local (o formato que o proprio seletor escreve).
+  const pitchLabel = (pitch) => (pitch.name ? `${pitch.name}, ${pitch.municipality}` : `Campo em ${pitch.municipality}`).slice(0, 80);
+  picker.syncFromText = (text) => {
+    const match = text ? pitches.find((pitch) => pitchLabel(pitch) === text.trim()) : null;
+    if (!match) return;
+    municipalitySelect.value = match.municipality;
+    municipalitySelect.dispatchEvent(new Event("change"));
+    pitchSelect.value = match.id;
+  };
+  picker.syncFromText(input.value);
 }
 
 // Local habitual do clube: pre-preenche a convocatoria enquanto o campo estiver vazio.
 function prefillEventLocation() {
   const field = els.eventLocation;
   const habitual = getActiveGroup()?.defaultLocation;
-  if (field && habitual && !field.value && document.activeElement !== field) field.value = habitual;
+  if (field && habitual && !field.value && document.activeElement !== field) {
+    field.value = habitual;
+    document.querySelector("#pitch-picker")?.syncFromText?.(habitual);
+  }
 }
 
 function renderClubTab() {

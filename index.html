@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261107-gh8">
+    <link rel="stylesheet" href="styles.css?v=20261107-gh9">
     <link rel="stylesheet" href="theme-caderneta.css?v=20261106-owner3">
   </head>
   <body>
@@ -143,7 +143,18 @@
                   <select data-pitch-select aria-label="Campo" disabled><option value="">Campo</option></select>
                 </div>
                 <input id="event-location" placeholder="Local">
-                <input id="event-max-players" type="number" min="10" max="12" value="12" placeholder="Max. jogadores">
+                <label class="event-field"><span>Jogadores (vagas)</span>
+                  <input id="event-max-players" type="number" min="10" max="12" value="12" placeholder="Max. jogadores"></label>
+                <label class="club-check"><input id="event-public" type="checkbox">
+                  <span>Jogo aberto ao público? Quem não é do clube vê o jogo e pede para entrar.</span></label>
+                <div id="event-public-options" class="event-public-options hidden">
+                  <select id="event-public-needs" aria-label="Jogador tipo">
+                    <option value="">Jogador tipo…</option>
+                    <option value="outfield">Jogador de campo</option>
+                    <option value="mixed">Misto</option>
+                    <option value="goalkeeper">Guarda-redes</option>
+                  </select>
+                </div>
                 <button class="primary-btn" type="submit">Lancar evento</button>
               </form>
             </section>
@@ -597,6 +608,6 @@
     <script src="notifications.js?v=20261106-owner3"></script>
     <script src="heart-rate.js?v=20261105-hr9"></script>
     <script src="video-lab.js?v=20261101-casa1"></script>
-    <script src="app.js?v=20261107-gh8"></script>
+    <script src="app.js?v=20261107-gh9"></script>
   </body>
 </html>

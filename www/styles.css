@@ -8558,3 +8558,8 @@ body.boot-refreshing::before {
 .other-club-text { display: grid; gap: 2px; min-width: 0; }
 .other-club-text small { color: var(--muted); font-size: 12.5px; }
 .other-club-go { font-size: 26px; color: var(--muted); }
+
+/* Nova convocatoria: campo das vagas com etiqueta e jogo aberto ao publico. */
+.event-field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.event-public-options { display: grid; gap: 8px; }
+.event-public-options.hidden { display: none; }
