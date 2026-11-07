@@ -1358,7 +1358,8 @@ function getAccountRole(profile) {
 
 const ROLE_LABELS = { owner: "dono", admin: "admin", player: "jogador" };
 
-async function switchActiveGroup(groupId) {
+// stay: continua na pagina em que estava (sem voltar ao perfil/"Eu"), por exemplo ao trocar de clube dentro do Clube.
+async function switchActiveGroup(groupId, { stay = false } = {}) {
   if (groupId === activeGroupId || !myGroups.some((group) => group.id === groupId)) return;
   activeGroupId = groupId;
   writeActiveGroupId(groupId);
@@ -1373,7 +1374,7 @@ async function switchActiveGroup(groupId) {
   currentSuggestions = [];
   finishingGame = false;
   await loadRemoteState();
-  applyLandingRoute();
+  if (!stay) applyLandingRoute();
   render();
   updateAccessUi();
 }
@@ -6835,7 +6836,7 @@ function renderEventsList() {
     + (others.length ? `<h3 class="events-other-title">Noutros clubes</h3>${others.map(renderOtherClubEventCard).join("")}` : "");
   els.eventsList.querySelectorAll("[data-open-club-event]").forEach((card) => {
     const open = async () => {
-      await switchActiveGroup(card.dataset.openClubEvent);
+      await switchActiveGroup(card.dataset.openClubEvent, { stay: true });
       showView("events");
     };
     card.addEventListener("click", open);
@@ -9768,7 +9769,7 @@ function renderGameMonths(items, { showClub = false } = {}) {
 }
 
 async function openGameFromHistory(gameId, groupId) {
-  if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId);
+  if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId, { stay: true });
   const game = state.games.find((item) => item.id === gameId);
   if (isFinishedGame(game)) {
     currentHistoryGameId = game.id;
@@ -10086,9 +10087,9 @@ function renderClubPanel() {
   bindGameCards(panel);
   panel.querySelectorAll("[data-club-step]").forEach((button) => button.addEventListener("click", () => {
     const next = myGroups[(clubIndex + Number(button.dataset.clubStep) + myGroups.length) % myGroups.length];
-    if (next) switchActiveGroup(next.id);
+    if (next) switchActiveGroup(next.id, { stay: true });
   }));
-  panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
+  panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch, { stay: true })));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
   panel.querySelectorAll("[data-club-leave]").forEach((button) => button.addEventListener("click", () => leaveClub(button.dataset.clubLeave)));
   panel.querySelector("[data-club-delete]")?.addEventListener("click", () => deleteGroup(group.id, group.name));
@@ -11027,11 +11028,11 @@ async function runSearch(query) {
 function bindSearchResults(root) {
   root.querySelectorAll("[data-search-player]").forEach((button) => button.addEventListener("click", async () => {
     const groupId = button.dataset.searchGroup;
-    if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId);
+    if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId, { stay: true });
     openPlayerProfile(button.dataset.searchPlayer);
   }));
   root.querySelectorAll("[data-search-switch]").forEach((button) => button.addEventListener("click", async () => {
-    await switchActiveGroup(button.dataset.searchSwitch);
+    await switchActiveGroup(button.dataset.searchSwitch, { stay: true });
     showView("club");
   }));
   root.querySelectorAll("[data-search-join]").forEach((button) => button.addEventListener("click", async () => {
