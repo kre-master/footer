@@ -9126,9 +9126,19 @@ async function saveCurrentScore() {
 function completeOriginEventForGame(game) {
   const gameTime = new Date(game.date).getTime();
   const originEvent = findOriginEventForGame(game)
-    || (state.events || []).find((eventData) => eventData.status === "open" && Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000);
+    || (state.events || []).find((eventData) => eventData.status === "open" && Math.abs(new Date(eventData.startsAt).getTime() - gameTime) <= 60 * 1000)
+    || getOpenEventBehindGame(game);
   if (!originEvent || originEvent.status === "completed") return;
   originEvent.status = "completed";
+}
+
+// Jogo guardado com data diferente da convocatoria de onde saiu (ex.: data do jogo mudada depois):
+// a convocatoria aberta em que o admin estava a trabalhar fecha com ele, se os jogadores batem.
+function getOpenEventBehindGame(game) {
+  const eventData = (state.events || []).find((item) => item.id === currentEventId && item.status === "open");
+  if (!eventData) return null;
+  const hoursApart = Math.abs(new Date(eventData.startsAt).getTime() - new Date(game.date).getTime()) / 36e5;
+  return hoursApart <= 36 && eventGoingMatchesGame(eventData, new Set(getGamePlayerIds(game))) ? eventData : null;
 }
 
 function getGameTitle(game) {
@@ -9151,9 +9161,17 @@ function findEventForGame(game, options = {}) {
     if (statuses && !statuses.has(eventData.status)) return false;
     const eventDate = new Date(eventData.startsAt).getTime();
     if (Math.abs(eventDate - gameDate) > 60 * 1000) return false;
-    const goingIds = getEventResponses(eventData.id, "going").map((response) => response.playerId);
-    return goingIds.length ? goingIds.every((playerId) => gamePlayerIds.has(playerId)) : true;
+    return eventGoingMatchesGame(eventData, gamePlayerIds);
   }) || null;
+}
+
+// Quem diz "Vou" e depois e retirado das equipas (ou nao aparece) nao pode impedir o fecho da
+// convocatoria: basta a maioria dos confirmados estar no jogo.
+function eventGoingMatchesGame(eventData, gamePlayerIds) {
+  const goingIds = getEventResponses(eventData.id, "going").map((response) => response.playerId);
+  if (!goingIds.length) return true;
+  const inGame = goingIds.filter((playerId) => gamePlayerIds.has(playerId)).length;
+  return inGame >= Math.ceil(goingIds.length / 2);
 }
 
 function findGameForEventData(eventData) {
@@ -9165,8 +9183,7 @@ function findGameForEventData(eventData) {
     const gameDate = new Date(game.date).getTime();
     if (Number.isNaN(gameDate) || Math.abs(gameDate - eventDate) > 60 * 1000) return false;
     if (game.eventId && game.eventId === eventData.id) return true;
-    const gamePlayerIds = new Set(getGamePlayerIds(game));
-    return goingIds.length ? goingIds.every((playerId) => gamePlayerIds.has(playerId)) : true;
+    return eventGoingMatchesGame(eventData, new Set(getGamePlayerIds(game)));
   }) || null;
 }
 
