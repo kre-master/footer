@@ -8541,7 +8541,7 @@ body.boot-refreshing::before {
 #view-club > .panel { display: flex; flex-direction: column; gap: 18px; }
 #club-panel { display: contents; }
 #club-panel > .club-after { order: 6; }
-#new-group-panel { order: 5; margin-top: 0; }
+#new-group-panel { order: 99; margin-top: 0; }
 .club-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .club-hero-text h3 { font-size: clamp(28px, 7vw, 40px); }
 
@@ -8571,3 +8571,15 @@ body.boot-refreshing::before {
   .subtabs { padding-top: 2px; }
   .subtab { padding: 0 9px; }
 }
+
+/* Contas do clube em cartoes (em vez de tabela larga) e Procurar com separadores. */
+.account-rows { display: grid; gap: 10px; }
+.account-row-card { display: grid; gap: 6px; padding: 12px; border: 2px solid var(--cad-ink, var(--line)); border-radius: 16px; background: var(--cad-paper, var(--surface)); min-width: 0; }
+.account-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.account-row-top strong { font-size: 16px; overflow-wrap: anywhere; }
+.account-row-card small { color: var(--muted); overflow-wrap: anywhere; }
+.account-row-player { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.account-row-action { justify-self: start; }
+.search-tabs { display: flex; gap: 4px; margin: 4px 0 10px; }
+.search-tabs .subtab small { color: inherit; opacity: .7; font-size: 11px; }
+.search-row-static { cursor: default; }

@@ -3039,6 +3039,7 @@ function clearSignedOutData() {
   archivePlayers = new Map();
   myGamesAll = null;
   otherClubEvents = [];
+  searchResults = null;
   selectedIds.clear();
   previewGame = null;
   currentGameId = null;
@@ -3777,6 +3778,7 @@ function render() {
   prefillEventLocation();
   renderGallery();
   renderAccountPanel();
+  renderAccountVisibility();
   renderClaimsList();
   renderAccountsList();
   renderPaymentsPanel();
@@ -3810,6 +3812,33 @@ function getLinkedPlayer() {
 function getMyPendingClaim() {
   if (!currentSession?.user) return null;
   return playerClaims.find((claim) => claim.user_id === currentSession.user.id && claim.status === "pending") || null;
+}
+
+// Visibilidade na pesquisa: por defeito a conta esta escondida; so aparece em Procurar se a pessoa escolher.
+function renderAccountVisibility() {
+  const holder = document.querySelector("#account-visibility");
+  if (!holder) return;
+  if (!remoteEnabled || !currentSession?.user) {
+    holder.innerHTML = "";
+    return;
+  }
+  holder.innerHTML = `
+    <div class="account-card">
+      <h3>Visibilidade na pesquisa</h3>
+      <label class="club-check"><input type="checkbox" data-profile-public ${currentProfile?.profile_public ? "checked" : ""}>
+        <span>Perfil público: qualquer pessoa pode encontrar-me em Procurar (só o nome e o clube, nunca as classificações). Por defeito estou escondido.</span></label>
+    </div>`;
+  holder.querySelector("[data-profile-public]")?.addEventListener("change", async (event) => {
+    const checkbox = event.target;
+    const wanted = checkbox.checked;
+    const { error } = await supabaseClient.rpc("set_profile_public", { p_public: wanted });
+    if (error) {
+      checkbox.checked = !wanted;
+      alert(`Nao consegui guardar: ${error.message}`);
+      return;
+    }
+    if (currentProfile) currentProfile.profile_public = wanted;
+  });
 }
 
 function renderAccountPanel() {
@@ -5636,47 +5665,25 @@ function renderAccountsList() {
     ? knownProfiles.filter((profile) => groupMemberRoles.has(profile.id))
     : knownProfiles;
   if (!profiles.length) {
-    els.accountsList.innerHTML = `<div class="empty-state">Ainda nao ha contas criadas.</div>`;
+    els.accountsList.innerHTML = `<div class="empty-state">Ainda nao ha contas neste clube.</div>`;
     return;
   }
 
-  els.accountsList.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Jogador</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${profiles.map((profile) => {
-            const linkedPlayer = state.players.find((p) => p.linkedUserId === profile.id);
-            const role = getAccountRole(profile);
-            const canToggle = role !== "owner" && profile.id !== currentSession?.user?.id;
-            return `
-              <tr>
-                <td><strong>${escapeHtml(profile.display_name || "-")}</strong></td>
-                <td>${escapeHtml(profile.username || "-")}</td>
-                <td>${escapeHtml(profile.email || "-")}</td>
-                <td><span class="metric">${escapeHtml(ROLE_LABELS[role] || role)}</span></td>
-                <td>${linkedPlayer ? `${renderAvatar(linkedPlayer)} <strong>${escapeHtml(linkedPlayer.name)}</strong>` : "<span class=\"metric\">Sem perfil</span>"}</td>
-                <td>
-                  ${canToggle ? `<button class="mini-btn" data-toggle-admin="${profile.id}">
-                    ${role === "admin" ? "Remover admin" : "Tornar admin"}
-                  </button>` : ""}
-                </td>
-              </tr>
-            `;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
+  els.accountsList.innerHTML = `<div class="account-rows">${profiles.map((profile) => {
+    const linkedPlayer = state.players.find((p) => p.linkedUserId === profile.id);
+    const role = getAccountRole(profile);
+    const canToggle = role !== "owner" && profile.id !== currentSession?.user?.id;
+    return `
+      <article class="account-row-card">
+        <div class="account-row-top">
+          <strong>${escapeHtml(profile.display_name || profile.username || "-")}</strong>
+          <span class="metric">${escapeHtml(ROLE_LABELS[role] || role)}</span>
+        </div>
+        <small>${escapeHtml(profile.username ? `@${profile.username}` : "")}${profile.username && profile.email ? " · " : ""}${escapeHtml(profile.email || "")}</small>
+        <div class="account-row-player">${linkedPlayer ? `${renderAvatar(linkedPlayer)} <strong>${escapeHtml(linkedPlayer.name)}</strong>` : '<span class="metric">Sem perfil de jogador</span>'}</div>
+        ${canToggle ? `<button class="ghost-btn account-row-action" data-toggle-admin="${profile.id}">${role === "admin" ? "Remover admin" : "Tornar admin"}</button>` : ""}
+      </article>`;
+  }).join("")}</div>`;
 
   els.accountsList.querySelectorAll("[data-toggle-admin]").forEach((button) => {
     button.addEventListener("click", () => toggleProfileAdminRole(button.dataset.toggleAdmin));
@@ -11006,6 +11013,8 @@ let searchBusy = false;
 let searchTimer = null;
 let searchToken = 0;
 
+let searchTab = "players";
+
 function renderSearchPanel() {
   const panel = document.querySelector("#search-panel");
   if (!panel) return;
@@ -11015,8 +11024,7 @@ function renderSearchPanel() {
   }
   panel.innerHTML = `
     <form class="search-form" data-search-form role="search">
-      <input id="search-q" type="search" name="q" value="${escapeHtml(searchQuery)}" placeholder="Nome de um jogador ou clube" maxlength="40" autocomplete="off" aria-label="Procurar jogadores e clubes">
-      <button class="primary-btn" type="submit">Procurar</button>
+      <input id="search-q" type="search" name="q" value="${escapeHtml(searchQuery)}" placeholder="${searchTab === "clubs" ? "Nome de um clube" : "Nome de um jogador"}" maxlength="40" autocomplete="off" aria-label="Procurar">
     </form>
     <div data-search-results>${renderSearchResults()}</div>
     <p class="hint search-soon">Em breve: jogos perto de ti.</p>`;
@@ -11032,43 +11040,53 @@ function renderSearchPanel() {
     searchTimer = setTimeout(() => runSearch(value), 350);
   });
   bindSearchResults(panel);
+  // Ao abrir Procurar ja aparecem os jogadores e clubes publicos, sem escrever nada.
+  if (!searchResults && !searchBusy) runSearch(searchQuery);
 }
 
 function renderSearchResults() {
-  if (searchBusy && !searchResults) return `<p class="hint">A procurar…</p>`;
-  if (!searchResults) return `<p class="hint">Procura jogadores dos teus clubes e clubes com perfil público.</p>`;
+  const counts = searchResults ? { players: searchResults.players.length, clubs: searchResults.clubs.length } : { players: "", clubs: "" };
+  const tabs = `
+    <div class="search-tabs" role="tablist" aria-label="Procurar">
+      ${[["players", "Jogadores"], ["clubs", "Clubes"]].map(([key, label]) => `
+        <button type="button" role="tab" class="subtab ${searchTab === key ? "active" : ""}" data-search-tab="${key}" aria-selected="${searchTab === key}">${label}${counts[key] !== "" ? ` <small>${counts[key]}</small>` : ""}</button>`).join("")}
+    </div>`;
+  if (searchBusy && !searchResults) return `${tabs}<p class="hint">A procurar…</p>`;
+  if (!searchResults) return tabs;
   const { players, clubs, failed } = searchResults;
-  if (failed) return `<p class="hint warn">Não consegui procurar agora. Tenta outra vez daqui a pouco.</p>`;
-  if (!players.length && !clubs.length) return `<p class="hint">Nada encontrado para "${escapeHtml(searchQuery)}".</p>`;
-  return `
-    ${players.length ? `
-      <section class="search-section">
-        <h3>Jogadores</h3>
-        <div class="search-list">
-          ${players.map((row) => `
-            <button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">
+  if (failed) return `${tabs}<p class="hint warn">Não consegui procurar agora. Tenta outra vez daqui a pouco.</p>`;
+  if (searchTab === "players") {
+    if (!players.length) return `${tabs}<p class="hint">${searchQuery ? `Nenhum jogador encontrado para "${escapeHtml(searchQuery)}".` : "Ainda não há jogadores públicos. Cada jogador escolhe na sua conta se quer aparecer aqui."}</p>`;
+    return `${tabs}
+      <div class="search-list">
+        ${players.map((row) => {
+          const outsider = row.is_member === false;
+          const sub = `${escapeHtml(row.group_name || "Jogador público")}${row.is_guest ? " · convidado" : ""}`;
+          const ovr = outsider ? "" : (ratingsVisible(myGroups.find((group) => group.id === row.group_id) || { slug: "" }) ? (row.overall ?? "") : "");
+          const inner = `
               <span class="avatar search-avatar">${escapeHtml(groupInitials(row.name))}</span>
-              <span class="search-row-text"><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.group_name)}${row.is_guest ? " · convidado" : ""}</small></span>
-              <b class="search-ovr">${ratingsVisible(myGroups.find((group) => group.id === row.group_id) || { slug: "" }) ? (row.overall ?? "") : ""}</b>
-            </button>`).join("")}
-        </div>
-      </section>` : ""}
-    ${clubs.length ? `
-      <section class="search-section">
-        <h3>Clubes</h3>
-        <div class="club-list">
-          ${clubs.map((club) => `
-            <div class="club-row">
-              ${renderClubSymbol(club, "club-symbol-md")}
-              <div class="club-row-text"><strong>${escapeHtml(club.name)}</strong>
-                <small>${club.member_count} membros${club.bio ? ` - ${escapeHtml(club.bio)}` : ""}</small></div>
-              ${club.is_member
-                ? (club.id === activeGroupId ? '<small class="hint">O teu clube</small>' : `<button type="button" class="ghost-btn" data-search-switch="${escapeHtml(club.id)}">Abrir</button>`)
-                : club.request_status === "pending" ? '<small class="hint">Pedido enviado</small>'
-                : `<button type="button" class="ghost-btn" data-search-join="${escapeHtml(club.id)}">Pedir para entrar</button>`}
-            </div>`).join("")}
-        </div>
-      </section>` : ""}`;
+              <span class="search-row-text"><strong>${escapeHtml(row.name)}</strong><small>${sub}</small></span>
+              <b class="search-ovr">${ovr}</b>`;
+          return outsider
+            ? `<div class="search-row search-row-static">${inner}</div>`
+            : `<button type="button" class="search-row" data-search-player="${escapeHtml(row.player_id)}" data-search-group="${escapeHtml(row.group_id)}">${inner}</button>`;
+        }).join("")}
+      </div>`;
+  }
+  if (!clubs.length) return `${tabs}<p class="hint">${searchQuery ? `Nenhum clube encontrado para "${escapeHtml(searchQuery)}".` : "Ainda não há clubes públicos."}</p>`;
+  return `${tabs}
+    <div class="club-list">
+      ${clubs.map((club) => `
+        <div class="club-row">
+          ${renderClubSymbol(club, "club-symbol-md")}
+          <div class="club-row-text"><strong>${escapeHtml(club.name)}</strong>
+            <small>${club.member_count} membros${club.bio ? ` - ${escapeHtml(club.bio)}` : ""}</small></div>
+          ${club.is_member
+            ? (club.id === activeGroupId ? '<small class="hint">O teu clube</small>' : `<button type="button" class="ghost-btn" data-search-switch="${escapeHtml(club.id)}">Abrir</button>`)
+            : club.request_status === "pending" ? '<small class="hint">Pedido enviado</small>'
+            : `<button type="button" class="ghost-btn" data-search-join="${escapeHtml(club.id)}">Pedir para entrar</button>`}
+        </div>`).join("")}
+    </div>`;
 }
 
 function updateSearchResults() {
@@ -11082,12 +11100,6 @@ function updateSearchResults() {
 async function runSearch(query) {
   searchQuery = query;
   const token = ++searchToken;
-  if (!query) {
-    searchResults = null;
-    searchBusy = false;
-    updateSearchResults();
-    return;
-  }
   searchBusy = true;
   updateSearchResults();
   const [players, clubs] = await Promise.all([
@@ -11107,6 +11119,12 @@ async function runSearch(query) {
 }
 
 function bindSearchResults(root) {
+  root.querySelectorAll("[data-search-tab]").forEach((button) => button.addEventListener("click", () => {
+    searchTab = button.dataset.searchTab;
+    const input = document.querySelector("#search-q");
+    if (input) input.placeholder = searchTab === "clubs" ? "Nome de um clube" : "Nome de um jogador";
+    updateSearchResults();
+  }));
   root.querySelectorAll("[data-search-player]").forEach((button) => button.addEventListener("click", async () => {
     const groupId = button.dataset.searchGroup;
     if (groupId && groupId !== activeGroupId) await switchActiveGroup(groupId, { stay: true });
