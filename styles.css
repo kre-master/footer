@@ -8536,3 +8536,11 @@ body.boot-refreshing::before {
 .photo-crop-zoom { display: flex; align-items: center; gap: 10px; width: 100%; font-size: 13px; font-weight: 700; }
 .photo-crop-zoom input { flex: 1; }
 .photo-crop-body .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* Pagina do Clube: simbolo e nome, bio, numeros, jogos, criar clube, Hall of Fame, depois a gestao. */
+#view-club > .panel { display: flex; flex-direction: column; gap: 18px; }
+#club-panel { display: contents; }
+#club-panel > .club-after { order: 6; }
+#new-group-panel { order: 5; margin-top: 0; }
+.club-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.club-hero-text h3 { font-size: clamp(28px, 7vw, 40px); }

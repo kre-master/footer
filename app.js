@@ -9971,29 +9971,21 @@ function renderClubPanel() {
     <section class="club-hero">
       ${renderClubSymbol(group, "club-symbol-xl")}
       <div class="club-hero-text">
-        <p class="eyebrow">${group.isFavorite ? "Clube favorito" : "Clube"}</p>
         <h3>${escapeHtml(group.name)}</h3>
-        <span class="club-role">${escapeHtml(ROLE_LABELS[group.role] || "jogador")}</span>
       </div>
       ${canEdit && !clubEditing ? '<button type="button" class="ghost-btn" data-edit-club>Editar</button>' : ""}
     </section>
     ${clubEditing && canEdit ? renderClubEditor(group) : (group.bio ? `<p class="club-bio">${escapeHtml(group.bio)}</p>` : (canEdit ? '<p class="hint">Sem bio ainda. Usa Editar para escrever uma.</p>' : ""))}
     <section class="club-stats">
-      <div class="club-stat"><b>${roster.length}</b><span>jogadores</span></div>
       <div class="club-stat"><b>${finished}</b><span>jogos</span></div>
-      <div class="club-stat"><b>${getMvpHistoryRows(999).length}</b><span>MVPs</span></div>
-    </section>
-    <section class="club-block">
-      <h4>Plantel</h4>
-      ${roster.length ? `<div class="club-roster">${roster.map((item) => `
-        <button type="button" class="club-player" data-club-player="${escapeHtml(item.id)}"><strong>${escapeHtml(item.name)}</strong><small>${item.overall ?? "-"}</small></button>`).join("")}</div>` : '<p class="hint">Sem jogadores.</p>'}
+      <div class="club-stat"><b>${roster.length}</b><span>jogadores</span></div>
     </section>
     <section class="club-block club-games">
       <h4>Jogos do clube</h4>
       ${state.games.length ? renderGameMonths(state.games.map((game) => ({ game, groupId: activeGroupId }))) : '<p class="hint">Ainda não há jogos.</p>'}
     </section>
-    <div class="actions"><button type="button" class="ghost-btn" data-club-hof>Ver Hall of Fame</button></div>
-    <section class="club-block">
+    <div class="actions club-after"><button type="button" class="ghost-btn" data-club-hof>Hall of Fame</button></div>
+    <section class="club-block club-after">
       <h4>Os meus clubes</h4>
       <div class="club-list">
         ${myGroups.map((item) => `
@@ -10006,10 +9998,10 @@ function renderClubPanel() {
           </div>`).join("")}
       </div>
     </section>
-    ${canEdit ? '<section class="club-block" id="club-join-requests"></section>' : ""}
-    <div class="actions"><button type="button" class="ghost-btn" data-club-find>Procurar outros clubes</button></div>
+    ${canEdit ? '<section class="club-block club-after" id="club-join-requests"></section>' : ""}
+    <div class="actions club-after"><button type="button" class="ghost-btn" data-club-find>Procurar outros clubes</button></div>
     ${group.role === "owner" && remoteEnabled ? `
-      <section class="club-block club-danger">
+      <section class="club-block club-danger club-after">
         <h4>Apagar grupo</h4>
         <p class="hint">O grupo desaparece logo para todos os membros. Podes recupera-lo durante 30 dias em "A minha conta"; depois e apagado de vez, com jogadores, jogos e estatisticas.</p>
         <button type="button" class="danger-btn" data-club-delete="${escapeHtml(group.id)}">Apagar ${escapeHtml(group.name)}</button>
@@ -10024,7 +10016,6 @@ function renderClubPanel() {
   });
   panel.querySelector("[data-club-hof]")?.addEventListener("click", () => showView("stats"));
   panel.querySelector("[data-club-find]")?.addEventListener("click", () => showView("search"));
-  panel.querySelectorAll("[data-club-player]").forEach((button) => button.addEventListener("click", () => openPlayerProfile(button.dataset.clubPlayer)));
   bindGameCards(panel);
   panel.querySelectorAll("[data-club-switch]").forEach((button) => button.addEventListener("click", () => switchActiveGroup(button.dataset.clubSwitch)));
   panel.querySelectorAll("[data-club-fav]").forEach((button) => button.addEventListener("click", () => setFavoriteClub(button.dataset.clubFav)));
