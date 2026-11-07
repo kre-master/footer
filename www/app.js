@@ -199,6 +199,7 @@ let newGroupFormOpen = false;
 const PUBLIC_GAME_ERRORS = {
   traits_required: "Preenche primeiro as tuas caracteristicas na Conta.",
   event_full: "O jogo ja esta cheio.",
+  public_spots_full: "As vagas publicas deste jogo ja estao preenchidas.",
   request_rejected: "O admin deste jogo recusou o teu pedido.",
   event_not_public: "Este jogo ja nao esta aberto.",
   already_group_member: "Ja fazes parte deste grupo.",
@@ -319,6 +320,7 @@ const els = {
   eventPublic: document.querySelector("#event-public"),
   eventPublicOptions: document.querySelector("#event-public-options"),
   eventPublicNeeds: document.querySelector("#event-public-needs"),
+  eventPublicSpots: document.querySelector("#event-public-spots"),
   eventsList: document.querySelector("#events-list"),
   loadEventGoing: document.querySelector("#load-event-going"),
 };
@@ -576,6 +578,9 @@ function normalizeEventRecord(record) {
     visibility: (record.visibility || "group") === "public" ? "public" : "group",
     // Lista fixa: corre ao carregar o estado, antes das constantes dos jogos publicos.
     publicNeeds: ["outfield", "mixed", "goalkeeper"].includes(record.publicNeeds ?? record.public_needs) ? (record.publicNeeds ?? record.public_needs) : null,
+    // Vagas abertas ao publico (o admin aceita quem pedir; ao preencher-se o jogo fecha ao publico). null = sem limite proprio.
+    publicSpots: Number.isInteger(Number(record.publicSpots ?? record.public_spots)) && Number(record.publicSpots ?? record.public_spots) >= 1
+      ? Math.min(12, Number(record.publicSpots ?? record.public_spots)) : null,
     createdBy: record.createdBy || record.created_by || null,
     createdAt: record.createdAt || record.created_at || null,
   };
@@ -593,6 +598,7 @@ function eventFromRow(row) {
     status: row.status,
     visibility: row.visibility,
     publicNeeds: row.public_needs,
+    publicSpots: row.public_spots,
     createdBy: row.created_by,
     createdAt: row.created_at,
   });
@@ -611,6 +617,7 @@ function eventToRow(eventData) {
     status: clean.status,
     visibility: clean.visibility,
     public_needs: clean.publicNeeds,
+    public_spots: clean.publicSpots,
     created_by: clean.createdBy,
     ...activeGroupColumn(),
     updated_at: new Date().toISOString(),
@@ -6921,8 +6928,8 @@ function renderEventsList() {
   els.eventsList.querySelectorAll("[data-recruit-toggle]").forEach((button) => {
     button.addEventListener("click", () => toggleRecruit(button.dataset.recruitToggle));
   });
-  els.eventsList.querySelectorAll("[data-event-public-toggle], [data-event-needs]").forEach((input) => {
-    input.addEventListener("change", () => saveEventPublicSettings(input.dataset.eventPublicToggle || input.dataset.eventNeeds));
+  els.eventsList.querySelectorAll("[data-event-public-toggle], [data-event-needs], [data-event-public-spots]").forEach((input) => {
+    input.addEventListener("change", () => saveEventPublicSettings(input.dataset.eventPublicToggle || input.dataset.eventNeeds || input.dataset.eventPublicSpots));
   });
   els.eventsList.querySelectorAll("[data-invite-player]").forEach((button) => {
     button.addEventListener("click", () => invitePlayerToEvent(button.dataset.eventId, button.dataset.invitePlayer));
@@ -7002,13 +7009,19 @@ function renderRecruitBody(eventData, pending, accepted) {
             ${Object.entries(NEEDS_LABELS).map(([value, label]) => `<option value="${value}" ${eventData.publicNeeds === value ? "selected" : ""}>${label}</option>`).join("")}
           </select>
         </label>
+        <label class="game-date-control">
+          <span>Vagas para o público</span>
+          <input type="number" min="1" max="${eventData.maxPlayers}" data-event-public-spots="${eventData.id}" value="${eventData.publicSpots || ""}" placeholder="Sem limite">
+        </label>
         <label class="recruit-switch">
           <input type="checkbox" data-event-public-toggle="${eventData.id}" ${isPublic ? "checked" : ""}>
           <span>Mostrar em Jogos publicos</span>
         </label>
       </div>
       <p class="hint">${isPublic
-        ? "Quem nao e do grupo ve a data, hora, local e quantos faltam, e pode pedir para vir."
+        ? (eventData.publicSpots
+          ? `Quem nao e do grupo ve a data, hora, local e as vagas, e pede para vir. Abriste ${eventData.publicSpots} ${eventData.publicSpots === 1 ? "vaga" : "vagas"} ao publico: tu decides quem aceitas e, quando aceitares ${eventData.publicSpots}, o jogo fecha ao publico.`
+          : "Quem nao e do grupo ve a data, hora, local e quantos faltam, e pode pedir para vir.")
         : "Podes convidar quem esta disponivel, ou mostrar o jogo em Jogos publicos para receberes pedidos."}</p>
       ${pending.length ? `
         <div class="join-requests">
@@ -7135,9 +7148,12 @@ async function saveEventPublicSettings(eventId) {
   if (!eventData) return;
   const visibility = els.eventsList?.querySelector(`[data-event-public-toggle="${eventId}"]`)?.checked ? "public" : "group";
   const needs = els.eventsList?.querySelector(`[data-event-needs="${eventId}"]`)?.value || null;
-  const previous = { visibility: eventData.visibility, publicNeeds: eventData.publicNeeds };
+  const spotsValue = Number(els.eventsList?.querySelector(`[data-event-public-spots="${eventId}"]`)?.value);
+  const spots = Number.isInteger(spotsValue) && spotsValue >= 1 ? Math.min(spotsValue, eventData.maxPlayers) : null;
+  const previous = { visibility: eventData.visibility, publicNeeds: eventData.publicNeeds, publicSpots: eventData.publicSpots };
   eventData.visibility = visibility;
   eventData.publicNeeds = needs;
+  eventData.publicSpots = spots;
   if (remoteEnabled && supabaseClient) {
     const { error } = await supabaseClient.from("events").upsert(eventToRow(eventData));
     if (error) {
@@ -7458,6 +7474,7 @@ async function saveEventFromForm(event) {
   const maxPlayers = clampNumber(Number(els.eventMaxPlayers.value || 12), 10, 12);
   const isPublic = Boolean(els.eventPublic?.checked);
   const publicNeeds = isPublic ? els.eventPublicNeeds?.value || "" : "";
+  const publicSpots = isPublic ? clampNumber(Number(els.eventPublicSpots?.value || 1), 1, maxPlayers) : null;
   if (!title || !startsAt) return;
   if (isPublic && !publicNeeds) {
     alert("Escolhe o jogador tipo que precisas para o jogo aberto ao público.");
@@ -7475,6 +7492,7 @@ async function saveEventFromForm(event) {
     status: "open",
     visibility: isPublic ? "public" : "group",
     publicNeeds: publicNeeds || null,
+    publicSpots,
     createdBy: currentSession?.user?.id || null,
   });
 
@@ -7491,6 +7509,7 @@ async function saveEventFromForm(event) {
   els.eventForm.reset();
   delete els.eventMaxPlayers.dataset.touched;
   els.eventPublicOptions?.classList.add("hidden");
+  if (els.eventPublicSpots) els.eventPublicSpots.value = "1";
   els.eventLocation.value = "";
   els.eventDate.value = toDateTimeLocalInput(defaultEventDate());
   render();
