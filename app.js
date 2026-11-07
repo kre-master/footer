@@ -9665,7 +9665,7 @@ function renderGameMonths(items, { showClub = false } = {}) {
   });
   return [...months].map(([key, list]) => `
     <section class="games-month">
-      <h3>${escapeHtml(formatMonthLabel(key))} <small>${list.length} ${list.length === 1 ? "jogo" : "jogos"}</small></h3>
+      <h3>${escapeHtml(formatMonthLabel(key).replace(/^./, (c) => c.toUpperCase()))} <small>${list.length} ${list.length === 1 ? "jogo" : "jogos"}</small></h3>
       <div class="games-rail">${list.map((item) => renderGameHistoryCard(item.game, { groupId: item.groupId, showClub })).join("")}</div>
     </section>`).join("");
 }
@@ -9710,8 +9710,7 @@ function renderGamesList() {
     els.gamesList.innerHTML = `<div class="empty-state">Ainda nao ha jogos confirmados.</div>`;
     return;
   }
-  const showClub = myGroups.length > 1;
-  els.gamesList.innerHTML = renderGameMonths(showClub && archiveGames ? [...items, ...archiveGames] : items, { showClub });
+  els.gamesList.innerHTML = renderGameMonths(archiveGames ? [...items, ...archiveGames] : items, { showClub: true });
   bindGameCards(els.gamesList);
 }
 

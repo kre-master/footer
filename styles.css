@@ -8479,7 +8479,7 @@ body.boot-refreshing::before {
 .subtabs { padding-bottom: 5px; }
 .games-list { gap: 16px; }
 .games-list > .games-month { display: grid; gap: 8px; padding: 0; border: 0; background: none; box-shadow: none; }
-.games-month h3 { margin: 0; font-family: var(--font-display); font-size: 20px; text-transform: capitalize; letter-spacing: .02em; }
+.games-month h3 { margin: 0; font-family: var(--font-display); font-size: 20px; letter-spacing: .02em; }
 .games-month h3 small { color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 700; text-transform: none; margin-left: 6px; }
 .games-rail {
   display: flex; gap: 12px; overflow-x: auto; padding: 4px 4px 10px; margin: 0 -4px;
