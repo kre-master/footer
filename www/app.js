@@ -4189,7 +4189,6 @@ function getPeriodAwards(playerId, games) {
 
 function renderProfileHero(playerData, form, variant) {
   const rating = canSeeCurrentRatings() ? form.currentRating : playerData.overall;
-  const isOwn = Boolean(currentSession?.user?.id) && playerData.linkedUserId === currentSession.user.id;
   const lastFive = getPlayerAppearanceRecord(playerData.id, 5).map((item) => item.outcome);
   return `
     <section class="pp-hero">
@@ -4197,16 +4196,14 @@ function renderProfileHero(playerData, form, variant) {
         <button type="button" class="pp-card-thumb" data-profile-card aria-label="Ver a carta de ${escapeHtml(playerData.name)}">
           ${renderPlayerCard(playerData, { mode: "field", form, variant })}
         </button>
-        ${lastFive.length ? `<span class="pp-last5"><small>Ult. ${lastFive.length}</small>${renderRecordDots(lastFive, { chronological: true })}</span>` : ""}
       </div>
       <div class="pp-identity">
-        <p class="eyebrow">Jogador</p>
         <h2>${escapeHtml(playerData.name)}</h2>
         <div class="pp-meta">
           ${ratingsVisible() ? `<span class="pp-ovr"><b>${rating}</b> OVR</span>` : ""}
         </div>
         ${renderClubBadge(getActiveGroup())}
-        ${isOwn ? `<label class="ghost-btn pp-photo-cta">${hasPlayerPhoto(playerData) ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
+        ${lastFive.length ? `<span class="pp-last5" aria-label="Últimos ${lastFive.length} jogos">${renderRecordDots(lastFive, { chronological: true })}</span>` : ""}
       </div>
     </section>`;
 }
@@ -4449,6 +4446,7 @@ function openProfileCardModal(playerData) {
   document.querySelector(".pp-card-modal")?.remove();
   const form = getPlayerForm(playerData);
   const variant = getPlayerCardVariant(playerData, form);
+  const isOwnPlayer = Boolean(currentSession?.user?.id) && playerData.linkedUserId === currentSession.user.id;
   const modal = document.createElement("div");
   modal.className = "auth-modal pp-card-modal";
   modal.setAttribute("role", "dialog");
@@ -4460,6 +4458,7 @@ function openProfileCardModal(playerData) {
       <button type="button" class="auth-close" data-close-card aria-label="Fechar">&times;</button>
       ${renderPlayerCard(playerData, { mode: "profile", form, variant })}
       <button type="button" class="primary-btn" data-card-collection>Ver coleção de cartas</button>
+      ${isOwnPlayer ? `<label class="pp-photo-cta">${hasPlayerPhoto(playerData) ? "Mudar a minha foto" : "Pôr a minha foto"}<input data-own-player-photo type="file" accept="image/*" hidden></label>` : ""}
     </div>`;
   const close = () => {
     modal.remove();
@@ -4468,6 +4467,10 @@ function openProfileCardModal(playerData) {
   };
   const onKey = (event) => { if (event.key === "Escape") close(); };
   modal.querySelectorAll("[data-close-card]").forEach((el) => el.addEventListener("click", close));
+  modal.querySelector("[data-own-player-photo]")?.addEventListener("change", async (event) => {
+    await handleOwnPlayerPhotoSelection(event);
+    close();
+  });
   modal.querySelector("[data-card-collection]").addEventListener("click", () => {
     close();
     profileTab = "cards";
@@ -4514,6 +4517,7 @@ function bindProfileOverview(playerData) {
     event.target.value = "";
   });
   root.querySelector("[data-profile-card]")?.addEventListener("click", () => openProfileCardModal(playerData));
+  root.querySelector("[data-open-club]")?.addEventListener("click", () => showView("club"));
 }
 
 function renderProfileStat(label, value) {
@@ -9593,15 +9597,14 @@ function renderClubTab() {
   if (currentViewName === "club") renderClubPanel();
 }
 
+// Simbolo e nome do clube; estrela se for o favorito e houver mais que um clube. Abre a pagina do clube.
 function renderClubBadge(group) {
+  const star = group?.isFavorite && myGroups.length > 1 ? '<span class="pp-club-star" aria-label="Clube favorito">★</span>' : "";
   return `
-    <div class="pp-club">
+    <button type="button" class="pp-club" data-open-club aria-label="Abrir o clube ${escapeHtml(group?.name || "")}">
       ${renderClubSymbol(group, "club-symbol-md")}
-      <div class="pp-club-text">
-        <small>Clube</small>
-        <strong>${escapeHtml(group?.name || "Sem clube")}</strong>
-      </div>
-    </div>`;
+      <strong>${escapeHtml(group?.name || "Sem clube")}</strong>${star}
+    </button>`;
 }
 
 let clubEditing = false;

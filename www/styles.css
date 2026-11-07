@@ -8444,3 +8444,33 @@ body.boot-refreshing::before {
 @media (prefers-reduced-motion: reduce) {
   body.boot-refreshing::before { animation: none; background-size: 100% 100%; opacity: .6; }
 }
+
+/* Pagina "Eu" mais compacta: cabecalho baixo, clube sem rotulo, ultimos 5 junto ao clube. */
+.app-shell { padding-top: 6px; }
+.topbar { gap: 6px; padding: 4px 0 8px; }
+.brand-logo { width: 36px; height: 36px; max-width: 36px; max-height: 36px; }
+.brand h1 { font-size: 28px; line-height: 1; }
+.account-avatar { width: 30px; height: 30px; }
+.pp-hero { gap: 12px; align-items: center; }
+.pp-identity { gap: 4px; }
+.pp-identity h2 { font-size: clamp(30px, 8vw, 44px); }
+.pp-club {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0;
+  border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  justify-self: start; max-width: 100%;
+}
+.pp-club strong { font-size: 16px; overflow-wrap: anywhere; }
+.pp-club-star { color: #d99a00; font-size: 16px; line-height: 1; }
+.pp-last5 { display: flex; justify-items: unset; gap: 6px; margin-top: 2px; }
+.pp-card-modal-body .pp-photo-cta {
+  justify-self: center; margin: 4px 0 0; min-height: 0; padding: 4px 10px;
+  font-size: 12px; color: var(--muted); background: transparent; border: 0; text-decoration: underline;
+}
+@media (max-width: 760px) {
+  .app-shell { width: min(1500px, calc(100% - 24px)); }
+  .brand-logo { width: 34px; height: 34px; max-width: 34px; max-height: 34px; }
+  .brand h1 { font-size: 26px; }
+  .pp-card-thumb { width: 84px; }
+  .me-now { margin: 0 0 10px; gap: 10px; }
+  .me-panel { gap: 10px; }
+}
