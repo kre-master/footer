@@ -2738,6 +2738,8 @@ async function submitLoginForm(event) {
     await loadRemoteState();
     await refreshPendingInvite();
     updateAccessUi();
+    // Depois de sair a app fica em "Eu" (pagina de quem ainda nao tem ficha): ao entrar vai-se para o perfil proprio.
+    if (currentViewName === "me" && !pendingInvite?.valid) applyLandingRoute();
     render();
     if (pendingInvite?.valid) await acceptPendingInvite();
   } finally {
@@ -2849,7 +2851,7 @@ async function submitSignupForm(event) {
     await acceptPendingInvite();
     return;
   }
-  showView("me");
+  applyLandingRoute();
   updateAccessUi();
   render();
 }
