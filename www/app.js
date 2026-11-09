@@ -3431,7 +3431,7 @@ function getGalleryHighlights() {
 
 // Separadores de testes do leitor (Bunny e casa): so o admin da plataforma.
 function canSeeVideoLab() {
-  return isPlatformAdmin;
+  return CUSTOM_PLAYER_ENABLED && isPlatformAdmin;
 }
 
 function renderGalleryFilter(gamesCount, highlightsCount) {
@@ -12683,6 +12683,9 @@ function getHomeVideoGames() {
 // O desktop envia o jogo; a VM publica-o em <grupo>/<AAAA-MM-DD>.mp4 e lista-o em index.json.
 // Um jogo com video de casa usa o leitor novo em toda a app; os outros continuam no YouTube.
 const HOME_VIDEO_BASE = "https://maestro.tail85c4b5.ts.net:8443";
+// Leitor Footer em standby (decisao de 2026-11-09): o codigo fica, mas a app so usa o YouTube.
+// Para o voltar a ligar basta pôr true (ver Footer_vault/11).
+const CUSTOM_PLAYER_ENABLED = false;
 // Marca dos momentos de videos de casa (a coluna youtube_id exige 11 caracteres).
 const HOME_VIDEO_PART = "casa-footer";
 let homeVideoIndex = {};
@@ -12701,7 +12704,7 @@ function loadHomeVideoIndexInBackground() {
 }
 
 async function loadHomeVideoIndex({ retry = true } = {}) {
-  if (!currentSession?.user) return;
+  if (!CUSTOM_PLAYER_ENABLED || !currentSession?.user) return;
   try {
     const response = await fetch(`${HOME_VIDEO_BASE}/v/index.json`, { cache: "no-store", signal: AbortSignal.timeout?.(15000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -12730,6 +12733,7 @@ function getGameDateKey(game) {
 }
 
 function getHomeVideo(gameId) {
+  if (!CUSTOM_PLAYER_ENABLED) return null;
   const game = state.games.find((item) => item.id === gameId);
   const slug = getActiveGroup()?.slug || LEGACY_GROUP_SLUG;
   const entry = game && homeVideoIndex[slug]?.[getGameDateKey(game)];

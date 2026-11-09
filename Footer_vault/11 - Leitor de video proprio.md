@@ -2,6 +2,12 @@
 
 Estado a 2026-10-31. Fonte única sobre o leitor novo que vai substituir o do YouTube. Ver também [[04 - Estado tecnico]] (detalhes por commit) e [[05 - Backlog e proximos passos]].
 
+## Decisão de 2026-11-09: leitor Footer em standby
+
+- O leitor próprio **fica no código mas escondido**: a app usa só o do YouTube. Sem seletor "Leitor Footer | YouTube", sem separadores 🧪 Testes / 🏠 Testes 2 e sem ir ler a lista de vídeos da NAS.
+- Interruptor único: `CUSTOM_PLAYER_ENABLED` em `www/app.js` (agora `false`). Pôr `true` para voltar ao comportamento descrito abaixo.
+- Jogos só com vídeo de casa (sem link do YouTube) ficam sem vídeo na app até haver YouTube ou o leitor voltar. A VM continua a publicar vídeos como antes.
+
 ## Decisão de 2026-11-01: os vídeos dos jogos passam a ser servidos de casa
 
 - **Daqui em diante, os vídeos dos jogos da Galeria vêm da NAS (casa)**, não do YouTube nem do Bunny. O jogo de 28/10 já usa o vídeo de casa.
