@@ -7857,7 +7857,7 @@ function renderEventAdminAdds(eventData) {
       <div class="add-existing-row">
         <select data-event-add-existing="${eventData.id}">
           <option value="">Adicionar jogador existente</option>
-          ${availablePlayers.map((p) => `<option value="${p.id}">${escapeHtml(p.name)} - ${p.overall}</option>`).join("")}
+          ${availablePlayers.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")}
         </select>
         <button class="ghost-btn" data-event-add-existing-btn="${eventData.id}" ${isFull ? "disabled" : ""}>Adicionar como Vou</button>
       </div>
@@ -9607,7 +9607,7 @@ function renderRosterRow(playerData, currentGroup) {
   return `
     <div class="roster-row">
       <div class="roster-row-head">
-        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
+        <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}</strong>
         <button class="roster-remove" type="button" data-remove-player="${playerData.id}" aria-label="Remover ${escapeHtml(playerData.name)}" title="Remover">&times;</button>
       </div>
       <div class="roster-actions">
@@ -9621,7 +9621,7 @@ function renderAddPlayerSelect(game) {
   const inGame = new Set(getGamePlayerIds(game));
   const available = state.players.filter((p) => !inGame.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
   els.addPlayerToGame.innerHTML = available.length
-    ? available.map((p) => `<option value="${p.id}">${escapeHtml(p.name)} - ${p.overall}</option>`).join("")
+    ? available.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")
     : `<option value="">Sem jogadores disponiveis</option>`;
 }
 
@@ -12273,14 +12273,24 @@ function renderTrackingBands(p) {
 }
 
 function getTrackingVideoTeamName(entry, game, videoTeam) {
-  // The video teams are labelled A/B by the tracker; show them by the Footer side of their mapped players.
+  const side = getTrackingVideoTeamSide(entry, game, videoTeam);
+  return side ? `Equipa ${side}` : `Equipa do vídeo ${videoTeam}`;
+}
+
+function getTrackingVideoTeamOrder(entry, game) {
+  // Video teams in Footer order (Equipa A first), so names and team colours match after a roster swap.
+  return getTrackingVideoTeamSide(entry, game, "A") === "B" || getTrackingVideoTeamSide(entry, game, "B") === "A" ? ["B", "A"] : ["A", "B"];
+}
+
+function getTrackingVideoTeamSide(entry, game, videoTeam) {
+  // The video teams are labelled A/B by the tracker; resolve them by the Footer side of their mapped players.
   const sides = entry.result.players
     .filter((p) => p.team === videoTeam && entry.mapping?.[p.label])
     .map((p) => getPlayerParticipation(game, entry.mapping[p.label])?.side)
     .filter(Boolean);
   const counts = sides.reduce((acc, side) => ({ ...acc, [side]: (acc[side] || 0) + 1 }), {});
   const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  return best ? `Equipa ${best[0]}` : `Equipa do vídeo ${videoTeam}`;
+  return best ? best[0] : null;
 }
 
 function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = null } = {}) {
@@ -12492,8 +12502,10 @@ function renderPlayerPath(tl, from, to) {
 function renderTeamFaceOff(entry, game) {
   // Paired bars, each row scaled to its larger value; "sem dados" instead of 0.
   const tracking = window.FooterTracking;
-  const f = tracking.teamFaceOff(entry.result);
-  if (!f.A || !f.B) return "";
+  const faceOff = tracking.teamFaceOff(entry.result);
+  if (!faceOff.A || !faceOff.B) return "";
+  const [left, right] = getTrackingVideoTeamOrder(entry, game);
+  const f = { A: faceOff[left], B: faceOff[right] };
   const rows = [
     ["Metros por jogador-minuto", "metersPerPlayerMin", 1, "", tracking.statusTag(entry.result, "distance")],
     ["Passes detetados", "passes", 0, "", tracking.statusTag(entry.result, "passes")],
@@ -12508,7 +12520,7 @@ function renderTeamFaceOff(entry, game) {
     : `<span class="tf-bar tf-${side}"><i style="width:${max ? (100 * v / max).toFixed(1) : 0}%"></i></span>`;
   return `
     <div class="tracking-faceoff">
-      <div class="tf-head"><strong class="tf-a">${escapeHtml(getTrackingVideoTeamName(entry, game, "A"))}</strong><strong class="tf-b">${escapeHtml(getTrackingVideoTeamName(entry, game, "B"))}</strong></div>
+      <div class="tf-head"><strong class="tf-a">${escapeHtml(getTrackingVideoTeamName(entry, game, left))}</strong><strong class="tf-b">${escapeHtml(getTrackingVideoTeamName(entry, game, right))}</strong></div>
       ${rows.map(([label, key, digits, unit, tag]) => {
         const a = f.A[key], b = f.B[key], max = Math.max(a ?? 0, b ?? 0);
         return `
@@ -12639,9 +12651,10 @@ function renderTrackingTestSection(game) {
     </article>
   `;
   const teamName = (key) => escapeHtml(getTrackingVideoTeamName(entry, game, key));
-  const attacksA = result.teams.A?.attacks, attacksB = result.teams.B?.attacks;
-  const possA = result.teams.A?.possessionPct, possB = result.teams.B?.possessionPct;
-  const vertA = result.teams.A?.verticalPasses, vertB = result.teams.B?.verticalPasses;
+  const [firstTeam, secondTeam] = getTrackingVideoTeamOrder(entry, game);
+  const attacksA = result.teams[firstTeam]?.attacks, attacksB = result.teams[secondTeam]?.attacks;
+  const possA = result.teams[firstTeam]?.possessionPct, possB = result.teams[secondTeam]?.possessionPct;
+  const vertA = result.teams[firstTeam]?.verticalPasses, vertB = result.teams[secondTeam]?.verticalPasses;
   const verticalSplit = (key, v) => v ? `${teamName(key)}: ${formatTrackingNumber(v.crossingMidline)} a cruzar o meio-campo, ${formatTrackingNumber(v.inAttackingHalf)} no meio-campo ofensivo, ${formatTrackingNumber(v.inOwnHalf)} no próprio meio-campo` : "";
   // Whose analysis is shown: the signed-in player's own; an admin can preview any associated player.
   const linked = getLinkedPlayer();
@@ -12669,26 +12682,26 @@ function renderTrackingTestSection(game) {
             <article class="tracking-highlight">
               <span>Ataques</span>
               <strong>${attacksA ? attacksA.count : "–"} <small>·</small> ${attacksB ? attacksB.count : "–"}</strong>
-              <em>${teamName("A")} · ${teamName("B")}</em>
+              <em>${teamName(firstTeam)} · ${teamName(secondTeam)}</em>
               <i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "attacks") || "estimativa")}</i>
             </article>` : ""}
           ${possA || possB ? `
             <article class="tracking-highlight">
               <span>Posse de bola</span>
               <strong>${possA ? formatTrackingNumber(possA.value) : "–"}<small>%</small> <small>·</small> ${possB ? formatTrackingNumber(possB.value) : "–"}<small>%</small></strong>
-              <em>${teamName("A")} · ${teamName("B")}</em>
+              <em>${teamName(firstTeam)} · ${teamName(secondTeam)}</em>
               <i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "possession") || "estimativa")}</i>
             </article>` : ""}
           ${vertA || vertB ? `
             <article class="tracking-highlight">
               <span>Passes verticais</span>
               <strong>${vertA ? vertA.count : "–"} <small>·</small> ${vertB ? vertB.count : "–"}</strong>
-              <em>${teamName("A")} · ${teamName("B")}</em>
+              <em>${teamName(firstTeam)} · ${teamName(secondTeam)}</em>
               ${tracking.statusTag(result, "vertical_passes") ? `<i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "vertical_passes"))}</i>` : ""}
             </article>` : ""}
         </div>
         ${vertA || vertB || possA || possB ? `
-          <p class="tracking-fineprint">${vertA || vertB ? `${[verticalSplit("A", vertA), verticalSplit("B", vertB)].filter(Boolean).join("; ")}. ${VERTICAL_PASS_RULE}${result.ball.verticalAudit ? ` (${result.ball.verticalAudit.correct} de ${result.ball.verticalAudit.judged} certos numa verificação).` : ""}` : ""}${possA || possB ? ` ${POSSESSION_RULE}${result.ball.possessionAudit ? ` (${result.ball.possessionAudit.same} de ${result.ball.possessionAudit.judged} instantes certos numa verificação).` : ""}` : ""}</p>` : ""}` : ""}
+          <p class="tracking-fineprint">${vertA || vertB ? `${[verticalSplit(firstTeam, vertA), verticalSplit(secondTeam, vertB)].filter(Boolean).join("; ")}. ${VERTICAL_PASS_RULE}${result.ball.verticalAudit ? ` (${result.ball.verticalAudit.correct} de ${result.ball.verticalAudit.judged} certos numa verificação).` : ""}` : ""}${possA || possB ? ` ${POSSESSION_RULE}${result.ball.possessionAudit ? ` (${result.ball.possessionAudit.same} de ${result.ball.possessionAudit.judged} instantes certos numa verificação).` : ""}` : ""}</p>` : ""}` : ""}
       <div class="tracking-highlights">
         ${highlight("Motor do jogo", highlights.motor, "m/min", 1, tracking.statusTag(result, "pace"))}
         ${highlight(`Mais rápido (${formatTrackingNumber(result.players[0]?.maxSustainedWindowS ?? 1, 0)} s)`, highlights.lightning, "km/h", 1, tracking.statusTag(result, "max_speed"))}
@@ -12717,10 +12730,10 @@ function renderTrackingTestSection(game) {
       <div class="tracking-head"><h3>Equipas no vídeo</h3></div>
       ${renderTeamFaceOff(entry, game)}
       <div class="tracking-teams">
-        ${Object.entries(result.teams).map(([key, t]) => `
+        ${[firstTeam, secondTeam].map((key) => [key, result.teams[key]]).filter(([, t]) => t).map(([key, t]) => `
           <article class="tracking-team">
             <strong>${escapeHtml(getTrackingVideoTeamName(entry, game, key))}</strong>
-            ${renderTrackingHeatmap(tracking.teamHeatmap(result, key), { label: `Mapa de calor da equipa ${key}`, color: key === "A" ? "var(--accent-2)" : "var(--orange)" })}
+            ${renderTrackingHeatmap(tracking.teamHeatmap(result, key), { label: `Mapa de calor da equipa ${key}`, color: key === firstTeam ? "var(--accent-2)" : "var(--orange)" })}
             <dl>
               <dt>Centro da equipa no meio-campo adversário</dt><dd>${formatTrackingNumber(t.attackingHalfPct, 0)}% do tempo</dd>
               <dt>Distância média à própria baliza</dt><dd>${formatTrackingNumber(t.fromOwnGoalM, 1)} m</dd>
@@ -14884,10 +14897,6 @@ function renderHistoryGameDetail() {
     <div class="field-card history-field-card">
       ${renderField(game, { radarPosition: "none", clickablePlayers: true })}
     </div>
-    ${ratingsVisible() ? `<section class="profile-section history-radar-section">
-      <h3>Equipas em comparação</h3>
-      ${renderTeamRadarChart([...hydrate(game.teamA), ...hydrate(getBenchA(game))], [...hydrate(game.teamB), ...hydrate(getBenchB(game))], { inlineOdds: true })}
-    </section>` : ""}
     ${renderHistoryRosterEditor(game)}
     ${renderNoShowSection(game)}
     ${renderGameVideoSection(game)}
@@ -14950,7 +14959,7 @@ function renderHistoryRosterEditor(game) {
       <div class="history-roster-tools">
         <select data-history-add-player="${game.id}">
           <option value="">Adicionar jogador ao jogo</option>
-          ${availablePlayers.map((playerData) => `<option value="${playerData.id}">${escapeHtml(playerData.name)} - ${playerData.overall}</option>`).join("")}
+          ${availablePlayers.map((playerData) => `<option value="${playerData.id}">${escapeHtml(playerData.name)}</option>`).join("")}
         </select>
         <button class="ghost-btn" data-history-add-to-team="${game.id}" data-to-group="teamA" ${availablePlayers.length ? "" : "disabled"}>Adicionar A</button>
         <button class="ghost-btn" data-history-add-to-team="${game.id}" data-to-group="teamB" ${availablePlayers.length ? "" : "disabled"}>Adicionar B</button>
@@ -14965,7 +14974,7 @@ function renderHistoryRosterRow(gameId, playerData, currentGroup) {
 
   return `
     <div class="roster-row">
-      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}${ratingsVisible() ? ` - ${playerData.overall}` : ""}</strong>
+      <strong>${renderAvatar(playerData)} ${escapeHtml(playerData.name)}</strong>
       <div class="roster-actions">
         ${actions.map(([key, label]) => `<button class="mini-btn" data-history-move-player="${playerData.id}" data-game-id="${gameId}" data-to-group="${key}">${label}</button>`).join("")}
         <button class="mini-btn" data-history-remove-player="${playerData.id}" data-game-id="${gameId}">Remover</button>
