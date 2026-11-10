@@ -6,11 +6,11 @@ Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas 
 
 ## Emails de conta e login (2026-11-10)
 
-- [ ] Escolher servidor de email: Gmail com palavra-passe de app ja (passos em `docs/emails-e-login.md`), dominio + Resend quando se decidir o nome/dominio (3.7).
-- [ ] Colar no Supabase os modelos "Confirm signup" e "Reset password" com o codigo (`{{ .Token }}`).
-- [ ] Confirmar Site URL e Redirect URLs no Supabase.
+- [x] Servidor de email (2026-11-10): Gmail `footer.info.app@gmail.com` com palavra-passe de app (verificacao em 2 passos ligada). Teste real entregue na caixa de entrada. Definitivo continua a ser dominio + Resend (3.7).
+- [x] Modelos "Confirm signup" e "Reset password" com codigo colados; Email OTP Length = 6.
+- [x] Site URL e Redirect URLs confirmados pelo utilizador.
 - [ ] Ligar Google (Google Cloud + Supabase) e por `authProviders: ["google"]` em `app-config.js`.
-- [ ] Testar com emails reais: criar conta, recuperar por codigo e por link.
+- [ ] Testar no site publicado: criar conta, recuperar por codigo e por link (email de recuperacao real ja verificado).
 - [ ] Mais tarde: deep link para Google na app Android/iOS; Apple obrigatorio no iPhone se houver Google; Facebook exige verificacao da Meta.
 
 ## Ideias e areas futuras

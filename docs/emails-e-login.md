@@ -33,6 +33,8 @@ O Supabase passa a enviar os emails pela tua conta Gmail, como se fosses tu a en
    - Password: as 16 letras da palavra-passe de app (sem espaços)
 4. Guardar e testar com "Esqueci-me da password" numa conta tua.
 
+Em uso desde 2026-11-10 com a conta `footer.info.app@gmail.com`. Cuidado: a palavra-passe de app tem de ser criada nessa conta (ver a foto no canto) e só aparece com a verificação em 2 passos ligada; com a password normal o Gmail responde "Username and Password not accepted".
+
 Limites: cerca de 500 emails por dia. Os emails saem do teu endereço pessoal. Para mudar, apaga essa palavra-passe de app e configura outro fornecedor.
 
 ### Opção B: domínio próprio + Resend (definitivo)
@@ -41,7 +43,7 @@ Precisa de um domínio (10–15 €/ano). Resend grátis: 100 emails/dia e 3000/
 
 ## 2. Textos dos emails (com código)
 
-Supabase > **Authentication > Emails > Templates**. Substituir o assunto e o corpo de cada um.
+Supabase > **Authentication > Emails > Templates**. Substituir o assunto e o corpo de cada um. Em **Authentication > Sign In / Providers > Email**, `Email OTP Length` = `6`.
 
 ### Confirm signup
 
