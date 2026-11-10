@@ -41,6 +41,18 @@
     };
   }
 
+  function verticalPasses(v) {
+    if (!v || finite(v.count) == null) return null;
+    return {
+      count: v.count,
+      crossingMidline: finite(v.crossing_midline),
+      inAttackingHalf: finite(v.in_attacking_half),
+      inOwnHalf: finite(v.in_own_half),
+      passes: finite(v.passes),
+      status: v.status || "detected",
+    };
+  }
+
   function parseResult(text) {
     let data;
     try {
@@ -83,6 +95,8 @@
         // Ball (revision 2+): only the audited pass metrics; absent in older results.
         passesMade: finite(m.passes_made_detected),
         passesReceived: finite(m.passes_received_detected),
+        // Vertical passes (2026-11-10): detected count only; absent in older results.
+        verticalPasses: finite(m.vertical_passes_detected),
         passPartner: m.top_pass_partner?.label ? { label: String(m.top_pass_partner.label), passes: finite(m.top_pass_partner.passes) } : null,
         meanPosition: Array.isArray(m.mean_position_m) && m.mean_position_m.length === 2 && m.mean_position_m.every((v) => finite(v) != null)
           ? { x: m.mean_position_m[0], y: m.mean_position_m[1] } : null,
@@ -108,6 +122,10 @@
         ballAttackingThirdPct: finite(t.ball_attacking_third_pct),
         // Attacks are shown as a count estimate only (blind audit 7/11); lanes and "dangerous" are not shown.
         attacks: t.attacks && finite(t.attacks.count) != null ? { count: t.attacks.count, status: t.attacks.status || "estimate" } : null,
+        // Vertical passes by where they happen (detected, counts by below) and possession share (estimate).
+        verticalPasses: verticalPasses(t.vertical_passes),
+        possessionPct: t.possession_pct && finite(t.possession_pct.value) != null
+          ? { value: t.possession_pct.value, status: t.possession_pct.status || "estimate" } : null,
         perMinute: Array.isArray(t.per_minute) ? t.per_minute.map((r) => ({ minute: r.minute, fromOwnGoalM: r.centroid_from_own_goal_m, seconds: r.seconds })) : [],
       };
     });
@@ -117,6 +135,8 @@
       middleThirdPct: finite(b.middle_third_pct),
       passesTotal: finite(b.passes_detected_total),
       passAudit: b.audit?.passes ? { correct: finite(b.audit.passes.correct), judged: finite(b.audit.passes.judged) } : null,
+      verticalAudit: b.audit?.vertical_passes ? { correct: finite(b.audit.vertical_passes.correct), judged: finite(b.audit.vertical_passes.judged) } : null,
+      possessionAudit: b.audit?.possession ? { same: finite(b.audit.possession.same), judged: finite(b.audit.possession.judged) } : null,
       // 3 x 3 grid of ball time: rows from the camera side outwards, columns from x = 0 (B's goal) to A's goal.
       zonesPct: Array.isArray(b.zones?.pct_row_major) && b.zones.pct_row_major.length === 9 ? b.zones.pct_row_major.map(Number) : null,
       passLinks: Array.isArray(b.pass_links)
@@ -196,6 +216,7 @@
       sprinter: topBy(players, "sprints", eligibleForHighlights),
       distance: topBy(players, "distanceM", eligibleForHighlights),
       passer: topBy(players, "passesMade", eligibleForHighlights),
+      vertical: topBy(players, "verticalPasses", (p) => eligibleForHighlights(p) && p.verticalPasses > 0),
       keepers: keeper.map((p) => ({ label: p.label, minutes: p.goalkeeperMin })),
     };
   }
@@ -320,6 +341,8 @@
         metersPerPlayerMin: minutes > 0 ? metres / minutes : null,
         passes: withPasses.length ? withPasses.reduce((s, p) => s + p.passesMade, 0) : null,
         attacks: team.attacks ? team.attacks.count : null,
+        verticalPasses: team.verticalPasses ? team.verticalPasses.count : null,
+        possessionPct: team.possessionPct ? team.possessionPct.value : null,
         widthM: team.widthM,
         compactnessM: team.compactnessM,
       };
