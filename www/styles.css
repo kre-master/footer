@@ -3019,6 +3019,74 @@ th.stat-col {
   text-decoration: underline;
 }
 
+/* Passos dentro do mesmo cartao (dados da conta / codigo do email): nao mexem na grelha. */
+.auth-step {
+  display: contents;
+}
+
+.auth-step.hidden,
+.auth-oauth.hidden,
+.auth-field.hidden,
+.auth-link.hidden {
+  display: none;
+}
+
+.auth-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-hint:empty {
+  display: none;
+}
+
+.auth-oauth {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-oauth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.auth-oauth-btn:hover {
+  border-color: rgba(89, 176, 255, .75);
+}
+
+.auth-oauth-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 /* Numeros de placard: fonte condensada nos valores de destaque. */
 .score-block strong,
 .profile-stat strong,

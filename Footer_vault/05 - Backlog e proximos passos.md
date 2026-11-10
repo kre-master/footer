@@ -4,6 +4,15 @@
 
 Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas quando for pedido explicitamente.
 
+## Emails de conta e login (2026-11-10)
+
+- [ ] Escolher servidor de email: Gmail com palavra-passe de app ja (passos em `docs/emails-e-login.md`), dominio + Resend quando se decidir o nome/dominio (3.7).
+- [ ] Colar no Supabase os modelos "Confirm signup" e "Reset password" com o codigo (`{{ .Token }}`).
+- [ ] Confirmar Site URL e Redirect URLs no Supabase.
+- [ ] Ligar Google (Google Cloud + Supabase) e por `authProviders: ["google"]` em `app-config.js`.
+- [ ] Testar com emails reais: criar conta, recuperar por codigo e por link.
+- [ ] Mais tarde: deep link para Google na app Android/iOS; Apple obrigatorio no iPhone se houver Google; Facebook exige verificacao da Meta.
+
 ## Ideias e areas futuras
 
 ### Videos e momentos
@@ -121,6 +130,7 @@ Depois de alterar:
 - 2026-11-02: costas da mala com tampa de correr e ventilacao (ventoinha 5 V opcional); frente 15 mm para dentro; manual de montagem v2.
 - 2026-11-02: decidido sem ventoinha para ja; o placard regista temperaturas (chip do Pi e ar da mala) e envia max/media por jogo; ventoinha so se o Pi passar dos 70 C.
 - 2026-11-02 (v3): fundo fixo com janela e tampa de correr so na metade B (ideia do utilizador); frente volta a 20 mm; manual de montagem v3.
+- 2026-11-08: mantem-se o conversor 15 -> 5 V (uma porta de 5 V do powerbank so da 15 W e a tensao cai). Esquema eletrico desenhado: https://claude.ai/artifact/GEFQvvsZoThzi9zn8m2WWY (fonte `esquema-eletrico.html`, gerada por `esquema.py`). Fixado no desenho: 4 ligadores Wago (2 por lado), condensador de 1000 uF e resistencia de 100 ohm na placa principal; mapa do cabo plano em `ligacoes-raspberry.csv`.
 
 ## Nova organizacao e onboarding (decidido 2026-11-05)
 

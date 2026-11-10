@@ -25,6 +25,8 @@ window.FIVE5_CONFIG = {
 
 ### Configurar SMTP para emails de conta
 
+Guia atualizado (Gmail ou Resend, textos dos emails com codigo, Entrar com Google): `docs/emails-e-login.md`.
+
 O email interno do Supabase serve apenas para testes e tem um limite muito baixo. Para criar contas, confirmar emails e recuperar passwords sem bater no erro `email rate limit exceeded`, configura um SMTP externo.
 
 Opcao simples para comecar:

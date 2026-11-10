@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261107-gh15">
+    <link rel="stylesheet" href="styles.css?v=20261110-auth1">
     <link rel="stylesheet" href="theme-caderneta.css?v=20261106-owner3">
   </head>
   <body>
@@ -529,6 +529,7 @@
           <p class="eyebrow">Bem-vindo de volta</p>
           <h2 id="login-title">Entrar</h2>
         </div>
+        <div id="login-oauth" class="auth-oauth hidden"></div>
         <div id="login-remembered" class="auth-remembered hidden"></div>
         <label class="auth-field">
           <span>Email ou username</span>
@@ -560,6 +561,8 @@
           <p class="eyebrow">Junta-te ao grupo</p>
           <h2 id="signup-title">Criar conta</h2>
         </div>
+        <div id="signup-oauth" class="auth-oauth hidden"></div>
+        <div id="signup-fields" class="auth-step">
         <label class="auth-field">
           <span>Nome a mostrar</span>
           <input id="signup-name" name="name" type="text" autocomplete="nickname" placeholder="Como te chamam no jogo">
@@ -576,10 +579,50 @@
           <span>Password</span>
           <input id="signup-password" name="new-password" type="password" autocomplete="new-password" minlength="6" required>
         </label>
+        </div>
+        <div id="signup-verify" class="auth-step hidden">
+          <p class="auth-hint">Enviamos um codigo para <strong id="signup-verify-email"></strong>. Escreve-o aqui para confirmar o email (se nao o vires, procura no spam).</p>
+          <label class="auth-field">
+            <span>Codigo do email</span>
+            <input id="signup-code" name="one-time-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" spellcheck="false">
+          </label>
+        </div>
         <p id="signup-message" class="auth-error hidden" role="alert"></p>
         <button id="signup-submit" class="primary-btn" type="submit">Criar conta</button>
         <div class="auth-links">
+          <button id="signup-resend" class="auth-link hidden" type="button">Enviar outro codigo</button>
           <button id="signup-to-login" class="auth-link" type="button">Ja tenho conta</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="recovery-modal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+      <div class="auth-modal-backdrop" data-close-recovery></div>
+      <form id="recovery-form" class="auth-card" autocomplete="on">
+        <button type="button" class="auth-close" data-close-recovery aria-label="Fechar">&times;</button>
+        <img class="auth-logo" src="assets/footer-logo-sm.png?v=20261106-perf1" width="56" height="56" alt="">
+        <div>
+          <p class="eyebrow">Acontece aos melhores</p>
+          <h2 id="recovery-title">Recuperar password</h2>
+        </div>
+        <p id="recovery-hint" class="auth-hint"></p>
+        <label id="recovery-login-field" class="auth-field">
+          <span>Email ou username</span>
+          <input id="recovery-login" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+        </label>
+        <label id="recovery-code-field" class="auth-field hidden">
+          <span>Codigo do email</span>
+          <input id="recovery-code" name="one-time-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" spellcheck="false">
+        </label>
+        <label id="recovery-password-field" class="auth-field hidden">
+          <span>Nova password</span>
+          <input id="recovery-password" name="new-password" type="password" autocomplete="new-password" minlength="6">
+        </label>
+        <p id="recovery-message" class="auth-error hidden" role="alert"></p>
+        <button id="recovery-submit" class="primary-btn" type="submit">Enviar codigo</button>
+        <div class="auth-links">
+          <button id="recovery-resend" class="auth-link hidden" type="button">Enviar outro codigo</button>
+          <button id="recovery-to-login" class="auth-link" type="button">Voltar a entrar</button>
         </div>
       </form>
     </div>
@@ -618,6 +661,6 @@
     <script src="notifications.js?v=20261106-owner3"></script>
     <script src="heart-rate.js?v=20261105-hr9"></script>
     <script src="video-lab.js?v=20261101-casa1"></script>
-    <script src="app.js?v=20261107-gh15"></script>
+    <script src="app.js?v=20261110-auth1"></script>
   </body>
 </html>

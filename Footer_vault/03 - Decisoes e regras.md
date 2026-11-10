@@ -234,6 +234,7 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Um jogador so pode alterar a propria foto em `players` (gatilho `players_guard_self_update`); admins do grupo continuam a poder tudo. Antes, um jogador podia mudar a propria nota e o `group_id` pela API.
 - O papel `anon` deixou de ter permissoes de escrita nas tabelas; `TRUNCATE`, `TRIGGER` e `REFERENCES` sairam de `anon` e `authenticated`.
 - Decisao do utilizador: manter a password minima em 6 caracteres.
+- Desde 2026-11-10: confirmacao de email e recuperacao de password por codigo escrito na app (o link do email continua a funcionar). "Sair" fecha a sessao so no aparelho; a sessao fica ativa ate sair. Entrar com Google e opcional e so aparece quando ligado em `app-config.js`.
 - Riscos conhecidos e aceites por agora: `email_for_login` revela o email de quem souber o username; um admin de grupo pode editar email/username/nome dos membros do seu grupo; protecao contra passwords vazadas desligada.
 
 ## Grupos e perfis sem aprovacao (2026-10-28)

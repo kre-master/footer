@@ -234,6 +234,9 @@ let currentHistoryGameId = null;
 let currentGenerationDateIso = new Date().toISOString();
 let previewGame = null;
 let authActionBusy = false;
+let authRedirect = null;
+let signupVerifyEmail = "";
+let recoveryEmail = "";
 let currentPlayerProfileId = null;
 let currentViewName = "me";
 let currentMonthlyMonth = null;
@@ -998,6 +1001,7 @@ function bindEvents() {
   on(els.adminLogout, "click", adminLogout);
   bindLoginModal();
   bindSignupModal();
+  bindRecoveryModal();
   bindNavigation();
   on(els.eventForm, "submit", saveEventFromForm);
   on(els.eventMaxPlayers, "input", () => { els.eventMaxPlayers.dataset.touched = "1"; });
@@ -1008,12 +1012,14 @@ function bindEvents() {
 
 async function initApp() {
   capturePendingInviteFromUrl();
+  captureAuthRedirect();
   // Com a copia da ultima visita desenha-se logo e a rede actualiza por tras; sem ela, espera-se pelos dados como antes.
   if (await warmStart()) {
     updateAccessUi();
     applyLandingRoute();
     render();
     setupNavigationHistory();
+    handleAuthRedirect();
     await refreshAfterWarmStart();
     return;
   }
@@ -1021,6 +1027,49 @@ async function initApp() {
   applyLandingRoute();
   render();
   setupNavigationHistory();
+  handleAuthRedirect();
+}
+
+// Um so cliente Supabase. A sessao fica guardada no dispositivo e renova-se sozinha: so se volta a pedir password depois de "Sair".
+function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+  supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event !== "PASSWORD_RECOVERY") return;
+    authRedirect = { ...authRedirect, type: "recovery" };
+    // Fora do callback: o Supabase recomenda nao chamar a API de auth dentro dele.
+    setTimeout(handleAuthRedirect, 0);
+  });
+  return supabaseClient;
+}
+
+// Os links dos emails voltam com "#type=recovery" ou com um erro (link expirado). Le-se antes de o Supabase limpar o endereco.
+function captureAuthRedirect() {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const query = new URLSearchParams(window.location.search);
+  const type = params.get("type") || query.get("type") || "";
+  const error = params.get("error_description") || query.get("error_description") || "";
+  authRedirect = type || error ? { type, error } : null;
+  if (error) {
+    const url = new URL(window.location.href);
+    url.hash = "";
+    ["error", "error_code", "error_description"].forEach((key) => url.searchParams.delete(key));
+    history.replaceState(history.state, "", url.toString());
+  }
+}
+
+function handleAuthRedirect() {
+  if (!authRedirect) return;
+  const { type, error } = authRedirect;
+  authRedirect = null;
+  if (error) {
+    openRecoveryModal({
+      step: "request",
+      message: "Esse link ja nao e valido (expirou ou ja foi usado). Pede um codigo novo aqui.",
+    });
+    return;
+  }
+  if (type === "recovery") openRecoveryModal({ step: "password" });
 }
 
 // ---- Arranque a quente ----
@@ -1124,7 +1173,7 @@ async function warmStart() {
   }
   // Convite por abrir: o fluxo de entrada precisa dos dados frescos.
   if (!raw || readPendingInviteCode()) return false;
-  supabaseClient = supabaseClient || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  getSupabaseClient();
   remoteEnabled = true;
   try {
     const { data } = await supabaseClient.auth.getSession();
@@ -1266,7 +1315,7 @@ async function initRemote() {
     return;
   }
 
-  supabaseClient = supabaseClient || window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  getSupabaseClient();
   remoteEnabled = true;
   await loadAccountState();
   await loadRemoteState();
@@ -1432,19 +1481,28 @@ async function loadAccountState() {
   currentProfile = profileRows.find((profile) => profile.id === user.id) || null;
   if (!currentProfile) {
     const role = await hasAnyRemoteProfile(profileRows) ? "player" : "admin";
-    const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Jogador";
-    const username = normalizeUsername(user.user_metadata?.username || displayName);
-    const { data: createdProfile, error } = await supabaseClient
-      .from("profiles")
-      .insert({
-        id: user.id,
-        email: user.email,
-        username,
-        display_name: displayName,
-        role,
-      })
-      .select()
-      .single();
+    const meta = user.user_metadata || {};
+    // Contas Google/Facebook trazem full_name/name em vez de display_name e nao escolhem username.
+    const displayName = meta.display_name || meta.full_name || meta.name || user.email?.split("@")[0] || "Jogador";
+    const baseUsername = normalizeUsername(meta.username || user.email?.split("@")[0] || displayName) || "jogador";
+    let createdProfile = null;
+    let error = null;
+    // Se o username ja estiver ocupado, tenta com um numero no fim em vez de ficar sem perfil.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const username = attempt ? `${baseUsername.slice(0, 27)}${Math.floor(1000 + Math.random() * 9000)}` : baseUsername;
+      ({ data: createdProfile, error } = await supabaseClient
+        .from("profiles")
+        .insert({
+          id: user.id,
+          email: user.email,
+          username,
+          display_name: displayName,
+          role,
+        })
+        .select()
+        .single());
+      if (!error || error.code !== "23505") break;
+    }
     if (error) {
       console.warn("Profile create failed", error);
     } else {
@@ -2679,6 +2737,7 @@ function openLoginModal() {
   const modal = document.querySelector("#login-modal");
   if (!modal) return;
   setLoginError("");
+  renderOAuthButtons();
   renderRememberedLogins();
   modal.classList.remove("hidden");
   document.body.classList.add("mvp-gate-open");
@@ -2725,6 +2784,11 @@ async function submitLoginForm(event) {
     }
     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
+      if (isEmailNotConfirmedError(error)) {
+        closeLoginModal();
+        await openSignupVerify(email, { resend: true });
+        return;
+      }
       setLoginError(`Login falhou: ${formatAuthError(error)}`);
       return;
     }
@@ -2756,7 +2820,7 @@ function bindLoginModal() {
   on(document.querySelector("#login-forgot"), "click", () => {
     const login = document.querySelector("#login-user")?.value.trim() || "";
     closeLoginModal();
-    requestPasswordReset(login);
+    openRecoveryModal({ step: "request", login });
   });
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeLoginModal();
@@ -2773,9 +2837,90 @@ function createAccount() {
   const modal = document.querySelector("#signup-modal");
   if (!modal) return;
   setSignupMessage("");
+  setSignupStep("fields");
+  renderOAuthButtons();
   modal.classList.remove("hidden");
   document.body.classList.add("mvp-gate-open");
   document.querySelector("#signup-name")?.focus();
+}
+
+// "fields": dados da conta; "verify": codigo de 6 digitos enviado para o email.
+function setSignupStep(step) {
+  const verify = step === "verify";
+  document.querySelector("#signup-fields")?.classList.toggle("hidden", verify);
+  document.querySelector("#signup-verify")?.classList.toggle("hidden", !verify);
+  document.querySelector("#signup-oauth")?.classList.toggle("hidden", verify || !getOAuthProviders().length);
+  document.querySelector("#signup-resend")?.classList.toggle("hidden", !verify);
+  // Campos escondidos ficam desligados para o browser nao exigir que estejam preenchidos.
+  document.querySelectorAll("#signup-fields input").forEach((input) => { input.disabled = verify; });
+  const submit = document.querySelector("#signup-submit");
+  if (submit) submit.textContent = verify ? "Confirmar email" : "Criar conta";
+  const title = document.querySelector("#signup-title");
+  if (title) title.textContent = verify ? "Confirmar email" : "Criar conta";
+  const emailLabel = document.querySelector("#signup-verify-email");
+  if (emailLabel) emailLabel.textContent = signupVerifyEmail;
+  const code = document.querySelector("#signup-code");
+  if (code) code.value = "";
+}
+
+async function openSignupVerify(email, { resend = false } = {}) {
+  const modal = document.querySelector("#signup-modal");
+  if (!modal) return;
+  signupVerifyEmail = email;
+  setSignupMessage("");
+  setSignupStep("verify");
+  modal.classList.remove("hidden");
+  document.body.classList.add("mvp-gate-open");
+  document.querySelector("#signup-code")?.focus();
+  if (resend) await resendSignupCode({ intro: "Este email ainda nao foi confirmado." });
+}
+
+async function resendSignupCode({ intro = "" } = {}) {
+  if (!signupVerifyEmail || authActionBusy) return;
+  setAuthActionBusy(true);
+  let error;
+  try {
+    ({ error } = await supabaseClient.auth.resend({ type: "signup", email: signupVerifyEmail }));
+  } finally {
+    setAuthActionBusy(false);
+  }
+  const lead = intro ? `${intro} ` : "";
+  if (error) setSignupMessage(`${lead}Nao consegui enviar o codigo: ${formatAuthError(error)}`);
+  else setSignupMessage(`${lead}Enviamos um codigo novo para ${signupVerifyEmail}.`, "success");
+}
+
+async function submitSignupCode() {
+  const submit = document.querySelector("#signup-submit");
+  const token = cleanAuthCode(document.querySelector("#signup-code")?.value);
+  if (!isValidAuthCode(token)) {
+    setSignupMessage("Escreve o codigo que recebeste no email (so numeros).");
+    return;
+  }
+  setSignupMessage("");
+  setAuthActionBusy(true);
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = "A confirmar...";
+  }
+  let data;
+  let error;
+  try {
+    ({ data, error } = await supabaseClient.auth.verifyOtp({ email: signupVerifyEmail, token, type: "signup" }));
+  } finally {
+    setAuthActionBusy(false);
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = "Confirmar email";
+    }
+  }
+  if (error || !data?.session) {
+    setSignupMessage(`Nao consegui confirmar: ${formatAuthError(error || "codigo invalido")}`);
+    return;
+  }
+  const remember = data.session.user?.user_metadata?.username || signupVerifyEmail;
+  signupVerifyEmail = "";
+  closeSignupModal();
+  await finishNewAccountSession(remember);
 }
 
 function closeSignupModal() {
@@ -2798,6 +2943,10 @@ function setSignupMessage(message, tone = "error") {
 async function submitSignupForm(event) {
   event.preventDefault();
   if (authActionBusy) return;
+  if (signupVerifyEmail && !document.querySelector("#signup-verify")?.classList.contains("hidden")) {
+    await submitSignupCode();
+    return;
+  }
   const submit = document.querySelector("#signup-submit");
   const email = document.querySelector("#signup-email")?.value.trim() || "";
   const usernameInput = document.querySelector("#signup-username");
@@ -2838,11 +2987,23 @@ async function submitSignupForm(event) {
     setSignupMessage(`Nao consegui criar conta: ${formatAuthError(error)}`);
     return;
   }
+  // Email que ja tem conta: o Supabase devolve um utilizador sem identidades e nao envia nada.
+  if (data.user && Array.isArray(data.user.identities) && !data.user.identities.length) {
+    setSignupMessage("Este email ja tem conta. Usa Entrar ou Esqueci-me da password.");
+    return;
+  }
   if (!data.session) {
-    setSignupMessage("Conta criada. Confirma o email que te enviamos e depois entra na app.", "success");
+    signupVerifyEmail = email;
+    setSignupStep("verify");
+    setSignupMessage("Conta criada. Falta so confirmar o email com o codigo.", "success");
+    document.querySelector("#signup-code")?.focus();
     return;
   }
   closeSignupModal();
+  await finishNewAccountSession(username);
+}
+
+async function finishNewAccountSession(username) {
   await loadAccountState();
   rememberLogin(username);
   await loadRemoteState();
@@ -2863,6 +3024,7 @@ function bindSignupModal() {
     closeSignupModal();
     openLoginModal();
   });
+  on(document.querySelector("#signup-resend"), "click", () => resendSignupCode());
   on(document.querySelector("#login-to-signup"), "click", createAccount);
   const email = document.querySelector("#signup-email");
   const username = document.querySelector("#signup-username");
@@ -2888,42 +3050,256 @@ async function resolveLoginEmail(login) {
   return data || "";
 }
 
-async function requestPasswordReset(prefilledLogin) {
+// Chamado pelos botoes "Recuperar password" (recebem o evento do clique) e com um login ja escrito.
+function requestPasswordReset(prefilledLogin) {
   if (!remoteEnabled || !supabaseClient) {
     alert("Configura primeiro o Supabase.");
     return;
   }
-  if (authActionBusy) return;
-  const login = typeof prefilledLogin === "string" && prefilledLogin
-    ? prefilledLogin
-    : prompt("Email ou username para recuperar password:");
-  if (!login) {
-    alert("Escreve o email ou username da conta.");
-    return;
+  const login = typeof prefilledLogin === "string" ? prefilledLogin : "";
+  openRecoveryModal({ step: "request", login });
+}
+
+// Passos: "request" (email/username), "code" (codigo + nova password), "password" (veio pelo link: so a nova password).
+function openRecoveryModal({ step = "request", login = "", message = "" } = {}) {
+  const modal = document.querySelector("#recovery-modal");
+  if (!modal) return;
+  closeLoginModal();
+  closeSignupModal();
+  if (login) {
+    const input = document.querySelector("#recovery-login");
+    if (input) input.value = login;
   }
-  const email = await resolveLoginEmail(login);
-  if (!email) {
-    alert("Nao encontrei esse email/username.");
-    return;
+  setRecoveryStep(step);
+  setRecoveryMessage(message);
+  modal.classList.remove("hidden");
+  document.body.classList.add("mvp-gate-open");
+  const focus = { request: "#recovery-login", code: "#recovery-code", password: "#recovery-password" }[step];
+  document.querySelector(focus)?.focus();
+}
+
+function closeRecoveryModal() {
+  const modal = document.querySelector("#recovery-modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  document.body.classList.remove("mvp-gate-open");
+  ["#recovery-code", "#recovery-password"].forEach((selector) => {
+    const input = document.querySelector(selector);
+    if (input) input.value = "";
+  });
+}
+
+function setRecoveryStep(step) {
+  const modal = document.querySelector("#recovery-modal");
+  if (modal) modal.dataset.step = step;
+  document.querySelector("#recovery-login-field")?.classList.toggle("hidden", step !== "request");
+  document.querySelector("#recovery-code-field")?.classList.toggle("hidden", step !== "code");
+  document.querySelector("#recovery-password-field")?.classList.toggle("hidden", step === "request");
+  document.querySelector("#recovery-resend")?.classList.toggle("hidden", step !== "code");
+  const hint = document.querySelector("#recovery-hint");
+  if (hint) {
+    hint.textContent = {
+      request: "Escreve o teu email ou username. Enviamos um codigo para o email da conta.",
+      code: `Enviamos um codigo para ${recoveryEmail}. Escreve-o aqui e escolhe a nova password (se nao o vires, procura no spam).`,
+      password: "Escolhe a nova password. A partir de agora entras com ela.",
+    }[step];
   }
-  const redirectTo = window.location.href.split("#")[0].split("?")[0];
+  const submit = document.querySelector("#recovery-submit");
+  if (submit) submit.textContent = step === "request" ? "Enviar codigo" : "Guardar nova password";
+}
+
+function setRecoveryMessage(message, tone = "error") {
+  const box = document.querySelector("#recovery-message");
+  if (!box) return;
+  box.textContent = message;
+  box.classList.toggle("hidden", !message);
+  box.classList.toggle("auth-success", tone === "success");
+}
+
+async function sendRecoveryCode() {
+  const email = recoveryEmail;
   setAuthActionBusy(true);
   let error;
   try {
-    ({ error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo }));
+    // O link do email (se o modelo o tiver) volta a esta pagina; o codigo funciona em qualquer lado, tambem na app.
+    ({ error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() }));
   } finally {
     setAuthActionBusy(false);
   }
-  if (error) {
-    alert(`Nao consegui enviar recuperacao: ${formatAuthError(error)}`);
+  return error;
+}
+
+async function submitRecoveryForm(event) {
+  event.preventDefault();
+  if (authActionBusy || !supabaseClient) return;
+  const step = document.querySelector("#recovery-modal")?.dataset.step || "request";
+  const submit = document.querySelector("#recovery-submit");
+  const idleText = submit?.textContent || "";
+  const busy = (text) => {
+    if (!submit) return;
+    submit.disabled = Boolean(text);
+    submit.textContent = text || idleText;
+  };
+
+  if (step === "request") {
+    const login = document.querySelector("#recovery-login")?.value.trim() || "";
+    if (!login) {
+      setRecoveryMessage("Escreve o email ou username da conta.");
+      return;
+    }
+    busy("A enviar...");
+    try {
+      const email = await resolveLoginEmail(login);
+      if (!email) {
+        setRecoveryMessage("Nao encontrei esse email ou username.");
+        return;
+      }
+      recoveryEmail = email;
+      const error = await sendRecoveryCode();
+      if (error) {
+        setRecoveryMessage(`Nao consegui enviar: ${formatAuthError(error)}`);
+        return;
+      }
+    } finally {
+      busy("");
+    }
+    setRecoveryStep("code");
+    setRecoveryMessage("");
+    document.querySelector("#recovery-code")?.focus();
     return;
   }
-  alert("Email de recuperacao enviado.");
+
+  const password = document.querySelector("#recovery-password")?.value || "";
+  if (step === "code") {
+    const token = cleanAuthCode(document.querySelector("#recovery-code")?.value);
+    if (!isValidAuthCode(token)) {
+      setRecoveryMessage("Escreve o codigo que recebeste no email (so numeros).");
+      return;
+    }
+  }
+  if (password.length < 6) {
+    setRecoveryMessage("A nova password tem de ter pelo menos 6 caracteres.");
+    return;
+  }
+  busy("A guardar...");
+  setAuthActionBusy(true);
+  let error = null;
+  try {
+    if (step === "code") {
+      const token = cleanAuthCode(document.querySelector("#recovery-code")?.value);
+      ({ error } = await supabaseClient.auth.verifyOtp({ email: recoveryEmail, token, type: "recovery" }));
+    }
+    if (!error) ({ error } = await supabaseClient.auth.updateUser({ password }));
+  } finally {
+    setAuthActionBusy(false);
+    busy("");
+  }
+  if (error) {
+    setRecoveryMessage(`Nao consegui mudar a password: ${formatAuthError(error)}`);
+    return;
+  }
+  recoveryEmail = "";
+  closeRecoveryModal();
+  await loadAccountState();
+  await loadRemoteState();
+  await refreshPendingInvite();
+  updateAccessUi();
+  if (currentViewName === "me" && !pendingInvite?.valid) applyLandingRoute();
+  render();
+  if (pendingInvite?.valid) await acceptPendingInvite();
+  alert("Password alterada. Ja estas dentro.");
+}
+
+function bindRecoveryModal() {
+  on(document.querySelector("#recovery-form"), "submit", submitRecoveryForm);
+  document.querySelectorAll("[data-close-recovery]").forEach((el) => on(el, "click", closeRecoveryModal));
+  on(document.querySelector("#recovery-to-login"), "click", () => {
+    closeRecoveryModal();
+    openLoginModal();
+  });
+  on(document.querySelector("#recovery-resend"), "click", async () => {
+    if (authActionBusy || !recoveryEmail) return;
+    const error = await sendRecoveryCode();
+    if (error) setRecoveryMessage(`Nao consegui enviar: ${formatAuthError(error)}`);
+    else setRecoveryMessage(`Enviamos um codigo novo para ${recoveryEmail}.`, "success");
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeRecoveryModal();
+  });
+}
+
+function getAuthRedirectUrl() {
+  return window.location.href.split("#")[0].split("?")[0];
+}
+
+function cleanAuthCode(value) {
+  return String(value || "").replace(/\D+/g, "");
+}
+
+// O Supabase envia 6 digitos por defeito (configuravel ate 10).
+function isValidAuthCode(code) {
+  return /^\d{6,10}$/.test(code);
+}
+
+function isEmailNotConfirmedError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("email not confirmed") || error?.code === "email_not_confirmed";
+}
+
+// ---- Entrar com Google/Facebook/... ----
+// Ligam-se em app-config.js (authProviders) depois de activados no Supabase. Na app instalada ficam escondidos
+// ate haver ligacao de volta para a app (deep link).
+const AUTH_PROVIDERS = {
+  google: {
+    label: "Google",
+    icon: `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.1C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.2-13.5-10l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>`,
+  },
+  facebook: {
+    label: "Facebook",
+    icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>`,
+  },
+  apple: {
+    label: "Apple",
+    icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.6 1.3-.1 1.7-.8 3.3-.8 1.5 0 1.9.8 3.3.8 1.4 0 2.2-1.3 3-2.5 1-1.4 1.4-2.8 1.4-2.8s-2.6-1-2.4-4.2zM13.9 4.9c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>`,
+  },
+};
+
+function getOAuthProviders() {
+  if (!remoteEnabled || !supabaseClient) return [];
+  if (window.Capacitor?.isNativePlatform?.()) return [];
+  const list = Array.isArray(config.authProviders) ? config.authProviders : [];
+  return list.filter((provider) => AUTH_PROVIDERS[provider]);
+}
+
+function renderOAuthButtons() {
+  const providers = getOAuthProviders();
+  ["#login-oauth", "#signup-oauth"].forEach((selector) => {
+    const wrap = document.querySelector(selector);
+    if (!wrap) return;
+    wrap.classList.toggle("hidden", !providers.length);
+    wrap.innerHTML = providers.length
+      ? `${providers.map((provider) => `
+          <button type="button" class="auth-oauth-btn" data-oauth="${provider}">
+            ${AUTH_PROVIDERS[provider].icon}<span>Continuar com ${AUTH_PROVIDERS[provider].label}</span>
+          </button>`).join("")}
+        <div class="auth-divider">ou com email</div>`
+      : "";
+    wrap.querySelectorAll("[data-oauth]").forEach((button) => on(button, "click", () => signInWithProvider(button.dataset.oauth)));
+  });
+}
+
+async function signInWithProvider(provider) {
+  if (authActionBusy || !supabaseClient) return;
+  setAuthActionBusy(true);
+  // Sai da pagina para o Google/Facebook e volta ja com sessao; o resto do arranque trata do perfil e do convite.
+  const { error } = await supabaseClient.auth.signInWithOAuth({ provider, options: { redirectTo: getAuthRedirectUrl() } });
+  setAuthActionBusy(false);
+  if (error) alert(`Nao consegui abrir ${AUTH_PROVIDERS[provider]?.label || provider}: ${formatAuthError(error)}`);
 }
 
 function setAuthActionBusy(isBusy) {
   authActionBusy = isBusy;
-  document.querySelectorAll("#account-signup, [data-account-signup], [data-password-reset]").forEach((button) => {
+  document.querySelectorAll("#account-signup, [data-account-signup], [data-password-reset], #signup-resend, #recovery-resend, [data-oauth]").forEach((button) => {
     button.disabled = isBusy;
     button.classList.toggle("is-busy", isBusy);
   });
@@ -2932,10 +3308,25 @@ function setAuthActionBusy(isBusy) {
 function formatAuthError(error) {
   const message = String(error?.message || error || "").toLowerCase();
   if (message.includes("email rate limit") || message.includes("rate limit exceeded")) {
-    return "o limite de emails de confirmacao/recuperacao foi atingido. Tenta novamente mais tarde ou pede ao organizador para configurar o SMTP no Supabase.";
+    return "foram pedidos demasiados emails. Espera um pouco e tenta outra vez.";
   }
-  if (message.includes("error sending confirmation email") || message.includes("error sending recovery email")) {
-    return "o Supabase tentou enviar o email, mas o SMTP falhou. Confirma no Supabase se o host, porta, username, API key e sender email do SendGrid estao corretos.";
+  if (message.includes("you can only request this after") || message.includes("over_email_send_rate_limit")) {
+    return "acabaste de pedir um codigo. Espera um minuto antes de pedir outro.";
+  }
+  if (message.includes("error sending") && message.includes("email")) {
+    return "o servidor de email falhou e o email nao saiu. Avisa o organizador (configuracao de email no Supabase).";
+  }
+  if (message.includes("token has expired") || message.includes("otp_expired") || message.includes("invalid otp") || message.includes("codigo invalido")) {
+    return "o codigo esta errado ou ja expirou. Confirma os numeros ou pede um codigo novo.";
+  }
+  if (message.includes("provider is not enabled") || message.includes("unsupported provider")) {
+    return "esta forma de entrar ainda nao esta ligada. Usa email e password.";
+  }
+  if (message.includes("auth session missing")) {
+    return "o link ja nao tem sessao valida. Pede um codigo novo em Esqueci-me da password.";
+  }
+  if (message.includes("should be different from the old")) {
+    return "a nova password tem de ser diferente da antiga.";
   }
   if (message.includes("password")) {
     return "confirma se a password tem pelo menos 6 caracteres.";
@@ -3052,7 +3443,8 @@ function clearSignedOutData() {
 
 async function adminLogout() {
   clearBootCache();
-  if (supabaseClient) await supabaseClient.auth.signOut();
+  // So neste aparelho: o telemovel e o computador ficam independentes.
+  if (supabaseClient) await supabaseClient.auth.signOut({ scope: "local" });
   isAdmin = false;
   currentSession = null;
   currentProfile = null;
