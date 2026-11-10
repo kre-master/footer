@@ -116,7 +116,7 @@ test("ball pass metrics are read when present and stay absent in older results",
   data.ball = { coverage_of_video_pct: 77.2, middle_third_pct: 42.7, passes_detected_total: 16,
     audit: { passes: { correct: 23, judged: 24 } } };
   const result = tracking.parseResult(data);
-  assert.deepEqual(result.ball, { coveragePct: 77.2, middleThirdPct: 42.7, passesTotal: 16, passAudit: { correct: 23, judged: 24 }, zonesPct: null, passLinks: [] });
+  assert.deepEqual(result.ball, { coveragePct: 77.2, middleThirdPct: 42.7, passesTotal: 16, passAudit: { correct: 23, judged: 24 }, verticalAudit: null, possessionAudit: null, zonesPct: null, passLinks: [] });
   assert.equal(result.players[0].passesMade, 7);
   assert.equal(result.players[0].passesReceived, 5);
   assert.deepEqual(result.players[0].passPartner, { label: "MARQUES", passes: 4 });
@@ -282,4 +282,36 @@ test("top speed window is read from the result and is 1 s in older results", () 
   const data = sample();
   data.players.forEach((p) => { p.metrics.max_speed_sustained_window_s = 2; });
   assert.equal(tracking.parseResult(data).players[0].maxSustainedWindowS, 2);
+});
+
+test("vertical passes and possession are read when present and stay null in older files", () => {
+  const old = tracking.parseResult(sample());
+  assert.equal(old.players[0].verticalPasses, null);
+  assert.equal(old.teams.A.verticalPasses, null);
+  assert.equal(old.teams.A.possessionPct, null);
+  assert.equal(tracking.teamFaceOff(old).A.possessionPct, null);   // "sem dados", not 0
+
+  const data = sample();
+  data.players[0].metrics.vertical_passes_detected = 4;
+  data.players[1].metrics.vertical_passes_detected = 6;
+  data.players[2].metrics.vertical_passes_detected = 9;            // keeper most of the time: not a highlight
+  data.teams.A.vertical_passes = { count: 10, crossing_midline: 5, in_attacking_half: 3, in_own_half: 2, passes: 40, status: "detected" };
+  data.teams.A.possession_pct = { value: 54.2, status: "estimate" };
+  data.teams.B = { team_width_m: 8, possession_pct: { value: 45.8 } };
+  data.metric_status = { vertical_passes: "detected", possession: "estimate" };
+  data.ball = { audit: { vertical_passes: { correct: 19, judged: 19 }, possession: { same: 17, judged: 20 } } };
+  const result = tracking.parseResult(data);
+  assert.equal(result.players[1].verticalPasses, 6);
+  assert.deepEqual(result.teams.A.verticalPasses, { count: 10, crossingMidline: 5, inAttackingHalf: 3, inOwnHalf: 2, passes: 40, status: "detected" });
+  assert.deepEqual(result.teams.B.possessionPct, { value: 45.8, status: "estimate" });
+  assert.equal(result.teams.B.verticalPasses, null);
+  assert.deepEqual(result.ball.verticalAudit, { correct: 19, judged: 19 });
+  assert.deepEqual(result.ball.possessionAudit, { same: 17, judged: 20 });
+  assert.equal(tracking.statusTag(result, "vertical_passes"), "contagem incompleta");
+  assert.equal(tracking.statusTag(result, "possession"), "estimativa");
+  assert.deepEqual(tracking.gameHighlights(result).vertical, { value: 6, labels: ["MARQUES"] });
+  const f = tracking.teamFaceOff(result);
+  assert.equal(f.A.verticalPasses, 10);
+  assert.equal(f.A.possessionPct, 54.2);
+  assert.equal(f.B.verticalPasses, null);
 });

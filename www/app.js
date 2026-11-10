@@ -12497,6 +12497,8 @@ function renderTeamFaceOff(entry, game) {
   const rows = [
     ["Metros por jogador-minuto", "metersPerPlayerMin", 1, "", tracking.statusTag(entry.result, "distance")],
     ["Passes detetados", "passes", 0, "", tracking.statusTag(entry.result, "passes")],
+    ["Posse de bola", "possessionPct", 0, "%", tracking.statusTag(entry.result, "possession") || "estimativa"],
+    ["Passes verticais", "verticalPasses", 0, "", tracking.statusTag(entry.result, "vertical_passes")],
     ["Ataques", "attacks", 0, "", tracking.statusTag(entry.result, "attacks")],
     ["Largura média", "widthM", 1, " m", null],
     ["Compactação (menor = mais junta)", "compactnessM", 1, " m", null],
@@ -12584,6 +12586,10 @@ function renderPassMap(entry, p) {
   `;
 }
 
+// Short definitions of the 2026-11-10 ball metrics, in the user's words (rules of the tracker, bola_footer.py).
+const VERTICAL_PASS_RULE = "Passe vertical: avança pelo menos 5 m para a baliza adversária (ângulo até 45°) ou atravessa o meio-campo para a frente.";
+const POSSESSION_RULE = "Posse: estimativa da % do tempo com a bola de cada equipa; o tempo com a bola solta não conta.";
+
 function renderPlayerPassBlock(entry, p, rank) {
   // Ball metrics exist from revision 2 on; only passes passed the human audit. Passes made are in the top cards.
   if (p.passesMade == null) return "";
@@ -12594,9 +12600,10 @@ function renderPlayerPassBlock(entry, p, rank) {
       <h4>Com bola</h4>
       <div class="tracking-highlights">
         ${trackingCard("Passes recebidos", p.passesReceived, "", { note: rank("passesReceived"), tag: window.FooterTracking.statusTag(entry.result, "passes") })}
+        ${p.verticalPasses != null ? trackingCard("Passes verticais", p.verticalPasses, "", { note: rank("verticalPasses"), tag: window.FooterTracking.statusTag(entry.result, "vertical_passes") }) : ""}
         ${partner ? `<article class="tracking-highlight"><span>Parceiro de passe</span><strong>${formatTrackingNumber(p.passPartner.passes)} <small>passes</small></strong><em>trocados com ${partner}</em></article>` : ""}
       </div>
-      <p class="tracking-fineprint">Contados automaticamente pela bola no vídeo${audit ? ` (${audit.correct} de ${audit.judged} certos numa verificação)` : ""}. O número real é maior: a bola nem sempre é vista.</p>
+      <p class="tracking-fineprint">Contados automaticamente pela bola no vídeo${audit ? ` (${audit.correct} de ${audit.judged} certos numa verificação)` : ""}. O número real é maior: a bola nem sempre é vista.${p.verticalPasses != null ? ` ${VERTICAL_PASS_RULE}` : ""}</p>
     </div>
   `;
 }
@@ -12633,6 +12640,9 @@ function renderTrackingTestSection(game) {
   `;
   const teamName = (key) => escapeHtml(getTrackingVideoTeamName(entry, game, key));
   const attacksA = result.teams.A?.attacks, attacksB = result.teams.B?.attacks;
+  const possA = result.teams.A?.possessionPct, possB = result.teams.B?.possessionPct;
+  const vertA = result.teams.A?.verticalPasses, vertB = result.teams.B?.verticalPasses;
+  const verticalSplit = (key, v) => v ? `${teamName(key)}: ${formatTrackingNumber(v.crossingMidline)} a cruzar o meio-campo, ${formatTrackingNumber(v.inAttackingHalf)} no meio-campo ofensivo, ${formatTrackingNumber(v.inOwnHalf)} no próprio meio-campo` : "";
   // Whose analysis is shown: the signed-in player's own; an admin can preview any associated player.
   const linked = getLinkedPlayer();
   const mappedPlayers = result.players.filter((p) => mapping[p.label]);
@@ -12662,13 +12672,30 @@ function renderTrackingTestSection(game) {
               <em>${teamName("A")} · ${teamName("B")}</em>
               <i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "attacks") || "estimativa")}</i>
             </article>` : ""}
-        </div>` : ""}
+          ${possA || possB ? `
+            <article class="tracking-highlight">
+              <span>Posse de bola</span>
+              <strong>${possA ? formatTrackingNumber(possA.value) : "–"}<small>%</small> <small>·</small> ${possB ? formatTrackingNumber(possB.value) : "–"}<small>%</small></strong>
+              <em>${teamName("A")} · ${teamName("B")}</em>
+              <i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "possession") || "estimativa")}</i>
+            </article>` : ""}
+          ${vertA || vertB ? `
+            <article class="tracking-highlight">
+              <span>Passes verticais</span>
+              <strong>${vertA ? vertA.count : "–"} <small>·</small> ${vertB ? vertB.count : "–"}</strong>
+              <em>${teamName("A")} · ${teamName("B")}</em>
+              ${tracking.statusTag(result, "vertical_passes") ? `<i class="tracking-tag">${escapeHtml(tracking.statusTag(result, "vertical_passes"))}</i>` : ""}
+            </article>` : ""}
+        </div>
+        ${vertA || vertB || possA || possB ? `
+          <p class="tracking-fineprint">${vertA || vertB ? `${[verticalSplit("A", vertA), verticalSplit("B", vertB)].filter(Boolean).join("; ")}. ${VERTICAL_PASS_RULE}${result.ball.verticalAudit ? ` (${result.ball.verticalAudit.correct} de ${result.ball.verticalAudit.judged} certos numa verificação).` : ""}` : ""}${possA || possB ? ` ${POSSESSION_RULE}${result.ball.possessionAudit ? ` (${result.ball.possessionAudit.same} de ${result.ball.possessionAudit.judged} instantes certos numa verificação).` : ""}` : ""}</p>` : ""}` : ""}
       <div class="tracking-highlights">
         ${highlight("Motor do jogo", highlights.motor, "m/min", 1, tracking.statusTag(result, "pace"))}
         ${highlight(`Mais rápido (${formatTrackingNumber(result.players[0]?.maxSustainedWindowS ?? 1, 0)} s)`, highlights.lightning, "km/h", 1, tracking.statusTag(result, "max_speed"))}
         ${highlight("Mais sprints", highlights.sprinter, "sprints")}
         ${highlight("Mais metros", highlights.distance, "m")}
         ${result.ball ? highlight("Mais passes", highlights.passer, "passes") : ""}
+        ${result.players.some((p) => p.verticalPasses != null) ? highlight("Mais passes verticais", highlights.vertical, "passes", 0, tracking.statusTag(result, "vertical_passes")) : ""}
       </div>
       <p class="tracking-fineprint">Destaques entre quem teve pelo menos ${tracking.MIN_MINUTES_FOR_HIGHLIGHT} min observados e não esteve na baliza a maior parte do tempo.${result.ball ? " Passes detetados automaticamente; o total real é maior." : ""}</p>
     </section>
