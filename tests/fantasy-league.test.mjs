@@ -107,7 +107,7 @@ test("avatar: todos os ficheiros usados existem", async () => {
     for (let tone = 1; tone <= 6; tone += 1) {
       for (const hair of F.AVATAR.hair[sx]) {
         for (const color of F.AVATAR.colors) {
-          for (const l of F.avatarLayers({ sx, tone, hair, color })) {
+          for (const beard of sx === "m" ? F.AVATAR.beards : ["sem"]) for (const l of F.avatarLayers({ sx, tone, hair, color, beard })) {
             await access(new URL(`../${F.AVATAR.root}${l.src}`, import.meta.url));
           }
         }
