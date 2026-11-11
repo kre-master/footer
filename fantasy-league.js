@@ -104,8 +104,8 @@
       f: ["coque", "rabo-de-cavalo", "curto", "encaracolado-solto", "trancas"],
     },
     colors: ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
-    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (por agora os por omissão).
-    approved: { m: ["penteado-para-tras"], f: ["coque"], colors: ["castanho-escuro"] },
+    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (2026-11-11). Cores ainda só a por omissão.
+    approved: { m: ["penteado-para-tras", "rapado", "encaracolado", "afro-curto"], f: ["coque"], colors: ["castanho-escuro"] },
     defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
     bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
   };
