@@ -101,11 +101,16 @@
     h: 512,
     hair: {
       m: ["penteado-para-tras", "rapado", "encaracolado", "afro-curto", "comprido-apanhado"],
-      f: ["coque", "rabo-de-cavalo", "curto", "encaracolado-solto", "trancas"],
+      f: ["coque", "rabo-de-cavalo-1", "rabo-de-cavalo-2", "rabo-de-cavalo-3", "curto-1", "curto-2", "curto-3", "curto-4",
+        "encaracolado-solto-1", "encaracolado-solto-2", "encaracolado-solto-3", "encaracolado-solto-4",
+        "trancas-1", "trancas-2", "trancas-3", "trancas-4"],
     },
     colors: ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
-    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (2026-11-11). Cores ainda só a por omissão.
-    approved: { m: ["penteado-para-tras", "rapado", "encaracolado", "afro-curto"], f: ["coque"], colors: ["castanho-escuro"] },
+    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (2026-11-11: todos os penteados).
+    // Cores e barbas ainda só as por omissão.
+    get approved() {
+      return { m: this.hair.m, f: this.hair.f, colors: ["castanho-escuro"] };
+    },
     defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
     bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
   };
