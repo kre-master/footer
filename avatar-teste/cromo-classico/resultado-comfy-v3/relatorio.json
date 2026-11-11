@@ -1,0 +1,31 @@
+{
+  "escolhidas": {
+    "abdomen_job": "abdomen3",
+    "abdomen": 1111202661,
+    "gola": null,
+    "meias": null
+  },
+  "webp_kb": {
+    "manequim": 248.7,
+    "camisola": 64.7,
+    "calcoes": 34.4,
+    "meias-chuteiras": 45.1,
+    "composicao": 263.9,
+    "metade": 79.8,
+    "busto": 13.8
+  },
+  "png_kb": {
+    "manequim": 353.1,
+    "camisola": 94.7,
+    "calcoes": 55.5,
+    "meias-chuteiras": 71.0,
+    "composicao": 373.0
+  },
+  "abdomen_novo_a_vista_com_camisola": 0,
+  "branco_das_cuecas_a_vista_vestido": 0,
+  "diferenca_max_fora_da_camada": {
+    "camisola": 0,
+    "calcoes": 0,
+    "meias-chuteiras": 0
+  }
+}

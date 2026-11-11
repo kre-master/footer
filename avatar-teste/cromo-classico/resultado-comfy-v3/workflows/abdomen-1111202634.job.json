@@ -1,0 +1,21 @@
+{
+  "job": "abdomen-1111202634",
+  "slot": "abdomen",
+  "seed": 1111202634,
+  "prompt": "pixel art footballer mannequin, same pose, lean athletic male torso, flat stomach with subtle clearly defined six-pack abs, clean pixel-art shading consistent with the chest and arms, same warm tan skin tone, no folds or rolls, white boxer briefs waistband unchanged, dark stepped outlines, crisp pixels",
+  "prompt_id": "49ec2b5d-feb7-4249-85b2-e888b082f100",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-v2-flat-e6d9324790.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-abdomen-4cbe0af1b8.png"
+  },
+  "sha256": {
+    "base": "e6d93247905c184140e6c67d992656d50217b834bcbf86cb3bec2f3b32848f37",
+    "mask": "4cbe0af1b80c5f2d290e6e742d14cf19381722313c2856607310588c28436bf0"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794413910.9802854
+}

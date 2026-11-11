@@ -1,0 +1,21 @@
+{
+  "job": "abdomen2-1111202637",
+  "slot": "abdomen2",
+  "seed": 1111202637,
+  "prompt": "pixel art, shirtless lean athletic young man, flat toned stomach with a clearly defined six-pack, two neat columns of three abdominal muscle blocks separated by a straight vertical line, smooth warm tan skin, clean simple pixel-art shading consistent with the chest above, no folds, no rolls, no wrinkles, top of white boxer briefs waistband at the bottom, dark stepped outlines on the sides, crisp pixels",
+  "prompt_id": "7c0cbc1d-5864-484c-9e17-d7145d830ddd",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-abdomen-liso-4e02043fcd.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-abdomen-4cbe0af1b8.png"
+  },
+  "sha256": {
+    "base": "4e02043fcd8a7436e8e48f5d595f5a570c111fe1f7dea234910ed1ab8d3d7e83",
+    "mask": "4cbe0af1b80c5f2d290e6e742d14cf19381722313c2856607310588c28436bf0"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794414760.1473308
+}
