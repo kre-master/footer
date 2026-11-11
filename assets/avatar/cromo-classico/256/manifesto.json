@@ -1,6 +1,6 @@
 {
   "colecao": "cromo-classico",
-  "versao": 3,
+  "versao": 4,
   "tela": [
     256,
     512
@@ -93,10 +93,21 @@
     ],
     "f": [
       "coque",
-      "rabo-de-cavalo",
-      "curto",
-      "encaracolado-solto",
-      "trancas"
+      "rabo-de-cavalo-1",
+      "rabo-de-cavalo-2",
+      "rabo-de-cavalo-3",
+      "curto-1",
+      "curto-2",
+      "curto-3",
+      "curto-4",
+      "encaracolado-solto-1",
+      "encaracolado-solto-2",
+      "encaracolado-solto-3",
+      "encaracolado-solto-4",
+      "trancas-1",
+      "trancas-2",
+      "trancas-3",
+      "trancas-4"
     ]
   },
   "cores_cabelo": [
