@@ -1,0 +1,47 @@
+{
+  "escolhidas": {
+    "manequim": 1111202671,
+    "camisola": 1111202682,
+    "calcoes": 1111202681
+  },
+  "webp_kb": {
+    "manequim-feminino": 153.0,
+    "camisola": 54.9,
+    "calcoes": 29.2,
+    "meias-chuteiras-partilhada": 36.2,
+    "composicao": 199.0,
+    "metade": 65.5,
+    "busto": 11.0
+  },
+  "png_kb": {
+    "manequim-feminino": 219.9,
+    "camisola": 78.4,
+    "calcoes": 46.9,
+    "meias-chuteiras-partilhada": 57.6,
+    "composicao": 279.6
+  },
+  "diferenca_max_fora_da_camada": {
+    "calcoes": 0,
+    "camisola": 0,
+    "meias-chuteiras": 0
+  },
+  "branco_do_top_ou_cuecas_a_vista_vestida": 0,
+  "partilha_meias": {
+    "topo_das_meias": {
+      "direita": 741,
+      "esquerda": 745
+    },
+    "pele_a_volta_das_meias_feminino": 0,
+    "pele_a_volta_das_meias_masculino": 0
+  },
+  "altura": {
+    "masculino_topo_chao": [
+      13,
+      986
+    ],
+    "feminino_topo_chao": [
+      7,
+      986
+    ]
+  }
+}

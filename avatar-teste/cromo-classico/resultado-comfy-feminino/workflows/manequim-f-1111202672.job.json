@@ -1,0 +1,23 @@
+{
+  "job": "manequim-f-1111202672",
+  "slot": "manequim-f",
+  "seed": 1111202672,
+  "prompt": "pixel art female footballer mannequin, exactly the same pose, same height and same scale, arms relaxed at the same angle, athletic woman with a toned fit body, hips slightly wider and shoulders slightly narrower than a man, natural proportions, feminine face, dark brown hair tied up in a high bun on top of the head, no hair on the shoulders, wearing only a plain white sports bra top and plain white briefs, bare arms, bare midriff and bare legs in the same warm tan skin tone, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background",
+  "prompt_id": "0f44ba4a-fef0-4f69-9589-5a4b90bb1fb0",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-m-v3-flat-53ef72b05c.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-corpo-feminino-435fe1aea0.png",
+    "female": "footer-avatar/2026-11-11/referencia-feminina-sepia-2x-5489a051d7.png"
+  },
+  "sha256": {
+    "base": "53ef72b05c656e268a3cf1b2b464e5fb63ae8f440b29df7556b0c90a99a8ed7c",
+    "mask": "435fe1aea0c529745aed16178e7015d74390e9495b1c653c8b287e9da8f73428",
+    "female": "5489a051d7eab46f92b18dc06ee99f70cd8ed78bd16e5ab883559fd795c2ba25"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794415728.9328206
+}
