@@ -1,0 +1,23 @@
+{
+  "job": "olhos-f-1111202703",
+  "slot": "olhos",
+  "seed": 1111202703,
+  "prompt": "pixel art, the same young woman's face, same skin, same nose and mouth, redraw only the eyes and eyebrows: small narrow eyes drawn exactly in the same pixel style and the same small size as the reference man's eyes, a thin dark upper eyelid line, a small dark brown iris, very little white, calm natural expression, slim dark eyebrows, no anime eyes, no eyelashes blocks, warm low-colour shading, crisp pixels",
+  "prompt_id": "368db6ec-1f5d-43cd-ae42-2b87214ca794",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-f-sem-olhos-f410baf06c.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-olhos-1a8fd9bfd4.png",
+    "male_face": "footer-avatar/2026-11-11/referencia-cara-masculina-4x-2946d30a4e.png"
+  },
+  "sha256": {
+    "base": "f410baf06cd5fcd5827c588c0e393053be026ac6c25983576501732cdd2a1375",
+    "mask": "1a8fd9bfd4e412435ff1ad746276872d9ded1b979e45e748428f9567630e47f7",
+    "male_face": "2946d30a4e44c73d9879123c64aa9b4bd4ffb3c6e1cb76925910d4df6fdc6796"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794421120.6567945
+}
