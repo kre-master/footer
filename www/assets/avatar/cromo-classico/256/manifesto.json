@@ -1,27 +1,163 @@
 {
   "colecao": "cromo-classico",
-  "versao": 1,
-  "tela": [256, 512],
+  "versao": 3,
+  "tela": [
+    256,
+    512
+  ],
   "nota": "Meia escala. Todas as camadas de corpo têm a tela inteira (256x512) e empilham-se em (0,0). Bola e galhardete são pequenos e vão na posição indicada.",
   "ordem": [
-    {"camada": "galhardete", "ficheiro": "kit/galhardete.webp", "pos": [197, 70], "tam": [43, 55], "nota": "atrás do corpo"},
-    {"camada": "base", "ficheiro": "bases/{sx}-pele-{tom}.webp", "tom": [1, 2, 3, 4, 5, 6], "omissao": 4},
-    {"camada": "meias", "ficheiro": "kit/meias-chuteiras.webp", "partilhada": true},
-    {"camada": "calcoes", "ficheiro": "kit/{sx}-calcoes.webp"},
-    {"camada": "camisola", "ficheiro": "kit/{sx}-camisola.webp"},
-    {"camada": "cabelo", "ficheiro": "cabelo/{sx}-{penteado}-{cor}.webp", "nota": "m-rapado não tem ficheiro (é a própria base)"},
-    {"camada": "bola", "ficheiro": "kit/bola.webp", "pos": [212, 462], "tam": [40, 40]}
+    {
+      "camada": "galhardete",
+      "ficheiro": "kit/galhardete.webp",
+      "pos": [
+        197,
+        70
+      ],
+      "tam": [
+        43,
+        55
+      ],
+      "nota": "atrás do corpo"
+    },
+    {
+      "camada": "base",
+      "ficheiro": "bases/{sx}-pele-{tom}.webp",
+      "tom": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "omissao": 4
+    },
+    {
+      "camada": "meias",
+      "ficheiro": "kit/meias.webp",
+      "partilhada": true,
+      "nota": "meia inteira, cobre o pé (fica bem sem chuteira); dá Passe na liga"
+    },
+    {
+      "camada": "chuteiras",
+      "ficheiro": "kit/chuteiras.webp",
+      "partilhada": true,
+      "nota": "dá Velocidade na liga"
+    },
+    {
+      "camada": "calcoes",
+      "ficheiro": "kit/{sx}-calcoes.webp"
+    },
+    {
+      "camada": "camisola",
+      "ficheiro": "kit/{sx}-camisola.webp"
+    },
+    {
+      "camada": "barba",
+      "ficheiro": "barba/m-{barba}-{cor}.webp",
+      "so": [
+        "m"
+      ],
+      "nota": "pelos faciais por cima da camisola e por baixo do cabelo; 'sem' não tem ficheiro; a base masculina já não tem bigode"
+    },
+    {
+      "camada": "cabelo",
+      "ficheiro": "cabelo/{sx}-{penteado}-{cor}.webp",
+      "nota": "m-rapado não tem ficheiro (é a própria base)"
+    },
+    {
+      "camada": "bola",
+      "ficheiro": "kit/bola.webp",
+      "pos": [
+        212,
+        462
+      ],
+      "tam": [
+        40,
+        40
+      ]
+    }
   ],
-  "sx": ["m", "f"],
+  "sx": [
+    "m",
+    "f"
+  ],
   "penteados": {
-    "m": ["penteado-para-tras", "rapado", "encaracolado", "afro-curto", "comprido-apanhado"],
-    "f": ["coque", "rabo-de-cavalo", "curto", "encaracolado-solto", "trancas"]
+    "m": [
+      "penteado-para-tras",
+      "rapado",
+      "encaracolado",
+      "afro-curto",
+      "comprido-apanhado"
+    ],
+    "f": [
+      "coque",
+      "rabo-de-cavalo",
+      "curto",
+      "encaracolado-solto",
+      "trancas"
+    ]
   },
-  "cores_cabelo": ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
-  "omissao": {"m": {"tom": 4, "penteado": "penteado-para-tras", "cor": "castanho-escuro"}, "f": {"tom": 4, "penteado": "coque", "cor": "castanho-escuro"}},
+  "cores_cabelo": [
+    "preto",
+    "castanho-escuro",
+    "castanho",
+    "ruivo",
+    "loiro",
+    "grisalho"
+  ],
+  "omissao": {
+    "m": {
+      "tom": 4,
+      "penteado": "penteado-para-tras",
+      "cor": "castanho-escuro",
+      "barba": "bigode",
+      "cor_barba": "castanho-escuro"
+    },
+    "f": {
+      "tom": 4,
+      "penteado": "coque",
+      "cor": "castanho-escuro"
+    }
+  },
   "busto": {
     "nota": "Recorte quadrado a partir do topo, centrado na cabeça, já em meia escala. Reduzir para o tamanho pedido (128, 40...).",
-    "m": {"caixa": [81, 0, 209, 128], "centro_cabeca": [145, 39]},
-    "f": {"caixa": [64, 0, 192, 128], "centro_cabeca": [128, 61]}
+    "m": {
+      "caixa": [
+        81,
+        0,
+        209,
+        128
+      ],
+      "centro_cabeca": [
+        145,
+        39
+      ]
+    },
+    "f": {
+      "caixa": [
+        64,
+        0,
+        192,
+        128
+      ],
+      "centro_cabeca": [
+        128,
+        61
+      ]
+    }
+  },
+  "barbas": {
+    "m": [
+      "bigode",
+      "barba-por-fazer",
+      "barba-curta",
+      "pera",
+      "sem"
+    ]
+  },
+  "antigo": {
+    "meias-chuteiras": "kit/meias-chuteiras.webp mantém-se por agora (camada única antiga, igual a meias+chuteiras)"
   }
 }

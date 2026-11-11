@@ -136,10 +136,13 @@
     const layers = [
       { src: "kit/galhardete.webp", box: [197, 70, 43, 55] },
       { src: `bases/${sx}-pele-${app.tone}.webp` },
-      { src: "kit/meias-chuteiras.webp" },
+      { src: "kit/meias.webp" },
+      { src: "kit/chuteiras.webp" },
       { src: `kit/${sx}-calcoes.webp` },
       { src: `kit/${sx}-camisola.webp` },
     ];
+    const beard = sx === "m" ? app.beard || "bigode" : "sem";
+    if (beard !== "sem") layers.push({ src: `barba/m-${beard}-${app.beardColor || app.color}.webp` });
     if (!(sx === "m" && app.hair === "rapado")) layers.push({ src: `cabelo/${sx}-${app.hair}-${app.color}.webp` });
     layers.push({ src: "kit/bola.webp", box: [212, 462, 40, 40] });
     return layers;
