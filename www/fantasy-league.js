@@ -143,12 +143,19 @@
   function avatarHtml(app, { width = 128, bust = 0 } = {}) {
     const sx = app.sx === "f" ? "f" : "m";
     const pct = (v, total) => `${((v / total) * 100).toFixed(3)}%`;
-    const imgs = avatarLayers(app).map((l) => {
+    // No busto da carta nao entram bola nem galhardete (camadas pequenas com caixa).
+    const imgs = avatarLayers(app).filter((l) => !(bust === "fluid" && l.box)).map((l) => {
       const style = l.box
         ? `left:${pct(l.box[0], AVATAR.w)};top:${pct(l.box[1], AVATAR.h)};width:${pct(l.box[2], AVATAR.w)};height:${pct(l.box[3], AVATAR.h)}`
         : "left:0;top:0;width:100%;height:100%";
       return `<img src="${AVATAR.root}${l.src}" alt="" loading="lazy" decoding="async" style="${style}">`;
     }).join("");
+    if (bust === "fluid") {
+      // Enche o contentor: a largura do busto = largura do contentor; o peito fica por baixo, cortado.
+      const [x0, , x1] = AVATAR.bust[sx];
+      const k = AVATAR.w / (x1 - x0);
+      return `<span class="fantasy-avatar-fluid" aria-hidden="true"><span class="fantasy-avatar" style="width:${(k * 100).toFixed(2)}%;left:${(-(x0 / (x1 - x0)) * 100).toFixed(2)}%">${imgs}</span></span>`;
+    }
     if (bust) {
       const [x0, y0, x1] = AVATAR.bust[sx];
       const scale = bust / (x1 - x0);
@@ -177,6 +184,8 @@
       userId ? client.rpc("fantasy_my_points") : Promise.resolve({ data: null }),
     ]);
     for (const result of [teams, players, fixtures, standings, profile, points]) if (result.error) throw result.error;
+    // Sem a tabela (migracao por aplicar) fica foto.
+    const cardPref = userId ? await client.from("card_preferences").select("portrait").eq("user_id", userId).maybeSingle() : { data: null };
     const userIds = [...new Set((players.data || []).map((p) => p.user_id).filter(Boolean))];
     const names = userIds.length
       ? (await client.from("fantasy_profiles").select("user_id, display_name").in("user_id", userIds)).data || []
@@ -197,6 +206,7 @@
       names: new Map(names.map((n) => [n.user_id, n.display_name])),
       events,
       summary,
+      cardPortrait: cardPref?.error ? null : (cardPref?.data?.portrait || "photo"),
     };
   }
 
@@ -229,6 +239,11 @@
               <span class="fantasy-bar" aria-hidden="true"><span style="width:${Math.round(((build[attr.key] - BASE) / (CAP - BASE)) * 100)}%"></span></span>
             </div>`).join("")}
         </div>
+        ${data.cardPortrait ? `<div class="fantasy-portrait" role="group" aria-label="Retrato na carta">
+          <span>Na tua carta:</span>
+          <button type="button" class="mini-btn ${data.cardPortrait === "photo" ? "is-on" : ""}" data-fantasy-portrait="photo" aria-pressed="${data.cardPortrait === "photo"}">Foto</button>
+          <button type="button" class="mini-btn ${data.cardPortrait === "avatar" ? "is-on" : ""}" data-fantasy-portrait="avatar" aria-pressed="${data.cardPortrait === "avatar"}">Avatar</button>
+        </div>` : ""}
         <div class="actions">
           <button type="button" class="primary-btn" data-fantasy-save ${state.busy ? "disabled" : ""}>Guardar jogador</button>
           ${data.profile && !data.mine ? `<button type="button" class="ghost-btn" data-fantasy-join ${state.busy ? "disabled" : ""}>Entrar na liga de teste</button>` : ""}
@@ -298,7 +313,7 @@
         </section>` : ""}`;
   }
 
-  async function render(container, { client, user, defaultName = "", escapeHtml }) {
+  async function render(container, { client, user, defaultName = "", escapeHtml, onCardPortrait }) {
     if (!container) return;
     const esc = escapeHtml || ((v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]));
     if (!client) {
@@ -331,7 +346,7 @@
         state.name = defaultName || "";
       }
     }
-    paint(container, data, { client, user, defaultName, escapeHtml, esc });
+    paint(container, data, { client, user, defaultName, escapeHtml, esc, onCardPortrait });
   }
 
   function paint(container, data, ctx) {
@@ -376,6 +391,12 @@
         if (error) throw error;
       }, "Jogador guardado. As mudanças contam a partir da próxima jornada.");
     });
+    container.querySelectorAll("[data-fantasy-portrait]").forEach((button) => button.addEventListener("click", () => run(async () => {
+      const portrait = button.dataset.fantasyPortrait;
+      const { error } = await client.from("card_preferences").upsert({ user_id: user.id, portrait, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      ctx.onCardPortrait?.(user.id, portrait);
+    }, button.dataset.fantasyPortrait === "avatar" ? "A tua carta passa a mostrar o avatar." : "A tua carta volta a mostrar a foto.")));
     container.querySelector("[data-fantasy-join]")?.addEventListener("click", () => run(async () => {
       const { error } = await client.rpc("fantasy_join_test_league");
       if (error) throw error;

@@ -113,3 +113,17 @@ test("avatar: todos os ficheiros usados existem", async () => {
     }
   }
 });
+
+test("carta: busto do avatar enche o retrato, sem bola nem galhardete", () => {
+  const html = F.avatarHtml({ sx: "m", tone: 4, hair: "penteado-para-tras", color: "preto" }, { bust: "fluid" });
+  assert.match(html, /fantasy-avatar-fluid/);
+  assert.doesNotMatch(html, /galhardete|bola/);
+  assert.match(html, /width:200\.00%;left:-63\.28%/);
+});
+
+test("carta: preferencias so escritas pela propria conta", async () => {
+  const cp = (await readFile(new URL("../supabase/card-preferences-migration.sql", import.meta.url), "utf8"));
+  assert.match(cp, /check \(portrait in \('photo', 'avatar'\)\)/);
+  assert.match(cp, /with check \(user_id = \(select auth\.uid\(\)\)\)/);
+  assert.doesNotMatch(cp, /grant[^;]*delete[^;]*card_preferences/);
+});

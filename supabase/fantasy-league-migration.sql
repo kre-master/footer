@@ -385,9 +385,10 @@ as $$
 declare
   s public.fantasy_settings := private.fantasy_settings();
   v_id uuid; i integer;
-  names text[] := array['Atlético da Ribeira', 'União do Largo', 'Grupo da Avenida', 'Juventude do Bairro',
-    'Estrela do Cais', 'Académico da Serra', 'Leões da Feira', 'Desportivo do Moinho',
-    'Recreativo da Praça', 'Unidos da Margem'];
+  -- Clubes reais das distritais da AF Porto 2026/27, sorteados pelo Jon a 2026-11-11 (3 Liga Pro, 3 Elite,
+  -- 2 Honra). So o nome; sem emblemas. Os jogadores de IA sao ficticios.
+  names text[] := array['Gondomar S.C.', 'Gandra S.C.', 'U.D. Lavrense', 'Vilarinho',
+    'U.D. Beiriz', 'Balio', 'Folgosa Maia F.C.', 'Atl. C. Alfenense'];
 begin
   select id into v_id from public.fantasy_leagues where is_test and status = 'running';
   if v_id is not null then return v_id; end if;
