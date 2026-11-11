@@ -1,6 +1,6 @@
 {
   "colecao": "cromo-classico",
-  "versao": 2,
+  "versao": 3,
   "tela": [
     256,
     512
@@ -35,8 +35,15 @@
     },
     {
       "camada": "meias",
-      "ficheiro": "kit/meias-chuteiras.webp",
-      "partilhada": true
+      "ficheiro": "kit/meias.webp",
+      "partilhada": true,
+      "nota": "meia inteira, cobre o pé (fica bem sem chuteira); dá Passe na liga"
+    },
+    {
+      "camada": "chuteiras",
+      "ficheiro": "kit/chuteiras.webp",
+      "partilhada": true,
+      "nota": "dá Velocidade na liga"
     },
     {
       "camada": "calcoes",
@@ -149,5 +156,8 @@
       "pera",
       "sem"
     ]
+  },
+  "antigo": {
+    "meias-chuteiras": "kit/meias-chuteiras.webp mantém-se por agora (camada única antiga, igual a meias+chuteiras)"
   }
 }
