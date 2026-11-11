@@ -1,0 +1,21 @@
+{
+  "job": "cabelo-m-afro-curto-1111202724",
+  "slot": "cabelo-m-afro-curto",
+  "seed": 1111202724,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, short rounded afro, very dark brown hair, tight coils, the face and the body unchanged",
+  "prompt_id": "a715ab82-81c4-4ab9-bfb5-a722f62542da",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-rapada-m-flat-7b0a176e9d.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-penteado-m-747811374e.png"
+  },
+  "sha256": {
+    "base": "7b0a176e9d3740776cd19f7e6a7936db8fae11c61e617d188c5325a4fafdf68c",
+    "mask": "747811374e203de71ea28983569c571e717665d7fe91680b47cfecaf69319550"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794424099.180171
+}
