@@ -1,0 +1,62 @@
+[
+  {
+    "peca": "calcoes",
+    "seed": 1111202604,
+    "segundos": 78.65,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband, high waistband reaching up to the jersey hem, the shorts fully cover the underwear"
+  },
+  {
+    "peca": "calcoes",
+    "seed": 1111202621,
+    "segundos": 77.891,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband, high waistband reaching up to the jersey hem, the shorts fully cover the underwear"
+  },
+  {
+    "peca": "camisola",
+    "seed": 1111202601,
+    "segundos": 146.096,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest, the jersey is long and tucked in, its ribbed burgundy hem reaches down over the waist"
+  },
+  {
+    "peca": "camisola",
+    "seed": 1111202621,
+    "segundos": 79.365,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest, the jersey is long and tucked in, its ribbed burgundy hem reaches down over the waist"
+  },
+  {
+    "peca": "manequim",
+    "seed": 1111202611,
+    "segundos": 104.37,
+    "prompt": "pixel art footballer mannequin, same pose, same body, same face, same arms and legs, shirtless with a bare muscular chest and stomach in the same warm tan skin tone, wearing only simple plain white short boxer briefs, no undershirt, no other clothing, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim",
+    "seed": 1111202612,
+    "segundos": 40.835,
+    "prompt": "pixel art footballer mannequin, same pose, same body, same face, same arms and legs, shirtless with a bare muscular chest and stomach in the same warm tan skin tone, wearing only simple plain white short boxer briefs, no undershirt, no other clothing, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim",
+    "seed": 1111202613,
+    "segundos": 40.826,
+    "prompt": "pixel art footballer mannequin, same pose, same body, same face, same arms and legs, shirtless with a bare muscular chest and stomach in the same warm tan skin tone, wearing only simple plain white short boxer briefs, no undershirt, no other clothing, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim",
+    "seed": 1111202614,
+    "segundos": 40.911,
+    "prompt": "pixel art footballer mannequin, same pose, same body, same face, same arms and legs, shirtless with a bare muscular chest and stomach in the same warm tan skin tone, wearing only simple plain white short boxer briefs, no undershirt, no other clothing, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "meias-chuteiras",
+    "seed": 1111202601,
+    "segundos": 78.499,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  },
+  {
+    "peca": "meias-chuteiras",
+    "seed": 1111202621,
+    "segundos": 77.75,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  }
+]
