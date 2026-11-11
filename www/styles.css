@@ -8719,3 +8719,10 @@ body.boot-refreshing::before {
 .fantasy-fixture span:last-of-type { text-align: right; }
 .fantasy-fixture small { grid-column: 1 / -1; color: var(--muted); }
 .fantasy-pos { display: inline-block; min-width: 34px; font-size: .75rem; color: var(--muted); }
+.fantasy-me { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: end; }
+.fantasy-me .fantasy-build-head { grid-template-columns: 1fr; }
+.fantasy-avatar { position: relative; display: block; flex: none; }
+.fantasy-avatar img { position: absolute; display: block; max-width: none; }
+.fantasy-avatar-bust { position: relative; display: inline-block; flex: none; overflow: hidden; border-radius: 50%; background: var(--surface-2); border: 2px solid var(--line-strong); vertical-align: middle; }
+.fantasy-avatar-bust .fantasy-avatar { position: absolute; }
+.fantasy-squad li { display: flex; align-items: center; gap: 8px; }

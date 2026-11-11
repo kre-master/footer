@@ -83,3 +83,33 @@ test("o cliente so le; escritas so por funcoes", () => {
   assert.match(sql, /revoke all on function private\.fantasy_play_due\(\) from public, anon, authenticated;/);
   assert.match(sql, /email_confirmed_at is not null/, "entrar na liga exige email confirmado");
 });
+
+test("avatar: reais com os valores por omissao, IA ao calhas mas fixo pelo id", () => {
+  assert.deepEqual(F.appearanceFor({ user_id: "u1" }), { sx: "m", tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" });
+  const a = F.appearanceFor({ id: "ia-1" });
+  assert.deepEqual(F.appearanceFor({ id: "ia-1" }), a);
+  assert.ok(a.tone >= 1 && a.tone <= 6);
+  assert.ok(F.AVATAR.hair[a.sx].includes(a.hair));
+});
+
+test("avatar: camadas pela ordem do manifesto e rapado sem cabelo", () => {
+  const names = F.avatarLayers({ sx: "m", tone: 2, hair: "rapado", color: "preto" }).map((l) => l.src);
+  assert.deepEqual(names, ["kit/galhardete.webp", "bases/m-pele-2.webp", "kit/meias-chuteiras.webp", "kit/m-calcoes.webp", "kit/m-camisola.webp", "kit/bola.webp"]);
+  const f = F.avatarLayers({ sx: "f", tone: 4, hair: "coque", color: "loiro" }).map((l) => l.src);
+  assert.ok(f.includes("cabelo/f-coque-loiro.webp"));
+});
+
+test("avatar: todos os ficheiros usados existem", async () => {
+  const { access } = await import("node:fs/promises");
+  for (const sx of ["m", "f"]) {
+    for (let tone = 1; tone <= 6; tone += 1) {
+      for (const hair of F.AVATAR.hair[sx]) {
+        for (const color of F.AVATAR.colors) {
+          for (const l of F.avatarLayers({ sx, tone, hair, color })) {
+            await access(new URL(`../${F.AVATAR.root}${l.src}`, import.meta.url));
+          }
+        }
+      }
+    }
+  }
+});

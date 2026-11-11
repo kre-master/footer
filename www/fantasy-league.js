@@ -93,6 +93,70 @@
     }
   }
 
+  // Avatar Cromo classico (meia escala 256x512, ver assets/avatar/cromo-classico/256/manifesto.json).
+  // Ainda nao ha aparencia por conta: reais usam os valores por omissao; IA tem aparencia ao calhas fixa pelo id.
+  const AVATAR = {
+    root: "assets/avatar/cromo-classico/256/",
+    w: 256,
+    h: 512,
+    hair: {
+      m: ["penteado-para-tras", "rapado", "encaracolado", "afro-curto", "comprido-apanhado"],
+      f: ["coque", "rabo-de-cavalo", "curto", "encaracolado-solto", "trancas"],
+    },
+    colors: ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
+    defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
+    bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
+  };
+
+  function hashString(value) {
+    let h = 2166136261;
+    for (const ch of String(value)) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h;
+  }
+
+  function appearanceFor(player, profile) {
+    if (profile?.avatar) return profile.avatar;
+    if (player?.user_id || !player?.id) return { sx: "m", ...AVATAR.defaults.m };
+    const h = hashString(player.id);
+    const sx = h % 5 === 0 ? "f" : "m";
+    return { sx, tone: 1 + ((h >>> 3) % 6), hair: AVATAR.hair[sx][(h >>> 7) % 5], color: AVATAR.colors[(h >>> 11) % 6] };
+  }
+
+  function avatarLayers(app) {
+    const sx = app.sx === "f" ? "f" : "m";
+    const layers = [
+      { src: "kit/galhardete.webp", box: [197, 70, 43, 55] },
+      { src: `bases/${sx}-pele-${app.tone}.webp` },
+      { src: "kit/meias-chuteiras.webp" },
+      { src: `kit/${sx}-calcoes.webp` },
+      { src: `kit/${sx}-camisola.webp` },
+    ];
+    if (!(sx === "m" && app.hair === "rapado")) layers.push({ src: `cabelo/${sx}-${app.hair}-${app.color}.webp` });
+    layers.push({ src: "kit/bola.webp", box: [212, 462, 40, 40] });
+    return layers;
+  }
+
+  // width = largura do corpo inteiro em px; bust = recorte quadrado da cabeca com esse lado em px.
+  function avatarHtml(app, { width = 128, bust = 0 } = {}) {
+    const sx = app.sx === "f" ? "f" : "m";
+    const pct = (v, total) => `${((v / total) * 100).toFixed(3)}%`;
+    const imgs = avatarLayers(app).map((l) => {
+      const style = l.box
+        ? `left:${pct(l.box[0], AVATAR.w)};top:${pct(l.box[1], AVATAR.h)};width:${pct(l.box[2], AVATAR.w)};height:${pct(l.box[3], AVATAR.h)}`
+        : "left:0;top:0;width:100%;height:100%";
+      return `<img src="${AVATAR.root}${l.src}" alt="" loading="lazy" decoding="async" style="${style}">`;
+    }).join("");
+    if (bust) {
+      const [x0, y0, x1] = AVATAR.bust[sx];
+      const scale = bust / (x1 - x0);
+      return `<span class="fantasy-avatar-bust" style="width:${bust}px;height:${bust}px" aria-hidden="true"><span class="fantasy-avatar" style="width:${AVATAR.w * scale}px;height:${AVATAR.h * scale}px;left:${-x0 * scale}px;top:${-y0 * scale}px">${imgs}</span></span>`;
+    }
+    return `<span class="fantasy-avatar is-full" style="width:${width}px;height:${width * 2}px" aria-hidden="true">${imgs}</span>`;
+  }
+
   // ---------------------------------------------------------------------------
   // DOM
   // ---------------------------------------------------------------------------
@@ -141,7 +205,9 @@
     const left = state.points - pointsSpent(build);
     return `
       <div class="fantasy-build">
-        <div class="fantasy-build-head">
+        <div class="fantasy-me">
+          ${avatarHtml(appearanceFor(data.mine || { user_id: "me" }), { width: 112 })}
+          <div class="fantasy-build-head">
           <label class="fantasy-field">Nome na liga
             <input type="text" maxlength="40" data-fantasy-name value="${esc(state.name)}">
           </label>
@@ -150,6 +216,7 @@
               ${POSITIONS.map((p) => `<option value="${p.key}" ${p.key === state.position ? "selected" : ""}>${p.label}</option>`).join("")}
             </select>
           </label>
+          </div>
         </div>
         <p class="fantasy-points"><strong>${left}</strong> de ${state.points} pontos por distribuir · nível de conta ${state.level}</p>
         <div class="fantasy-attrs">
@@ -203,7 +270,7 @@
         <section class="fantasy-section">
           <h3>${esc(teamName.get(mine.team_id))}</h3>
           <ul class="fantasy-squad">
-            ${myTeam.map((p) => `<li><span class="fantasy-pos">${p.position}</span> ${p.user_id ? esc(data.names.get(p.user_id) || "Jogador") : `${esc(p.ai_name)} <span class="muted-pill">IA</span>`}</li>`).join("")}
+            ${myTeam.map((p) => `<li>${avatarHtml(appearanceFor(p), { bust: 40 })}<span class="fantasy-pos">${p.position}</span> ${p.user_id ? esc(data.names.get(p.user_id) || "Jogador") : `${esc(p.ai_name)} <span class="muted-pill">IA</span>`}</li>`).join("")}
           </ul>
         </section>` : ""}
       <section class="fantasy-section">
@@ -324,5 +391,5 @@
     state.message = "";
   }
 
-  return { ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
+  return { AVATAR, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
 });
