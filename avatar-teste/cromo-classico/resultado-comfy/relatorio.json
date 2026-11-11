@@ -1,0 +1,38 @@
+{
+  "pesos_kb": {
+    "camisola": {
+      "png": 110.4,
+      "webp": 79.0
+    },
+    "calcoes": {
+      "png": 45.7,
+      "webp": 29.5
+    },
+    "meias-chuteiras": {
+      "png": 76.7,
+      "webp": 52.6
+    },
+    "manequim": {
+      "png": 525.0,
+      "webp": 279.9
+    },
+    "composicao": {
+      "png": 387.1,
+      "webp": 281.4
+    },
+    "miniatura_54x144": {
+      "png": 7.4,
+      "webp": 2.5
+    }
+  },
+  "escolhidas": {
+    "camisola": 1111202601,
+    "calcoes": 1111202604,
+    "meias-chuteiras": 1111202601
+  },
+  "diferenca_max_fora_da_camada": {
+    "camisola": 0,
+    "calcoes": 0,
+    "meias-chuteiras": 0
+  }
+}

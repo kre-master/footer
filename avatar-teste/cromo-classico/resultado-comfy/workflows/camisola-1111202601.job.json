@@ -1,0 +1,25 @@
+{
+  "job": "camisola-1111202601",
+  "slot": "camisola",
+  "seed": 1111202601,
+  "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest",
+  "prompt_id": "bdef89ab-7e0e-4968-b290-76b5e366832f",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/manequim-flat-2x-5e85e71620.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-camisola-9a8e0205ac.png",
+    "player": "footer-avatar/2026-11-11/jogador-flat-2x-ed4a9ad1e7.png",
+    "icon": "footer-avatar/2026-11-11/icone-camisola-6b3a650b27.png"
+  },
+  "sha256": {
+    "base": "5e85e71620c735cf5b66304b7b256230c1cefeecf3f0754f1795e5654aaa7903",
+    "mask": "9a8e0205aca4f19fa16433675f4b99c608f6a8fc3d1c92e2d7f0d646e4e7f3de",
+    "player": "ed4a9ad1e7827c7fd452ae9c0f8fc7c7d7a72c7be6aa3d915a0b287b4fe20a8b",
+    "icon": "6b3a650b27ea0a4917e1eb6c5de0b1dd926e56320c5a02694c818c29dacd18ff"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794407709.855763
+}

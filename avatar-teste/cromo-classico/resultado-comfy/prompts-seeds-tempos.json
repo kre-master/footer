@@ -1,0 +1,74 @@
+[
+  {
+    "slot": "calcoes",
+    "seed": 1111202601,
+    "segundos": 81.528,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband"
+  },
+  {
+    "slot": "calcoes",
+    "seed": 1111202602,
+    "segundos": 77.914,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband"
+  },
+  {
+    "slot": "calcoes",
+    "seed": 1111202603,
+    "segundos": 78.018,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband"
+  },
+  {
+    "slot": "calcoes",
+    "seed": 1111202604,
+    "segundos": 77.971,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband"
+  },
+  {
+    "slot": "camisola",
+    "seed": 1111202601,
+    "segundos": 102.273,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest"
+  },
+  {
+    "slot": "camisola",
+    "seed": 1111202602,
+    "segundos": 82.944,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest"
+  },
+  {
+    "slot": "camisola",
+    "seed": 1111202603,
+    "segundos": 79.334,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest"
+  },
+  {
+    "slot": "camisola",
+    "seed": 1111202604,
+    "segundos": 79.387,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest"
+  },
+  {
+    "slot": "meias-chuteiras",
+    "seed": 1111202601,
+    "segundos": 78.772,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  },
+  {
+    "slot": "meias-chuteiras",
+    "seed": 1111202602,
+    "segundos": 80.631,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  },
+  {
+    "slot": "meias-chuteiras",
+    "seed": 1111202603,
+    "segundos": 77.736,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  },
+  {
+    "slot": "meias-chuteiras",
+    "seed": 1111202604,
+    "segundos": 77.831,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing burgundy socks with cream band below the knee, vintage black leather lace-up football boots with cream laces and brown studs"
+  }
+]
