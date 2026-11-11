@@ -106,10 +106,10 @@
         "trancas-1", "trancas-2", "trancas-3", "trancas-4"],
     },
     colors: ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
-    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (2026-11-11: todos os penteados).
-    // Cores e barbas ainda só as por omissão.
+    beards: ["sem", "bigode", "barba-por-fazer", "barba-curta", "pera"],
+    // O que a IA pode sortear: só o aprovado pelo Jon (2026-11-11: todos os penteados, cores e barbas).
     get approved() {
-      return { m: this.hair.m, f: this.hair.f, colors: ["castanho-escuro"] };
+      return { m: this.hair.m, f: this.hair.f, colors: this.colors, beards: this.beards };
     },
     defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
     bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
@@ -133,7 +133,8 @@
     if (player?.user_id || !player?.id) return { sx: "m", ...AVATAR.defaults.m };
     const h = hashString(player.id);
     const sx = h % 5 === 0 ? "f" : "m";
-    return { sx, tone: 1 + ((h >>> 3) % 6), hair: pick(AVATAR.approved[sx], h >>> 7), color: pick(AVATAR.approved.colors, h >>> 11) };
+    return { sx, tone: 1 + ((h >>> 3) % 6), hair: pick(AVATAR.approved[sx], h >>> 7), color: pick(AVATAR.approved.colors, h >>> 13),
+      ...(sx === "m" ? { beard: pick(AVATAR.approved.beards, h >>> 17) } : {}) };
   }
 
   function avatarLayers(app) {
