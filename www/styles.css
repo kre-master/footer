@@ -8661,3 +8661,36 @@ body.boot-refreshing::before {
 .search-section .club-row { min-width: 0; }
 .search-section .club-row .club-row-text small { overflow-wrap: anywhere; }
 .search-tabs { margin-top: 0; }
+
+/* Golos: marcador e assistencia por equipa (historico do jogo). */
+.goals-section .hint { margin: 6px 0 10px; }
+.goals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.goals-team { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; background: var(--surface); min-width: 0; }
+.goals-team-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.goals-team-head h4 { margin: 0; }
+.goals-team-a .goals-team-head h4 { color: var(--accent-2); }
+.goals-team-b .goals-team-head h4 { color: var(--orange); }
+.goals-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.goals-table th { text-align: left; font-size: .72rem; font-weight: 600; color: var(--muted); padding: 2px 4px; }
+.goals-table td { padding: 4px; border-top: 1px solid var(--line); vertical-align: middle; }
+.goals-table select { width: 100%; min-width: 0; }
+.goals-table .goal-n { width: 1.6em; color: var(--muted); font-weight: 700; }
+.goals-table .goal-time { white-space: nowrap; }
+.goals-table .goal-time .mini-btn { margin-left: 2px; }
+@media (max-width: 520px) {
+  .goals-table thead { display: none; }
+  .goals-table tr { display: grid; grid-template-columns: 1.6em 1fr 1fr; gap: 4px; border-top: 1px solid var(--line); padding: 4px 0; }
+  .goals-table td { border: 0; padding: 0; }
+  .goals-table .goal-time { grid-column: 2 / -1; }
+}
+.goals-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.goals-head h3 { margin: 0; }
+.goals-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .88rem; font-weight: 600; cursor: pointer; }
+.goals-table .goal-suggestion td { border-top: 0; padding-top: 0; font-size: .82rem; }
+.goals-table .goal-suggestion span { margin-right: 6px; }
+.goal-suggest-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.goal-suggest-form select, .goal-suggest-form input { flex: 1 1 120px; min-width: 0; }
+@media (max-width: 520px) {
+  .goals-table .goal-suggestion td:first-child { display: none; }
+  .goals-table .goal-suggestion td { grid-column: 1 / -1; }
+}

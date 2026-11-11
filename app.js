@@ -10774,6 +10774,477 @@ function renderReliability(playerData) {
     </div>`;
 }
 
+// ---- Golos (2026-11-11): marcador e assistencia de cada golo; supabase/game-goals-migration.sql ----
+// Uma linha por golo, conforme o resultado. O admin do clube liga o registo; ligado, qualquer membro regista um
+// golo ainda vazio e quem discordar sugere outro marcador (o admin aceita ou recusa). Sem as tabelas, so o admin
+// regista e fica neste aparelho. O tempo e o da analise (como os ▶ do video).
+const GAME_GOALS_KEY = "footer-game-goals-v1";
+const gameGoals = {};
+const goalSuggestions = {};
+const goalSettings = {};
+const goalDrafts = {};
+const goalSuggestOpen = new Set();
+let gameGoalsRemote = null;
+const gameGoalsLoading = new Set();
+const gameGoalsDirty = {};
+const gameGoalsSaveTimers = {};
+
+function readLocalGameGoals() {
+  try {
+    return JSON.parse(localStorage.getItem(GAME_GOALS_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalGameGoals(gameId) {
+  try {
+    const all = readLocalGameGoals();
+    all[gameId] = gameGoals[gameId] || [];
+    localStorage.setItem(GAME_GOALS_KEY, JSON.stringify(all));
+  } catch (error) {
+    console.warn("Goals local save failed.", error);
+  }
+}
+
+function goalFromRow(row) {
+  return {
+    side: row.side,
+    position: Number(row.position),
+    scorerId: row.scorer_id || null,
+    ownGoal: Boolean(row.own_goal),
+    assistId: row.assist_id || null,
+    gameS: row.game_s == null ? null : Number(row.game_s),
+  };
+}
+
+function goalToRow(gameId, goal) {
+  return {
+    game_id: gameId,
+    side: goal.side,
+    position: goal.position,
+    scorer_id: goal.ownGoal ? null : goal.scorerId || null,
+    own_goal: Boolean(goal.ownGoal),
+    assist_id: goal.assistId && goal.assistId !== goal.scorerId ? goal.assistId : null,
+    game_s: goal.gameS == null ? null : Math.round(goal.gameS * 10) / 10,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function isGoalFilled(goal) {
+  return Boolean(goal && (goal.scorerId || goal.ownGoal));
+}
+
+function goalsEnabledForGroup(groupId = activeGroupId) {
+  return Boolean(goalSettings[groupId || "local"]);
+}
+
+async function loadGameGoals(gameId) {
+  if (gameGoals[gameId] || gameGoalsLoading.has(gameId)) return;
+  gameGoalsLoading.add(gameId);
+  let goals = null;
+  if (supabaseClient && currentSession?.user && gameGoalsRemote !== false) {
+    const groupKey = activeGroupId || "local";
+    const [goalsResult, suggestionsResult, settingsResult] = await Promise.all([
+      supabaseClient.from("game_goals").select("*").eq("game_id", gameId),
+      supabaseClient.from("game_goal_suggestions").select("*").eq("game_id", gameId).eq("status", "pending").order("created_at"),
+      activeGroupId && !(groupKey in goalSettings)
+        ? supabaseClient.from("game_goal_settings").select("enabled").eq("group_id", activeGroupId).maybeSingle()
+        : Promise.resolve({ data: null, error: null, skipped: true }),
+    ]);
+    const error = goalsResult.error || suggestionsResult.error || settingsResult.error;
+    if (error) {
+      console.warn("Goals load failed. Run supabase/game-goals-migration.sql.", error);
+      gameGoalsRemote = false;
+    } else {
+      gameGoalsRemote = true;
+      goals = (goalsResult.data || []).map(goalFromRow);
+      goalSuggestions[gameId] = suggestionsResult.data || [];
+      if (!settingsResult.skipped) goalSettings[groupKey] = Boolean(settingsResult.data?.enabled);
+    }
+  }
+  gameGoals[gameId] = goals || readLocalGameGoals()[gameId] || [];
+  gameGoalsLoading.delete(gameId);
+  const game = state.games.find((item) => item.id === gameId);
+  if (game && currentHistoryGameId === gameId) refreshGoalsSection(game);
+}
+
+async function setGoalsEnabled(enabled) {
+  const groupKey = activeGroupId || "local";
+  if (gameGoalsRemote && supabaseClient && activeGroupId) {
+    const { error } = await supabaseClient.from("game_goal_settings")
+      .upsert({ group_id: activeGroupId, enabled, updated_at: new Date().toISOString() }, { onConflict: "group_id" });
+    if (error) {
+      alert(`Nao consegui mudar o registo de golos: ${error.message}`);
+      return;
+    }
+  }
+  goalSettings[groupKey] = enabled;
+}
+
+function getGameGoal(gameId, side, position) {
+  return (gameGoals[gameId] || []).find((goal) => goal.side === side && goal.position === position) || null;
+}
+
+function putGameGoal(gameId, side, position, changes) {
+  const list = gameGoals[gameId] || (gameGoals[gameId] = []);
+  let goal = getGameGoal(gameId, side, position);
+  if (!goal) {
+    goal = { side, position, scorerId: null, ownGoal: false, assistId: null, gameS: null };
+    list.push(goal);
+  }
+  Object.assign(goal, changes);
+  if (goal.ownGoal) goal.scorerId = null;
+  if (goal.assistId && goal.assistId === goal.scorerId) goal.assistId = null;
+  return goal;
+}
+
+// Admin: cada mudanca grava sozinha (com uma pequena espera).
+function setGameGoal(gameId, side, position, changes) {
+  const goal = putGameGoal(gameId, side, position, changes);
+  (gameGoalsDirty[gameId] || (gameGoalsDirty[gameId] = new Set())).add(`${side}:${position}`);
+  clearTimeout(gameGoalsSaveTimers[gameId]);
+  gameGoalsSaveTimers[gameId] = setTimeout(() => saveGameGoals(gameId), 600);
+  return goal;
+}
+
+async function saveGameGoals(gameId) {
+  const game = state.games.find((item) => item.id === gameId);
+  if (!game) return;
+  // Golos acima do resultado atual (o resultado baixou) saem.
+  const limit = { A: Number(game.scoreA) || 0, B: Number(game.scoreB) || 0 };
+  gameGoals[gameId] = (gameGoals[gameId] || []).filter((goal) => goal.position <= limit[goal.side]);
+  const dirty = gameGoalsDirty[gameId] || new Set();
+  gameGoalsDirty[gameId] = new Set();
+  if (!gameGoalsRemote || !supabaseClient) {
+    writeLocalGameGoals(gameId);
+    return;
+  }
+  const rows = gameGoals[gameId].filter((goal) => dirty.has(`${goal.side}:${goal.position}`)).map((goal) => goalToRow(gameId, goal));
+  const upsert = rows.length
+    ? await supabaseClient.from("game_goals").upsert(rows, { onConflict: "game_id,side,position" })
+    : { error: null };
+  const cleanup = await Promise.all(["A", "B"].map((side) =>
+    supabaseClient.from("game_goals").delete().eq("game_id", gameId).eq("side", side).gt("position", limit[side])));
+  const error = upsert.error || cleanup.find((result) => result.error)?.error;
+  if (error) alert(`Nao consegui guardar os golos: ${error.message}`);
+}
+
+// Jogador: escolhe marcador e assistencia e so depois carrega em Registar (o golo fica fechado a seguir).
+async function registerGoalAsMember(game, side, position) {
+  const key = `${game.id}:${side}:${position}`;
+  const draft = goalDrafts[key] || {};
+  if (!draft.scorerId && !draft.ownGoal) {
+    alert("Escolhe primeiro quem marcou (ou AG).");
+    return false;
+  }
+  const goal = { side, position, scorerId: null, ownGoal: false, assistId: null, gameS: null, ...getGameGoal(game.id, side, position), ...draft };
+  if (gameGoalsRemote && supabaseClient) {
+    const { error } = await supabaseClient.from("game_goals").upsert(goalToRow(game.id, goal), { onConflict: "game_id,side,position" });
+    if (error) {
+      alert("Nao foi possivel registar: alguem pode ter registado este golo entretanto. Se discordares, assinala um possivel erro.");
+      delete gameGoals[game.id];
+      delete goalDrafts[key];
+      loadGameGoals(game.id);
+      return false;
+    }
+  }
+  putGameGoal(game.id, side, position, goal);
+  delete goalDrafts[key];
+  return true;
+}
+
+async function sendGoalSuggestion(game, side, position, form) {
+  const scorer = form.querySelector("[data-suggest-scorer]").value;
+  const assist = form.querySelector("[data-suggest-assist]").value || null;
+  const note = form.querySelector("[data-suggest-note]").value.trim().slice(0, 200) || null;
+  if (!scorer) {
+    alert("Escolhe quem achas que marcou (ou AG).");
+    return false;
+  }
+  const row = {
+    game_id: game.id, side, position, note,
+    own_goal: scorer === "AG",
+    scorer_id: scorer === "AG" ? null : scorer,
+    assist_id: assist && assist !== scorer ? assist : null,
+  };
+  const { data, error } = await supabaseClient.from("game_goal_suggestions").insert(row).select().single();
+  if (error) {
+    alert(`Nao consegui enviar a sugestao: ${error.message}`);
+    return false;
+  }
+  (goalSuggestions[game.id] || (goalSuggestions[game.id] = [])).push(data);
+  return true;
+}
+
+async function decideGoalSuggestion(game, suggestionId, accept) {
+  const suggestion = (goalSuggestions[game.id] || []).find((item) => item.id === suggestionId);
+  if (!suggestion) return;
+  if (accept) {
+    setGameGoal(game.id, suggestion.side, Number(suggestion.position), {
+      ownGoal: Boolean(suggestion.own_goal), scorerId: suggestion.scorer_id || null, assistId: suggestion.assist_id || null,
+    });
+    clearTimeout(gameGoalsSaveTimers[game.id]);
+    await saveGameGoals(game.id);
+  }
+  const { error } = await supabaseClient.from("game_goal_suggestions")
+    .update({ status: accept ? "accepted" : "rejected", decided_by: currentSession?.user?.id || null, decided_at: new Date().toISOString() })
+    .eq("id", suggestionId);
+  if (error) {
+    alert(`Nao consegui fechar a sugestao: ${error.message}`);
+    return;
+  }
+  goalSuggestions[game.id] = goalSuggestions[game.id].filter((item) => item.id !== suggestionId);
+}
+
+async function withdrawGoalSuggestion(game, suggestionId) {
+  const { error } = await supabaseClient.from("game_goal_suggestions").delete().eq("id", suggestionId);
+  if (error) {
+    alert(`Nao consegui retirar a sugestao: ${error.message}`);
+    return;
+  }
+  goalSuggestions[game.id] = (goalSuggestions[game.id] || []).filter((item) => item.id !== suggestionId);
+}
+
+function getGameSidePlayers(game, side) {
+  return hydrate(side === "A" ? [...(game.teamA || []), ...getBenchA(game)] : [...(game.teamB || []), ...getBenchB(game)]);
+}
+
+function goalPersonText(goal) {
+  if (goal.ownGoal || goal.own_goal) return "AG (autogolo)";
+  const id = goal.scorerId || goal.scorer_id;
+  return id ? findPlayer(id)?.name || "Jogador" : "Por registar";
+}
+
+function goalAssistText(goal) {
+  const id = goal.assistId || goal.assist_id;
+  return id ? findPlayer(id)?.name || "Jogador" : "sem assistência";
+}
+
+function renderGoalSelects(players, value, kind, attrs) {
+  const scorer = kind === "scorer";
+  return `
+    <select ${attrs} aria-label="${scorer ? "Marcador" : "Assistência"}">
+      <option value="">${scorer ? "Marcador…" : "Sem assistência"}</option>
+      ${scorer ? `<option value="AG" ${value === "AG" ? "selected" : ""}>AG (autogolo)</option>` : ""}
+      ${players.map((playerData) => `<option value="${escapeHtml(playerData.id)}" ${value === playerData.id ? "selected" : ""}>${escapeHtml(playerData.name)}</option>`).join("")}
+    </select>`;
+}
+
+function renderGoalsSection(game) {
+  // Fica sempre um lugar marcado: carregar ou mudar um golo so redesenha este bloco (o video continua a dar).
+  const placeholder = `<div data-goals-section hidden></div>`;
+  if (!isFinishedGame(game)) return placeholder;
+  if (!gameGoals[game.id]) {
+    loadGameGoals(game.id);
+    return placeholder;
+  }
+  const enabled = goalsEnabledForGroup();
+  const remote = Boolean(gameGoalsRemote);
+  const canRegister = !isAdmin && remote && enabled && Boolean(currentSession?.user);
+  if (!isAdmin && (!remote || !enabled)) return placeholder;
+  const counts = { A: Number(game.scoreA) || 0, B: Number(game.scoreB) || 0 };
+  const hasVideo = getGameVideoParts(game.id).length > 0;
+  const myUserId = currentSession?.user?.id || null;
+  const suggestions = goalSuggestions[game.id] || [];
+  const authorName = (userId) => state.players.find((playerData) => playerData.linkedUserId === userId)?.name || "Um jogador";
+
+  const rowFor = (side, position, players) => {
+    const goal = getGameGoal(game.id, side, position);
+    const filled = isGoalFilled(goal);
+    const attrs = `data-goal-side="${side}" data-goal-position="${position}"`;
+    const draft = goalDrafts[`${game.id}:${side}:${position}`] || {};
+    const shownS = !isAdmin && !filled && draft.gameS != null ? draft.gameS : goal?.gameS;
+    const time = shownS != null ? videoClockLink(game.id, shownS) : "";
+    const editable = isAdmin || (canRegister && !filled);
+    const nowButton = editable && hasVideo ? `<button type="button" class="mini-btn" data-goal-now ${attrs} title="Usar o momento do vídeo">⏱ Agora</button>` : "";
+    const clearButton = isAdmin && goal?.gameS != null ? `<button type="button" class="mini-btn" data-goal-clear-time ${attrs} title="Tirar o tempo">✕</button>` : "";
+    const rowSuggestions = suggestions.filter((item) => item.side === side && Number(item.position) === position);
+    const mine = rowSuggestions.find((item) => item.created_by === myUserId);
+    let main;
+    let extra = "";
+    if (editable) {
+      const source = isAdmin ? goal || {} : { ...goal, ...draft };
+      main = `
+        <td>${renderGoalSelects(players, source.ownGoal ? "AG" : source.scorerId || "", "scorer", `data-goal-scorer ${attrs}`)}</td>
+        <td>${renderGoalSelects(players.filter((playerData) => playerData.id !== source.scorerId), source.assistId || "", "assist", `data-goal-assist ${attrs}`)}</td>
+        <td class="goal-time">${time}${nowButton}${clearButton}${isAdmin ? "" : `<button type="button" class="primary-btn mini-btn" data-goal-register ${attrs}>Registar</button>`}</td>`;
+    } else {
+      main = `
+        <td><strong>${escapeHtml(filled ? goalPersonText(goal) : "Por registar")}</strong></td>
+        <td>${filled ? escapeHtml(goalAssistText(goal)) : "–"}</td>
+        <td class="goal-time">${time}${canRegister && filled && !mine ? `<button type="button" class="mini-btn" data-goal-dispute ${attrs} title="Achas que está mal? Sugere a correção ao admin">Possível erro?</button>` : ""}</td>`;
+    }
+    if (isAdmin && rowSuggestions.length) {
+      extra = rowSuggestions.map((item) => `
+        <tr class="goal-suggestion"><td></td><td colspan="3">
+          <span>⚠ <strong>${escapeHtml(authorName(item.created_by))}</strong> sugere: ${escapeHtml(goalPersonText(item))} · ${escapeHtml(goalAssistText(item))}${item.note ? ` — «${escapeHtml(item.note)}»` : ""}</span>
+          <button type="button" class="mini-btn" data-suggestion-accept="${escapeHtml(item.id)}">Aceitar</button>
+          <button type="button" class="mini-btn" data-suggestion-reject="${escapeHtml(item.id)}">Recusar</button>
+        </td></tr>`).join("");
+    } else if (mine) {
+      extra = `
+        <tr class="goal-suggestion"><td></td><td colspan="3">
+          <span>A tua sugestão (${escapeHtml(goalPersonText(mine))} · ${escapeHtml(goalAssistText(mine))}) está à espera do admin.</span>
+          <button type="button" class="mini-btn" data-suggestion-withdraw="${escapeHtml(mine.id)}">Retirar</button>
+        </td></tr>`;
+    } else if (goalSuggestOpen.has(`${game.id}:${side}:${position}`)) {
+      extra = `
+        <tr class="goal-suggestion"><td></td><td colspan="3">
+          <form class="goal-suggest-form" data-goal-suggest-form ${attrs}>
+            ${renderGoalSelects(players, "", "scorer", "data-suggest-scorer")}
+            ${renderGoalSelects(players, "", "assist", "data-suggest-assist")}
+            <input type="text" data-suggest-note maxlength="200" placeholder="Nota para o admin (opcional)">
+            <button type="submit" class="primary-btn mini-btn">Enviar sugestão</button>
+            <button type="button" class="mini-btn" data-goal-dispute-cancel ${attrs}>Cancelar</button>
+          </form>
+        </td></tr>`;
+    }
+    return `<tr><td class="goal-n">${position}</td>${main}</tr>${extra}`;
+  };
+
+  const table = (side) => {
+    const players = getGameSidePlayers(game, side);
+    const rows = Array.from({ length: counts[side] }, (_, index) => rowFor(side, index + 1, players)).join("");
+    const quick = (isAdmin || canRegister) && hasVideo && counts[side];
+    return `
+      <div class="goals-team goals-team-${side.toLowerCase()}">
+        <div class="goals-team-head">
+          <h4>Equipa ${side} · ${counts[side]} ${counts[side] === 1 ? "golo" : "golos"}</h4>
+          ${quick ? `<button type="button" class="ghost-btn" data-goal-quick="${side}" title="Põe o momento do vídeo no próximo golo sem tempo">⚽ Golo ${side} agora</button>` : ""}
+        </div>
+        ${rows ? `
+          <table class="goals-table">
+            <thead><tr><th>#</th><th>Marcador</th><th>Assistência</th><th>Vídeo</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>` : `<p class="eyebrow">Sem golos</p>`}
+      </div>`;
+  };
+
+  const pending = suggestions.length;
+  const howTo = hasVideo ? "Com o vídeo a dar, carrega em «⚽ Golo A/B agora» no momento do golo e escolhe depois quem marcou." : "Quando houver vídeo, cada golo pode guardar o momento.";
+  return `
+    <section class="profile-section goals-section" data-goals-section>
+      <div class="goals-head">
+        <h3>Golos${isAdmin && pending ? ` <span class="metric warn-pill">${pending} ${pending === 1 ? "sugestão" : "sugestões"}</span>` : ""}</h3>
+        ${isAdmin ? `
+          <label class="goals-toggle admin-actions">
+            <input type="checkbox" data-goals-enabled ${enabled ? "checked" : ""} ${remote ? "" : "disabled"}>
+            <span>Registo de golos e assistências no clube</span>
+          </label>` : ""}
+      </div>
+      ${isAdmin ? `<p class="hint">${!remote
+        ? "Ainda fica só neste aparelho e os jogadores não veem (falta correr supabase/game-goals-migration.sql)."
+        : enabled
+          ? "Ligado: os jogadores veem esta tabela, registam golos ainda vazios e podem assinalar um possível erro; tu aceitas ou recusas."
+          : "Desligado: só os admins veem e registam."} ${howTo} AG = autogolo.</p>`
+        : canRegister ? `<p class="hint">${howTo} Um golo já registado só o admin muda; se achares que está mal, carrega em «Possível erro?».</p>` : ""}
+      <div class="goals-grid">${table("A")}${table("B")}</div>
+    </section>`;
+}
+
+function refreshGoalsSection(game) {
+  const current = els.historyGameDetail?.querySelector("[data-goals-section]");
+  if (!current) return;
+  current.outerHTML = renderGoalsSection(game);
+  bindGoalsSection(game, els.historyGameDetail);
+}
+
+function bindGoalsSection(game, root) {
+  const section = root?.querySelector("[data-goals-section]");
+  if (!section) return;
+  const key = (element) => [element.dataset.goalSide, Number(element.dataset.goalPosition)];
+  const draftKey = (side, position) => `${game.id}:${side}:${position}`;
+  const refresh = () => refreshGoalsSection(game);
+  // Admin grava logo; um jogador vai juntando num rascunho ate carregar em Registar.
+  const change = (side, position, changes) => {
+    if (isAdmin) setGameGoal(game.id, side, position, changes);
+    else {
+      const draft = goalDrafts[draftKey(side, position)] || (goalDrafts[draftKey(side, position)] = {});
+      Object.assign(draft, changes);
+      if (draft.ownGoal) draft.scorerId = null;
+      if (draft.assistId && draft.assistId === draft.scorerId) draft.assistId = null;
+    }
+  };
+  const clockNow = () => {
+    const videoSection = root.querySelector("[data-game-video-section]");
+    const clock = videoSection ? readHeartRateClock(game, videoSection) : null;
+    if (!clock) alert("Põe o vídeo a dar (ou em pausa no momento do golo) e carrega outra vez.");
+    return clock ? Math.max(0, clock.gameS) : null;
+  };
+  on(section.querySelector("[data-goals-enabled]"), "change", async (event) => {
+    await setGoalsEnabled(event.target.checked);
+    refresh();
+  });
+  section.querySelectorAll("[data-goal-scorer]").forEach((select) => select.addEventListener("change", () => {
+    const [side, position] = key(select);
+    change(side, position, select.value === "AG" ? { ownGoal: true, scorerId: null } : { ownGoal: false, scorerId: select.value || null });
+    refresh();
+  }));
+  section.querySelectorAll("[data-goal-assist]").forEach((select) => select.addEventListener("change", () => {
+    const [side, position] = key(select);
+    change(side, position, { assistId: select.value || null });
+  }));
+  section.querySelectorAll("[data-goal-now]").forEach((button) => button.addEventListener("click", () => {
+    const seconds = clockNow();
+    if (seconds == null) return;
+    const [side, position] = key(button);
+    change(side, position, { gameS: seconds });
+    refresh();
+  }));
+  section.querySelectorAll("[data-goal-clear-time]").forEach((button) => button.addEventListener("click", () => {
+    const [side, position] = key(button);
+    change(side, position, { gameS: null });
+    refresh();
+  }));
+  section.querySelectorAll("[data-goal-register]").forEach((button) => button.addEventListener("click", async () => {
+    const [side, position] = key(button);
+    button.disabled = true;
+    if (await registerGoalAsMember(game, side, position)) refresh();
+    else button.disabled = false;
+  }));
+  section.querySelectorAll("[data-goal-dispute], [data-goal-dispute-cancel]").forEach((button) => button.addEventListener("click", () => {
+    const id = draftKey(...key(button));
+    if (goalSuggestOpen.has(id)) goalSuggestOpen.delete(id);
+    else goalSuggestOpen.add(id);
+    refresh();
+  }));
+  section.querySelectorAll("[data-goal-suggest-form]").forEach((form) => form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const [side, position] = key(form);
+    form.querySelector("[type=submit]").disabled = true;
+    if (await sendGoalSuggestion(game, side, position, form)) {
+      goalSuggestOpen.delete(draftKey(side, position));
+      refresh();
+    } else form.querySelector("[type=submit]").disabled = false;
+  }));
+  section.querySelectorAll("[data-suggestion-accept], [data-suggestion-reject]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    await decideGoalSuggestion(game, button.dataset.suggestionAccept || button.dataset.suggestionReject, Boolean(button.dataset.suggestionAccept));
+    refresh();
+  }));
+  section.querySelectorAll("[data-suggestion-withdraw]").forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    await withdrawGoalSuggestion(game, button.dataset.suggestionWithdraw);
+    refresh();
+  }));
+  section.querySelectorAll("[data-goal-quick]").forEach((button) => button.addEventListener("click", () => {
+    const side = button.dataset.goalQuick;
+    const total = side === "A" ? Number(game.scoreA) || 0 : Number(game.scoreB) || 0;
+    const timeOf = (n) => (isAdmin ? getGameGoal(game.id, side, n)?.gameS : isGoalFilled(getGameGoal(game.id, side, n)) ? 0 : goalDrafts[draftKey(side, n)]?.gameS ?? getGameGoal(game.id, side, n)?.gameS);
+    const position = Array.from({ length: total }, (_, index) => index + 1).find((n) => timeOf(n) == null);
+    if (!position) {
+      alert(`Os golos da Equipa ${side} já têm momento. Para corrigir um, usa «⏱ Agora» na linha certa.`);
+      return;
+    }
+    const seconds = clockNow();
+    if (seconds == null) return;
+    change(side, position, { gameS: seconds });
+    refresh();
+    els.historyGameDetail.querySelector(`[data-goal-scorer][data-goal-side="${side}"][data-goal-position="${position}"]`)?.focus({ preventScroll: true });
+  }));
+}
+
 // ---- Micro-interaccoes (2026-11-05). So transform/opacity; com "reduzir movimento" nada mexe. ----
 let lastSavedResponse = null;
 let justRevealedPlayerId = null;
@@ -14900,6 +15371,7 @@ function renderHistoryGameDetail() {
     ${renderHistoryRosterEditor(game)}
     ${renderNoShowSection(game)}
     ${renderGameVideoSection(game)}
+    ${renderGoalsSection(game)}
     ${renderTrackingTestSection(game)}
   `;
   els.historyGameDetail.querySelector("[data-save-history-game-date]")?.addEventListener("click", async (buttonEvent) => {
@@ -14927,6 +15399,7 @@ function renderHistoryGameDetail() {
   bindMvpPanelActions(game, els.historyGameDetail);
   bindTrackingTestSection(game, els.historyGameDetail);
   bindGameVideoSection(game, els.historyGameDetail);
+  bindGoalsSection(game, els.historyGameDetail);
 }
 
 function renderHistoryRosterEditor(game) {

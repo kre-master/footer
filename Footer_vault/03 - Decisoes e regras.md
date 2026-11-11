@@ -306,3 +306,11 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - So o dono da app (private.platform_admins), no Painel do dono, com confirmacao que diz o que vai acontecer.
 - Jogador que ja jogou nao e apagado: fica anonimo ("Jogador removido", sem foto, sem conta, sem pedidos de associacao nem metricas privadas), para nao estragar resultados, estatisticas dos outros e pagamentos. Jogador sem jogos e apagado (com os pagamentos que tiver).
 - Conta eliminada e apagada de vez (perfil, grupos, caracteristicas, disponibilidade, momentos marcados); as fichas de jogador ficam no clube, sem conta. Nao se eliminam: a propria conta, outros donos da app e donos de clubes (apagar ou passar o clube primeiro).
+
+## Golos: marcador e assistencia (decidido 2026-11-11)
+
+- Uma linha por golo de cada equipa, conforme o resultado gravado. Marcador = jogador dessa equipa (titular ou banco) ou AG (autogolo, sem nome). Assistencia opcional.
+- O admin do clube liga ou desliga o registo. Desligado: so os admins veem e registam. Ligado: todos os membros veem a tabela.
+- Ligado, qualquer membro regista um golo ainda vazio (escolhe e carrega em Registar). Golo ja registado so o admin muda.
+- Quem discordar carrega em "Possivel erro?" e sugere outro marcador/assistencia (com nota opcional). So o proprio e os admins veem a sugestao; o admin aceita (o golo muda) ou recusa. O proprio pode retirar enquanto esta pendente.
+- Cada golo pode guardar o momento do video (tempo da analise, como os ▶). Quando o placard registar golos sozinho, ele preenche os tempos e as pessoas so escolhem os nomes.
