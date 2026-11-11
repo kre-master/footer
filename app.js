@@ -1608,6 +1608,7 @@ async function loadRemoteState() {
     updateAccessUi("Supabase indisponivel, modo local");
     return;
   }
+  loadCardPreferences().then(() => { if (cardAvatarUsers.size) render(); }).catch(() => {});
   if (mvpError) console.warn("MVP vote load failed. Run supabase/schema.sql again.", mvpError);
   if (mvpCountError) console.warn("MVP vote count load failed. Run supabase/schema.sql again.", mvpCountError);
   if (feedbackError) console.warn("Postgame feedback load failed. Run supabase/postgame-feedback-migration.sql.", feedbackError);
@@ -3553,6 +3554,7 @@ function renderFantasyPanel() {
     user: currentSession?.user || null,
     defaultName: getLinkedPlayer()?.name || "",
     escapeHtml,
+    onCardPortrait: setCardPortrait,
   });
 }
 
@@ -9496,7 +9498,27 @@ function hasPlayerPhoto(playerData) {
   return Boolean(playerData.photoThumb || playerData.photoDataUrl || playerData.photoSize > 0);
 }
 
+// Carta: retrato com foto (por omissao) ou com o avatar, a escolha de cada conta (card_preferences).
+const cardAvatarUsers = new Set();
+async function loadCardPreferences() {
+  if (!remoteEnabled || !supabaseClient || !currentSession?.user) return;
+  const { data, error } = await supabaseClient.from("card_preferences").select("user_id").eq("portrait", "avatar");
+  if (error) return; // migracao por aplicar: fica tudo com foto
+  cardAvatarUsers.clear();
+  (data || []).forEach((row) => cardAvatarUsers.add(row.user_id));
+}
+
+function setCardPortrait(userId, portrait) {
+  if (portrait === "avatar") cardAvatarUsers.add(userId);
+  else cardAvatarUsers.delete(userId);
+  render();
+}
+
 function renderPlayerCardPhoto(playerData) {
+  const fantasy = globalThis.FooterFantasy;
+  if (fantasy && playerData.linkedUserId && cardAvatarUsers.has(playerData.linkedUserId)) {
+    return fantasy.avatarHtml(fantasy.appearanceFor({ user_id: playerData.linkedUserId }), { bust: "fluid" });
+  }
   if (getPlayerPhotoSrc(playerData)) {
     return `<img src="${escapeHtml(getPlayerPhotoSrc(playerData))}" alt="">`;
   }
@@ -11448,9 +11470,10 @@ function bindSwipe(root) {
 // ---- Clubes sem notas (2026-11-05): fora dos Futeboleiros ninguem ve nota nem numeros; todos comecam iguais ----
 const NO_RATING_BASE = 60;
 
-function ratingsVisible(group = getActiveGroup()) {
-  if (!remoteEnabled || !group) return true;
-  return group.slug === LEGACY_GROUP_SLUG || group.settings?.ratings === true;
+// Ratings antigos (OVR e notas) deixam de aparecer em todos os clubes (decidido pelo Jon a 2026-11-11).
+// Os valores continuam na base de dados; as equipas equilibram-se pela forma.
+function ratingsVisible() {
+  return false;
 }
 
 function respondWithMotion(button) {
