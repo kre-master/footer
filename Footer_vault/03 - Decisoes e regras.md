@@ -314,3 +314,15 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Ligado, qualquer membro regista um golo ainda vazio (escolhe e carrega em Registar). Golo ja registado so o admin muda.
 - Quem discordar carrega em "Possivel erro?" e sugere outro marcador/assistencia (com nota opcional). So o proprio e os admins veem a sugestao; o admin aceita (o golo muda) ou recusa. O proprio pode retirar enquanto esta pendente.
 - Cada golo pode guardar o momento do video (tempo da analise, como os ▶). Quando o placard registar golos sozinho, ele preenche os tempos e as pessoas so escolhem os nomes.
+
+## Anti-fraude das recompensas (decidido 2026-11-11)
+
+- XP e itens so nascem de jogos verificados e e o servidor que os atribui (`reward_ledger`). Os jogos continuam livres para historico e estatisticas.
+- Jogo verificado: pelo menos 7 contas distintas nas equipas (2 em cada equipa, 4 do proprio clube), resultado registado ate 48 h depois da hora do jogo e pelo menos 7 dessas contas fizeram o fecho do jogo ou votaram MVP nessas 48 h. Sem outro jogo verificado do mesmo clube 2 h antes ou depois.
+- Depois das 48 h sem isso: jogo de arquivo, sem recompensa.
+- Video e relogio nao contam como prova de presenca.
+- Os jogos que ja existiam ficam de arquivo: toda a gente comeca do 0.
+- Por conta: email confirmado; no maximo 1 jogo recompensado por dia e 4 por semana; itens Raro+ so com a conta com 14 dias.
+- Clube em estagio (menos de 7 contas do clube em jogos verificados ou menos de 5 jogos verificados): XP normal, itens Epico/Lendario/Mitico ficam guardados ate acabar.
+- Admin que jogou e muda equipas/resultado/data de um jogo verificado depois das 48 h: o jogo fica sinalizado e as recompensas em espera ate outro admin (que nao jogou) ou o dono da app aprovar.
+- Os numeros vivem em `reward_settings`. Proposta completa: Claude Doc "Anti-fraude: jogos ficticios e recompensas".
