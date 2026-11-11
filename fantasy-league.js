@@ -104,6 +104,8 @@
       f: ["coque", "rabo-de-cavalo", "curto", "encaracolado-solto", "trancas"],
     },
     colors: ["preto", "castanho-escuro", "castanho", "ruivo", "loiro", "grisalho"],
+    // Penteados e cores que a IA pode sortear: só os aprovados pelo Jon (por agora os por omissão).
+    approved: { m: ["penteado-para-tras"], f: ["coque"], colors: ["castanho-escuro"] },
     defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
     bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
   };
@@ -117,12 +119,16 @@
     return h;
   }
 
+  function pick(list, n) {
+    return list[n % list.length];
+  }
+
   function appearanceFor(player, profile) {
     if (profile?.avatar) return profile.avatar;
     if (player?.user_id || !player?.id) return { sx: "m", ...AVATAR.defaults.m };
     const h = hashString(player.id);
     const sx = h % 5 === 0 ? "f" : "m";
-    return { sx, tone: 1 + ((h >>> 3) % 6), hair: AVATAR.hair[sx][(h >>> 7) % 5], color: AVATAR.colors[(h >>> 11) % 6] };
+    return { sx, tone: 1 + ((h >>> 3) % 6), hair: pick(AVATAR.approved[sx], h >>> 7), color: pick(AVATAR.approved.colors, h >>> 11) };
   }
 
   function avatarLayers(app) {

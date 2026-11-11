@@ -89,7 +89,8 @@ test("avatar: reais com os valores por omissao, IA ao calhas mas fixo pelo id", 
   const a = F.appearanceFor({ id: "ia-1" });
   assert.deepEqual(F.appearanceFor({ id: "ia-1" }), a);
   assert.ok(a.tone >= 1 && a.tone <= 6);
-  assert.ok(F.AVATAR.hair[a.sx].includes(a.hair));
+  assert.ok(F.AVATAR.approved[a.sx].includes(a.hair));
+  assert.ok(F.AVATAR.approved.colors.includes(a.color));
 });
 
 test("avatar: camadas pela ordem do manifesto e rapado sem cabelo", () => {
