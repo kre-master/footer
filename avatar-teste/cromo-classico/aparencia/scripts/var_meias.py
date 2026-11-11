@@ -34,6 +34,9 @@ def split():
     burgundy = (r > g + 25) & (r > b + 12) & (g < 60)
     yy = np.arange(old.shape[0])[:, None]
     boots = a & ((yy >= 900) | ((yy >= BOOTS_FROM) & ~burgundy))
+    # Light lace/collar pixels just above the boot top belong to the boot too.
+    lum = rgb.mean(axis=2)
+    boots |= a & (yy >= 856) & (yy < BOOTS_FROM) & (lum > 120)
     return old, boots
 
 
@@ -69,6 +72,33 @@ def build(seed):
     add = foot & boots & ~bg & (socks[..., 3] == 0)
     socks[add, :3] = wide[add]
     socks[add, 3] = 255
+    # The inpainting drew the old boot top (a dark line, grey bits) at the ankle: there, anything that is not
+    # sock-coloured becomes the sock's own colour.
+    srgb = socks[..., :3].astype(int)
+    sock_col = (srgb[..., 0] > srgb[..., 1] + 25) & (srgb[..., 0] > srgb[..., 2] + 12) & (srgb[..., 1] < 60)
+    ref = np.median(socks[850:876][socks[850:876, :, 3] > 0][:, :3], axis=0).astype(np.uint8)
+    ankle = add & (np.arange(1024)[:, None] < 900) & ~sock_col
+    socks[ankle, :3] = ref
+    # Under the lace pixels moved to the boots, the sock continues: colour of the sock pixel beside it.
+    lace = boots & (np.arange(1024)[:, None] < BOOTS_FROM) & (socks[..., 3] == 0)
+    for y, x in zip(*np.where(lace)):
+        for dx in (-1, 1, -2, 2, -3, 3):
+            if socks[y, x + dx, 3] > 0 and not lace[y, x + dx]:
+                socks[y, x] = socks[y, x + dx]
+                break
+    # Ankle tidy-up: nothing sticking out sideways beyond the sock's own width just above, and no skin specks.
+    for x0, x1 in ((0, 256), (256, 512)):
+        xs = np.where((socks[860:868, x0:x1, 3] > 0).any(axis=0))[0]
+        if len(xs):
+            lo, hi = x0 + xs[0] - 1, x0 + xs[-1] + 1
+            for y in range(868, 886):
+                row = socks[y, x0:x1, 3] > 0
+                for x in np.where(row)[0] + x0:
+                    if (x < lo or x > hi) and not boots[y, x]:
+                        socks[y, x] = 0
+    speck = (socks[..., 3] > 0) & vs.skinlike(socks[..., :3]) & ~boots
+    speck[900:] = False
+    socks[speck] = 0
     out = VAR / 'meias-chuteiras-split'
     out.mkdir(exist_ok=True)
     chuteiras = np.zeros_like(old)

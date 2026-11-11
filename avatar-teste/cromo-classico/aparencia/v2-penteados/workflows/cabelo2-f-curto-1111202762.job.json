@@ -1,0 +1,21 @@
+{
+  "job": "cabelo2-f-curto-1111202762",
+  "slot": "cabelo2-f-curto",
+  "seed": 1111202762,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, short dark brown pixie cut covering the whole head including the crown, full hair, not shaved, the face and the body unchanged",
+  "prompt_id": "8ca7d6b6-5bfc-45ef-90a0-d2be7362646e",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-careca-f-flat-07d6e239ee.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-penteado-f-93316894de.png"
+  },
+  "sha256": {
+    "base": "07d6e239ee70a592f0dd975fc7640e60b351e00199ca891973e663df0f59203a",
+    "mask": "93316894de4a0d6cc9962374937f22d5dda5efee3e0338391accac50889f13b1"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794426620.8180227
+}

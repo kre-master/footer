@@ -121,6 +121,26 @@ def submit_hair():
 
 if __name__ == '__main__':
     if sys.argv[1] == 'submit':
-        {'base': submit_base, 'penteados': submit_hair, 'barbas': submit_beard, 'penteados2': submit_hair2}[sys.argv[2]]()
+        if sys.argv[2] != 'meias':
+            {'base': submit_base, 'penteados': submit_hair, 'barbas': submit_beard, 'penteados2': submit_hair2}[sys.argv[2]]()
     else:
         v2.collect()
+
+
+# Socks generated on their own (Jon): whole socks from the knee down, covering the feet, on the bare-foot base.
+SOCK_SEEDS = [1111202781, 1111202782, 1111202783, 1111202784]
+SOCK_PROMPT = ('pixel art footballer, same pose, same legs, vintage burgundy ribbed football socks pulled up to just '
+               'below the knee with a warm cream band near the top, exactly like the socks in the reference, the '
+               'socks continue down and cover the whole feet, socked feet, no shoes, no boots')
+
+
+def submit_socks():
+    base = v2.up2(PREP / 'base-descalca-m-flat.png', PREP / '2x-base-descalca-m-flat.png')
+    mask = v2.up2(PREP / 'mascara-meias-inteiras.png', PREP / '2x-mascara-meias-inteiras.png')
+    files = {'base': base, 'mask': mask, 'ref': PREP / 'ref-meias-atuais-2x.png'}
+    for seed in SOCK_SEEDS:
+        v2.submit_one(f'meias-{seed}', 'meias', seed, f'{STYLE}, {SOCK_PROMPT}', files, ['ref'])
+
+
+if __name__ == '__main__' and sys.argv[1:3] == ['submit', 'meias']:
+    submit_socks()
