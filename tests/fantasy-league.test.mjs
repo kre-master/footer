@@ -95,9 +95,10 @@ test("avatar: reais com os valores por omissao, IA ao calhas mas fixo pelo id", 
 
 test("avatar: camadas pela ordem do manifesto e rapado sem cabelo", () => {
   const names = F.avatarLayers({ sx: "m", tone: 2, hair: "rapado", color: "preto" }).map((l) => l.src);
-  assert.deepEqual(names, ["kit/galhardete.webp", "bases/m-pele-2.webp", "kit/meias-chuteiras.webp", "kit/m-calcoes.webp", "kit/m-camisola.webp", "kit/bola.webp"]);
+  assert.deepEqual(names, ["kit/galhardete.webp", "bases/m-pele-2.webp", "kit/meias.webp", "kit/chuteiras.webp", "kit/m-calcoes.webp", "kit/m-camisola.webp", "barba/m-bigode-preto.webp", "kit/bola.webp"]);
   const f = F.avatarLayers({ sx: "f", tone: 4, hair: "coque", color: "loiro" }).map((l) => l.src);
   assert.ok(f.includes("cabelo/f-coque-loiro.webp"));
+  assert.ok(!f.some((src) => src.startsWith("barba/")));
 });
 
 test("avatar: todos os ficheiros usados existem", async () => {
