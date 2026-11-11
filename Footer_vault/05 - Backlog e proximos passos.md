@@ -60,7 +60,7 @@ Continuar a desenvolver primeiro a versao web/base. Preparar Android/iOS apenas 
 - Manter pagina propria para jogos finalizados.
 - Garantir navegacao correcta a partir do perfil do jogador.
 - Permitir clicar em cartas no campo do historico para abrir jogador.
-- Golos (2026-11-11): correr `supabase/game-goals-migration.sql`; depois usar marcadores/assistencias nas estatisticas, no perfil e nas cartas; ligar ao placard quando registar golos sozinho; testar os botoes do video num telemovel.
+- Golos (2026-11-11, migracao aplicada; experimentar no proximo jogo): usar marcadores/assistencias nas estatisticas, no perfil e nas cartas; ligar ao placard quando registar golos sozinho; testar os botoes do video num telemovel.
 
 ### Ratings
 
