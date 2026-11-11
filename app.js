@@ -3471,6 +3471,7 @@ const VIEW_GROUPS = {
   today: "game",
   "public-games": "game",
   "new-game": "game",
+  fantasy: "game",
   games: "history",
   "history-game": "history",
   gallery: "history",
@@ -3527,6 +3528,7 @@ function showView(viewName, options = {}) {
   if (viewName === "owner") loadOwnerPanel();
   if (viewName === "me") renderMePanel();
   if (viewName === "search") renderSearchPanel();
+  if (viewName === "fantasy") renderFantasyPanel();
   renderGroupBanner();
   playCascade(document.querySelector(`#view-${viewName}`));
   if (viewName === "today") {
@@ -3536,6 +3538,22 @@ function showView(viewName, options = {}) {
   if (navigationHistoryReady && options.push !== false) {
     pushNavigationState();
   }
+}
+
+// Liga Fantasia: jogo simulado, separado das estatisticas reais (fantasy-league.js).
+function renderFantasyPanel() {
+  const panel = document.querySelector("#fantasy-panel");
+  if (!panel || !globalThis.FooterFantasy) return;
+  if (!remoteEnabled || !supabaseClient) {
+    panel.innerHTML = `<p class="empty-state">A liga fantasia precisa de ligação ao servidor.</p>`;
+    return;
+  }
+  globalThis.FooterFantasy.render(panel, {
+    client: supabaseClient,
+    user: currentSession?.user || null,
+    defaultName: getLinkedPlayer()?.name || "",
+    escapeHtml,
+  });
 }
 
 function toggleAccountMenu(force) {
