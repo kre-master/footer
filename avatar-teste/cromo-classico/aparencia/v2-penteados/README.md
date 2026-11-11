@@ -21,4 +21,4 @@ Sobre a base rapada (a que a app usa), ainda ficava algum cabelo rente à vista 
 - `{512,256}/{sx}-{penteado}-{n}-{cor}.webp`: cada versão (n = 1 a 4) nas 6 cores, pronta para testar na app.
 - `workflows/`: o grafo, o pedido e o tempo de cada trabalho.
 
-Em algumas versões o tapar do cabelo rente vê-se como uma zona mais lisa de cabelo escuro (por exemplo, nas versões 4 e 5 do comprido apanhado e na 5 do rabo-de-cavalo). Convém olhar para isso na escolha.
+Em algumas versões o tapar do cabelo rente vê-se como uma zona mais lisa de cabelo escuro (por exemplo, na versão 4 do comprido apanhado e na versão 4 do rabo-de-cavalo, de lado). Convém olhar para isso na escolha.
