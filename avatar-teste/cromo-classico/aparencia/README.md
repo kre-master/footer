@@ -78,3 +78,26 @@ Um jogador completo em meia escala (base, 3 peças de kit e cabelo) pesa ~49 KB.
 - O bigode não é uma camada à parte.
 - No comprido-apanhado, o topo da cabeça fica rente.
 - O estilo feminino é um pouco mais liso do que o masculino.
+
+## 6. Bigode e barbas (camada «barba», só no masculino)
+
+- **Base sem bigode** (`base-rapada-m-sem-bigode.png` e os 6 tons em `bases/m-pele-*`):
+  - o bigode saiu sem IA: é uma máscara só nos pixels escuros entre o nariz e a boca (as narinas e a linha da boca ficam fora);
+  - cada linha foi preenchida com a pele que fica à esquerda e à direita, para manter o gradiente da cara;
+  - fora da máscara a diferença é 0 nos 6 tons. Os tons usam as estatísticas de pele da base com bigode, por isso o resto da pele não muda.
+- **4 estilos** (`{512,256}/barba/m-{estilo}-{cor}.webp`, 6 cores cada; o estilo «sem» não tem ficheiro):
+
+  | Estilo | Origem |
+  |---|---|
+  | bigode | O bigode original, tirado da base |
+  | barba-por-fazer | Inpainting, seed 1111202753 (segunda tentativa, com um prompt mais leve; a primeira dava barba cheia) |
+  | barba-curta | Inpainting, seed 1111202751 |
+  | pera | Inpainting, seed 1111202754, com uma máscara só no queixo (com a máscara grande dava barba no maxilar) |
+
+- Cada camada guarda só o que mudou em relação à base sem bigode e fica só sobre a cara, nunca sobre o fundo. Pinta-se nas 6 cores de cabelo sem IA; nas barbas pinta-se também o preto puro, porque a barba é quase toda preta.
+- Nova ordem: galhardete, base, meias, calções, camisola, **barba**, cabelo, bola. No `256/manifesto.json` entraram a camada «barba», a lista de estilos e, por omissão, «bigode» no masculino.
+- `grelha-m-barbas-x-cores.png`: os 4 estilos × as 6 cores, nos tons de pele 1, 4 e 6.
+- Correções nesta ronda:
+  - nas camadas de cabelo, alguns blocos de fundo junto à cara tinham ficado preenchidos com cabelo (106 a 460 px por camada). O preenchimento agora usa o contorno da cara e não a caixa;
+  - o penteado-para-trás original perdeu a patilha abaixo da orelha, que era o contorno do maxilar e ficava clara nas cores loiro e grisalho.
+- Em loiro e grisalho, a barba curta e a barba por fazer cobrem o contorno do maxilar, como uma barba real.

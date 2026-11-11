@@ -1,0 +1,21 @@
+{
+  "job": "barba-m-barba-por-fazer-1111202753",
+  "slot": "barba-m-barba-por-fazer",
+  "seed": 1111202753,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, same man, same face shape, eyes, nose and mouth, dark brown facial hair: very light two-day stubble: sparse tiny dark dots of stubble on the jaw, chin and upper lip, the skin clearly visible through it, not a beard, no moustache",
+  "prompt_id": "ea9db8d9-e252-4d7b-afb5-bb2350492cc9",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-rapada-m-sem-bigode-flat-5f9c0b4374.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-barba-m-73a629dad1.png"
+  },
+  "sha256": {
+    "base": "5f9c0b43745aa503a4bcb650f5669527e4f34b291fab9d0f07d447ea528fc24d",
+    "mask": "73a629dad1193e8cfea29293492fa734904e5f929aedf047cb429db022d7cc13"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794426583.0678742
+}

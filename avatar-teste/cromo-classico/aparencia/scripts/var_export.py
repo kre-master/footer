@@ -86,7 +86,8 @@ def main(chosen):
         h = HEADS[key]
         x0, y0, x1, y1 = h['head']
         fx0, fy0, fx1, fy1 = h['face']
-        base384 = np.asarray(Image.open(VAR / f'base-rapada-{key}.png').convert('RGBA'))
+        with_m = np.asarray(Image.open(VAR / f'base-rapada-{key}.png').convert('RGBA'))
+        base384 = np.asarray(Image.open(VAR / f'base-rapada-{key}-sem-bigode.png').convert('RGBA')) if key == 'm' else with_m
         base_flat = flat384(base384)
         yy, xx = np.mgrid[:H, :384]
         face = (xx >= fx0) & (xx <= fx1) & (yy >= fy0) & (yy <= fy1)
@@ -95,6 +96,9 @@ def main(chosen):
         orig = np.asarray(Image.open(VAR / 'prep' / f'manequim-{key}-384.png').convert('RGBA'))
         cur_mask = np.asarray(Image.open(VAR / 'prep' / f'mascara-cabelo-atual-{key}.png')) > 127
         styles = {CURRENT[key]: vh.hair_layer(flat384(orig), base_flat, cur_mask, face)}
+        if key == 'm':
+            # The original sideburn ran down the jaw outline: below the ear it is the face's outline.
+            styles[CURRENT[key]][121:] = 0
         smask = np.asarray(Image.open(VAR / 'prep' / f'mascara-penteado-{key}.png')) > 127
         for name, seed in chosen[key].items():
             own = VAR / 'prep' / f'mascara-penteado-{key}-{name}.png'
@@ -113,9 +117,16 @@ def main(chosen):
         # Skin tones on the shaved base.
         head = (x0 - 10, y0, x1 + 10, y1 + 10)
         skin = vs.skin_mask(base384, head=head)
+        stats = vs.stats_of(with_m, vs.skin_mask(with_m, head=head))
         bases = {}
         for t in range(1, 7):
-            bases[t] = wide(vs.remap(base384, skin, t))
+            bases[t] = wide(vs.remap(base384, skin, t, stats))
+            if key == 'm':
+                # Outside the moustache the base without it is identical to the one with it.
+                bm = np.asarray(Image.open(VAR / 'prep' / 'mascara-bigode.png')) > 127
+                ref = vs.remap(with_m, vs.skin_mask(with_m, head=head), t, stats)
+                report.setdefault('sem_bigode_diferenca_fora_da_mascara', {})[t] = int(
+                    np.abs(vs.remap(base384, skin, t, stats).astype(int) - ref.astype(int))[~bm].max())
             save(bases[t], f'bases/{key}-pele-{t}', weights)
             dressed = over(bases[t], socks, kit['calcoes'], kit['camisola'])
             if t != 4:
@@ -127,6 +138,26 @@ def main(chosen):
         for name, layer in styles.items():
             for colour in vh.COLOURS:
                 save(wide(vh.recolour(layer, colour)), f'cabelo/{key}-{name}-{colour}', weights)
+
+        beards = {}
+        if key == 'm':
+            beards['bigode'] = np.asarray(Image.open(VAR / 'barba-bigode-atual.png').convert('RGBA'))
+            bflat = flat384(base384)
+            nobox = np.zeros(face.shape, bool)
+            for name, seed in chosen.get('barbas', {}).items():
+                own = VAR / 'prep' / f'mascara-barba-m-{name}.png'
+                bmask = np.asarray(Image.open(own if own.exists() else VAR / 'prep' / 'mascara-barba-m.png')) > 127
+                res = np.asarray(Image.open(VAR / 'jobs' / f'barba-m-{name}-{seed}.png').convert('RGB')
+                                 .resize((384, H), Image.BOX))
+                beards[name] = vh.hair_layer(res, bflat, bmask, nobox)
+                # The face's dark outline (jaw, mouth) stays the base's, so a light beard colour does not erase it.
+                outline = (bflat.astype(float) @ [0.299, 0.587, 0.114]) < 40
+                beards[name][outline] = 0
+                beards[name][base384[..., 3] < 128] = 0  # facial hair only on the face, never on the background
+            for name, layer in beards.items():
+                for colour in vh.COLOURS:
+                    save(wide(vh.recolour(layer, colour, outline=0)), f'barba/m-{name}-{colour}', weights)
+            report['barbas'] = list(beards)
         report.setdefault('penteados', {})[key] = list(styles)
 
         # Grid: skin tones (rows) x hairstyles (columns), dressed, half scale, top 300 px.
@@ -141,6 +172,8 @@ def main(chosen):
             for t in range(1, 7):
                 colour = colours[(c + t) % len(colours)]
                 layers = [bases[t], socks, kit['calcoes'], kit['camisola']]
+                if 'bigode' in beards:
+                    layers.append(wide(beards['bigode']))
                 if name != 'rapado':
                     layers.append(wide(vh.recolour(styles[name], colour)))
                 img = flatten(half(over(*layers))).crop((0, 0, cell_w, cell_h))
@@ -154,7 +187,8 @@ def main(chosen):
         for c, colour in enumerate(colours):
             draw.text((c * 200 + 6, 6), colour, fill=(255, 230, 160))
             for r, name in enumerate(names):
-                img = flatten(over(bases[4], kit['camisola'], wide(vh.recolour(styles[name], colour))))
+                extra = [wide(beards['bigode'])] if 'bigode' in beards else []
+                img = flatten(over(bases[4], kit['camisola'], *extra, wide(vh.recolour(styles[name], colour))))
                 cx = OX + (x0 + x1) // 2
                 sheet.paste(img.crop((cx - 100, 0, cx + 100, 220)), (c * 200, 24 + r * 220))
         sheet.save(OUT / f'grelha-{key}-penteados-x-cores.png', optimize=True)
@@ -165,7 +199,8 @@ def main(chosen):
         crop = (cx - 128, 0, cx + 128, 256)
         report.setdefault('busto_recorte_512', {})[key] = {'centro_x': cx, 'caixa': list(crop)}
         for t in range(1, 7):
-            dressed = over(bases[t], socks, kit['calcoes'], kit['camisola'],
+            extra = [wide(beards['bigode'])] if 'bigode' in beards else []
+            dressed = over(bases[t], socks, kit['calcoes'], kit['camisola'], *extra,
                            wide(vh.recolour(styles[CURRENT[key]], 'castanho-escuro')))
             bust = np.asarray(Image.fromarray(dressed, 'RGBA').crop(crop))
             b128 = Image.fromarray(bust, 'RGBA').resize((128, 128), Image.BOX)
@@ -173,6 +208,22 @@ def main(chosen):
             path.parent.mkdir(parents=True, exist_ok=True)
             b128.save(path, 'WEBP', quality=90, alpha_quality=100, method=6)
             weights.setdefault('busto', {})[f'{key}-pele-{t}'] = round(path.stat().st_size / 1024, 1)
+
+        if beards:
+            colours = list(vh.COLOURS)
+            rows = [(t, b) for t in (1, 4, 6) for b in beards]
+            g = Image.new('RGB', (110 + len(colours) * 160, 24 + len(rows) * 170), (40, 40, 40))
+            d = ImageDraw.Draw(g)
+            for c, colour in enumerate(colours):
+                d.text((110 + c * 160 + 6, 6), colour, fill=(255, 230, 160))
+            cx = OX + h['skull'][0]
+            for r, (t, b) in enumerate(rows):
+                d.text((6, 24 + r * 170 + 70), f'pele {t}\n{b}', fill=(255, 230, 160))
+                for c, colour in enumerate(colours):
+                    img = flatten(over(bases[t], kit['camisola'], wide(vh.recolour(beards[b], colour, outline=0)),
+                                       wide(vh.recolour(styles[CURRENT[key]], colour))))
+                    g.paste(img.crop((cx - 80, 0, cx + 80, 170)), (110 + c * 160, 24 + r * 170))
+            g.save(OUT / 'grelha-m-barbas-x-cores.png', optimize=True)
 
         # Layers stay off the face.
         skinface = face & (base384[..., 3] > 127)  # the face itself, not the background inside its box

@@ -35,14 +35,15 @@ def skin_mask(px, head=None, exclude=None):
     return m
 
 
-def remap(px, mask, tone):
-    """Luminance of each skin pixel placed on the tone's ramp: p5 -> shadow, p50 -> mid, p95 -> highlight."""
+def remap(px, mask, tone, stats=None):
+    """Luminance of each skin pixel placed on the tone's ramp: p5 -> shadow, p50 -> mid, p95 -> highlight.
+    stats: (p5, p50, p95) fixed from another image, so two versions of a base map identically."""
     out = px.copy()
     if TONES[tone] is None:
         return out
     rgb = px[..., :3].astype(float)
     lum = rgb @ [0.299, 0.587, 0.114]
-    p5, p50, p95 = np.percentile(lum[mask], [5, 50, 95])
+    p5, p50, p95 = stats if stats is not None else np.percentile(lum[mask], [5, 50, 95])
     sh, mid, hi = (np.array(c, float) for c in TONES[tone])
     l = lum[mask]
     lo = np.clip((l - p5) / max(p50 - p5, 1), -0.5, 1)[:, None]
@@ -61,3 +62,8 @@ def strip_skin(layer, keep_below=None):
         m[keep_below:] = False
     out[m] = 0
     return out, int(m.sum())
+
+
+def stats_of(px, mask):
+    lum = px[..., :3].astype(float) @ [0.299, 0.587, 0.114]
+    return tuple(np.percentile(lum[mask], [5, 50, 95]))

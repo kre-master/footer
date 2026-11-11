@@ -46,6 +46,58 @@ HAIR = {
 }
 
 
+BEARD_SEEDS = [1111202751, 1111202752]
+# Second try: the whole-jaw mask invited full beards. Stubble with a lighter prompt; goatee on the chin only.
+BEARD_RETRY = {'barba-por-fazer': [1111202753, 1111202754, 1111202755], 'pera': [1111202753, 1111202754, 1111202755]}
+BEARD = {
+    'barba-por-fazer': 'very light two-day stubble: sparse tiny dark dots of stubble on the jaw, chin and upper lip, the skin '
+                       'clearly visible through it, not a beard, no moustache',
+    'barba-curta': 'a short neat full beard on the jaw and chin with a short moustache joined to it',
+    'pera': 'a small pointed goatee on the chin only, the rest of the face clean-shaven, no moustache, no jaw beard',
+}
+
+
+def submit_beard():
+    base = v2.up2(PREP / 'base-rapada-m-sem-bigode-flat.png', PREP / '2x-base-rapada-m-sem-bigode-flat.png')
+    for name, prompt in BEARD.items():
+        own = PREP / f'mascara-barba-m-{name}.png'
+        src = own if own.exists() else PREP / 'mascara-barba-m.png'
+        mask = v2.up2(src, PREP / f'2x-{src.name}')
+        for seed in BEARD_SEEDS + BEARD_RETRY.get(name, []):
+            v2.submit_one(f'barba-m-{name}-{seed}', f'barba-m-{name}', seed,
+                          f'{STYLE}, same man, same face shape, eyes, nose and mouth, dark brown facial hair: {prompt}',
+                          {'base': base, 'mask': mask}, [])
+
+
+# Hairstyles redone on a bald base (Jon: the shaved hair showed under the new one; the ponytails looked
+# stuck to the side). Each layer has the whole hair, crown included.
+HAIR2_SEEDS = [1111202761, 1111202762, 1111202763, 1111202764]
+HAIR2 = {
+    ('m', 'comprido-apanhado'): 'long dark brown hair combed straight back from the forehead with volume on top, '
+                                'covering the whole top of the head, gathered into a ponytail at the back of the '
+                                'head, the ponytail hangs behind the head and the neck, not on the side',
+    ('f', 'rabo-de-cavalo'): 'dark brown hair pulled back from the forehead with volume on top, covering the whole '
+                             'head, tied into a high ponytail at the back of the head, the ponytail hangs behind '
+                             'the head, not on the side',
+    ('f', 'curto'): 'short dark brown pixie cut covering the whole head including the crown, full hair, not shaved',
+    ('f', 'encaracolado-solto'): 'voluminous loose curly dark brown hair covering the whole head from the hairline, '
+                                 'falling to the shoulders',
+    ('f', 'trancas'): 'long dark brown box braids starting at the hairline and covering the whole head, two long '
+                      'braids falling in front of the shoulders to the chest',
+}
+
+
+def submit_hair2():
+    for (key, name), prompt in HAIR2.items():
+        base = v2.up2(PREP / f'base-careca-{key}-flat.png', PREP / f'2x-base-careca-{key}-flat.png')
+        own = PREP / f'mascara-penteado-{key}-{name}.png'
+        src = own if own.exists() else PREP / f'mascara-penteado-{key}.png'
+        mask = v2.up2(src, PREP / f'2x-{src.name}')
+        for seed in HAIR2_SEEDS:
+            v2.submit_one(f'cabelo2-{key}-{name}-{seed}', f'cabelo2-{key}-{name}', seed,
+                          f'{STYLE}, {prompt}, the face and the body unchanged', {'base': base, 'mask': mask}, [])
+
+
 def submit_base():
     for key in 'mf':
         base = v2.up2(PREP / f'manequim-{key}-sem-cabelo-prefill.png', PREP / f'2x-manequim-{key}-sem-cabelo-prefill.png')
@@ -69,6 +121,6 @@ def submit_hair():
 
 if __name__ == '__main__':
     if sys.argv[1] == 'submit':
-        submit_base() if sys.argv[2] == 'base' else submit_hair()
+        {'base': submit_base, 'penteados': submit_hair, 'barbas': submit_beard, 'penteados2': submit_hair2}[sys.argv[2]]()
     else:
         v2.collect()

@@ -39,7 +39,8 @@ def hair_layer(result, base, mask, face):
     holes = closed & ~m & mask & ~face & _morph(white, ImageFilter.MaxFilter(3))
     # Background gaps enclosed by hair (beside the jaw, where the face box kept the model out).
     bg_base = np.abs(base.astype(int) - [0xE9, 0xDC, 0xC3]).max(axis=-1) < 8
-    hugged = _morph(_morph(m | face, ImageFilter.MaxFilter(13)), ImageFilter.MinFilter(13))
+    # Border = the face's own outline (opaque pixels inside the box), not the whole box.
+    hugged = _morph(_morph(m | (face & ~bg_base), ImageFilter.MaxFilter(13)), ImageFilter.MinFilter(13))
     holes |= hugged & ~m & bg_base
     # Filled with the hair's own shadow tone (the hair behind the jaw is in shade).
     col = np.where(m[..., None], result, 0).astype(float)
@@ -56,12 +57,13 @@ def hair_layer(result, base, mask, face):
     return out
 
 
-def recolour(layer, colour):
+def recolour(layer, colour, outline=9):
+    """outline: luminance below which pixels stay as they are (0 for beards, which are mostly black)."""
     out = layer.copy()
     a = out[..., 3] > 0
     rgb = out[..., :3].astype(float)
     lum = rgb @ [0.299, 0.587, 0.114]
-    sel = a & (lum >= 9)  # only the near-black outline stays as it is
+    sel = a & (lum >= outline)  # only the near-black outline stays as it is
     if not sel.any():
         return out
     p5, p50, p95 = np.percentile(lum[sel], [5, 50, 95])
