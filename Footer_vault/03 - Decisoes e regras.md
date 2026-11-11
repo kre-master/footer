@@ -326,3 +326,13 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Clube em estagio (menos de 7 contas do clube em jogos verificados ou menos de 5 jogos verificados): XP normal, itens Epico/Lendario/Mitico ficam guardados ate acabar.
 - Admin que jogou e muda equipas/resultado/data de um jogo verificado depois das 48 h: o jogo fica sinalizado e as recompensas em espera ate outro admin (que nao jogou) ou o dono da app aprovar.
 - Os numeros vivem em `reward_settings`. Proposta completa: Claude Doc "Anti-fraude: jogos ficticios e recompensas".
+
+## Liga Fantasia (decidido 2026-11-11)
+
+- Proposta: https://claude.ai/artifact/16mEPVpumgdvy99RtikELE (motor calibrado em Python antes).
+- Para ja uma so liga de teste: 8 equipas de 5 contra 5 (plantel de 7), duas voltas, uma jornada por semana (segunda 21:00 de Lisboa). Os jogadores entram numa equipa ao acaso, no lugar de um jogador de IA; nao ficam juntos por clube.
+- Atributos de fantasia iguais para todos a partida: 40 em tudo, 20 pontos para distribuir, +1 por nivel de conta (XP concedido). Nunca calculados a partir do desempenho real.
+- Itens dao bonus so dentro da liga; ligados apenas quando houver itens e a regra de jogos verificados (anti-fraude). Na liga de teste estao desligados.
+- Forma: presenca num jogo nos 7 dias antes da jornada da +2 a todos os atributos.
+- A liga nao da XP de conta e nao escreve em jogos, estatisticas ou recompensas reais (nota 12).
+- Mais tarde: ligas por calibre, subidas e descidas e janelas de transferencia (propostas pelo sistema, o jogador aceita ou recusa).

@@ -587,3 +587,10 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 - XP provisorio em `reward_settings.xp` (presenca 100, V/E/D 60/30/15), da proposta dos patamares ainda por aprovar. Itens e conquistas ainda nao existem; `private.grant_reward` aceita raridade para quando existirem.
 - Testes: `npm run test:antifraud` (estrutural) e `tests/sql/anti-fraud-scenarios.sql` (31 cenarios) contra um Postgres 16 local: `psql -f tests/sql/anti-fraud-stub.sql`, depois a migracao sem a linha `cron.schedule`, depois os cenarios; todos `ok`.
 - Por fazer: lembrete as 24 h a quem nao fechou o jogo; mostrar "a confirmar n/7" no ecra de resultados; regras R24/R25/R28 entre clubes fora do estagio quando esses percursos existirem; a app preencher `event_id`.
+
+## Liga Fantasia (2026-11-11)
+
+- Migracao `supabase/fantasy-league-migration.sql` (por aplicar): tabelas `fantasy_*`, vista `fantasy_standings`, motor em PL/pgSQL (`private.fantasy_play_fixture`, seed guardada) e pg_cron `footer-fantasy-play-due` de hora a hora. Cria logo a liga de teste so com IA.
+- Cliente: `fantasy-league.js` (separador Jogos > Liga fantasia). So le e chama `fantasy_save_profile`, `fantasy_join_test_league`, `fantasy_leave_league`, `fantasy_my_points`.
+- Numeros do motor em `fantasy_settings` (afinar sem nova migracao). Calibracao em Python em `/mnt/project-files/liga-fantasia/` (fora do repo).
+- Testes: `npm run test:fantasy` e `tests/sql/fantasy-league-scenarios.sql` (47 cenarios) contra Postgres 16 local: stub anti-fraude, migracao anti-fraude e migracao da liga (ambas sem as linhas `cron.*`), depois os cenarios.

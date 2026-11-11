@@ -22,7 +22,8 @@
     "cap:sync:ios": "npm run build:web && npx cap sync ios",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
-    "test:antifraud": "node --test tests/anti-fraud-schema.test.mjs"
+    "test:antifraud": "node --test tests/anti-fraud-schema.test.mjs",
+    "test:fantasy": "node --test tests/fantasy-league.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.5",
