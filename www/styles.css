@@ -8701,12 +8701,13 @@ body.boot-refreshing::before {
 .fantasy-build { display: grid; gap: 12px; }
 .fantasy-build-head { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .fantasy-field { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.fantasy-field :is(input, select) { width: 100%; min-height: 40px; padding: 8px 10px; border: 2px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 1rem; }
 .fantasy-points { margin: 0; color: var(--muted); }
 .fantasy-points strong { color: var(--ink); font-size: 1.2rem; }
 .fantasy-attrs { display: grid; gap: 6px; }
-.fantasy-attr { display: grid; grid-template-columns: minmax(96px, 1fr) 32px 32px 32px minmax(60px, 2fr); align-items: center; gap: 6px; }
+.fantasy-attr { padding: 4px 0; display: grid; grid-template-columns: minmax(96px, 1fr) 32px 32px 32px minmax(60px, 2fr); align-items: center; gap: 6px; }
 .fantasy-attr strong { text-align: center; }
-.fantasy-bar { height: 6px; border-radius: 3px; background: var(--surface-strong); overflow: hidden; }
+.fantasy-bar { height: 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
 .fantasy-bar span { display: block; height: 100%; background: var(--accent); }
 .fantasy-message { margin: 0; font-weight: 600; }
 .fantasy-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
