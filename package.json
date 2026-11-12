@@ -23,7 +23,8 @@
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
     "test:antifraud": "node --test tests/anti-fraud-schema.test.mjs",
-    "test:fantasy": "node --test tests/fantasy-league.test.mjs"
+    "test:fantasy": "node --test tests/fantasy-league.test.mjs",
+    "test:balneario": "node --test tests/balneario.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.5",

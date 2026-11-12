@@ -8731,3 +8731,23 @@ body.boot-refreshing::before {
 .card-photo .fantasy-avatar-fluid img { -webkit-mask-image: none; mask-image: none; object-fit: fill; }
 .fantasy-portrait { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fantasy-portrait .is-on { background: var(--cad-yellow, var(--accent)); }
+/* Balneario: escolher a aparencia do avatar */
+.balneario-panel[hidden] { display: none; }
+.balneario { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.balneario-stage { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; justify-items: center; gap: 10px; padding: 12px; border: 2px solid var(--line-strong); border-radius: 12px; background: var(--surface-2); }
+.balneario-controls { display: grid; gap: 14px; min-width: 0; }
+.balneario-group { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 6px; }
+.balneario-group legend { padding: 0; margin-bottom: 6px; font-weight: 700; font-size: .9rem; }
+.balneario-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.balneario-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.balneario-opt { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-height: 40px; padding: 6px 10px; border: 2px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: .8rem; cursor: pointer; }
+.balneario-row .balneario-opt { flex-direction: row; }
+.balneario-opt.is-on { background: var(--cad-yellow, var(--accent)); border-color: var(--ink); }
+.balneario-opt:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.balneario-opt-label { line-height: 1.1; text-align: center; }
+.balneario-swatch { display: inline-block; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--ink); }
+.balneario-opt .fantasy-avatar-bust { border-width: 1px; }
+@media (max-width: 560px) {
+  .balneario { grid-template-columns: 1fr; }
+  .balneario-stage { position: static; grid-template-columns: auto auto; justify-content: center; align-items: end; }
+}
