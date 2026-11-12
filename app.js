@@ -9506,18 +9506,31 @@ async function loadCardPreferences() {
   if (error) return; // migracao por aplicar: fica tudo com foto
   cardAvatarUsers.clear();
   (data || []).forEach((row) => cardAvatarUsers.add(row.user_id));
+  await loadCardAvatars();
+}
+
+// Aparencia escolhida por cada conta (avatar_profiles); sem linha usa-se a de omissao.
+const cardAvatarProfiles = new Map();
+async function loadCardAvatars() {
+  cardAvatarProfiles.clear();
+  if (!cardAvatarUsers.size) return;
+  const { data, error } = await supabaseClient.from("avatar_profiles")
+    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", [...cardAvatarUsers]);
+  if (error) return;
+  (data || []).forEach((row) => cardAvatarProfiles.set(row.user_id, row));
 }
 
 function setCardPortrait(userId, portrait) {
   if (portrait === "avatar") cardAvatarUsers.add(userId);
   else cardAvatarUsers.delete(userId);
   render();
+  if (portrait === "avatar") loadCardAvatars().then(render).catch(() => {});
 }
 
 function renderPlayerCardPhoto(playerData) {
   const fantasy = globalThis.FooterFantasy;
   if (fantasy && playerData.linkedUserId && cardAvatarUsers.has(playerData.linkedUserId)) {
-    return fantasy.avatarHtml(fantasy.appearanceFor({ user_id: playerData.linkedUserId }), { bust: "fluid" });
+    return fantasy.avatarHtml(fantasy.appearanceFor({ user_id: playerData.linkedUserId }, cardAvatarProfiles.get(playerData.linkedUserId)), { bust: "fluid" });
   }
   if (getPlayerPhotoSrc(playerData)) {
     return `<img src="${escapeHtml(getPlayerPhotoSrc(playerData))}" alt="">`;
