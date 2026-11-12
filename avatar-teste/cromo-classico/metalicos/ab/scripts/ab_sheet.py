@@ -25,11 +25,13 @@ def cromo_palette():
     return np.asarray(img.quantize(32, method=Image.MEDIANCUT).getpalette()[:96]).reshape(32, 3)
 
 
-def metal_palette(key):
+def metal_palette(key, n=16):
+    """The item's own colours only (black, dark greys, champagne gold), from its HD: no skin, no blue."""
     hd = np.asarray(Image.open(PREP / f'{key}-hd.png').convert('RGB'))
     fg = hd[np.abs(hd.astype(int) - BG).max(axis=2) > 18]
     img = Image.fromarray(fg[np.random.default_rng(1).choice(len(fg), 40000)].reshape(200, 200, 3))
-    return np.asarray(img.quantize(12, method=Image.MEDIANCUT).getpalette()[:36]).reshape(12, 3)
+    pal = np.asarray(img.quantize(n, method=Image.MEDIANCUT).getpalette()[:n * 3]).reshape(n, 3)
+    return np.concatenate([pal, [[12, 10, 10]]])  # plus a near-black for the pixel-art outline
 
 
 def quantize(rgb, pal):
@@ -38,15 +40,18 @@ def quantize(rgb, pal):
 
 
 def icon(tag, pal):
+    from fem_build import background
     im = np.asarray(Image.open(JOBS / f'{tag}.png').convert('RGB'))
-    fg = np.abs(im.astype(int) - BG).max(axis=2) > 18
+    # Background cut by flood fill from the borders, with the generated background's own tone.
+    fg = ~background(im.astype(float), tol=26)
     ys, xs = np.where(fg)
     side = max(ys.max() - ys.min(), xs.max() - xs.min()) + 16
     cy, cx = (ys.max() + ys.min()) // 2, (xs.max() + xs.min()) // 2
     box = (cx - side // 2, cy - side // 2, cx + side // 2, cy + side // 2)
     small = np.asarray(Image.fromarray(im).crop(box).resize((128, 128), Image.BOX))
+    fgs = np.asarray(Image.fromarray((fg * 255).astype(np.uint8)).crop(box).resize((128, 128), Image.BOX)) > 127
     q = quantize(small, pal)
-    alpha = np.where(np.abs(small.astype(int) - BG).max(axis=2) > 18, 255, 0).astype(np.uint8)
+    alpha = np.where(fgs, 255, 0).astype(np.uint8)
     return Image.fromarray(np.dstack([q, alpha]), 'RGBA')
 
 
@@ -59,7 +64,9 @@ def worn(tag, key, pal):
     base = np.asarray(Image.open(PREP / f'{key}-corpo-2x.png').convert('RGB').resize((x1 - x0, y1 - y0), Image.NEAREST))
     changed = np.abs(res.astype(int) - base.astype(int)).max(axis=2) > 12
     q = quantize(res, pal)
-    alpha = np.where(mask & changed, 255, 0).astype(np.uint8)
+    from var_skin import skinlike
+    # Skin redrawn inside the mask (neck, arms) is not fabric: leave it to the base, in its own tone.
+    alpha = np.where(mask & changed & ~skinlike(res), 255, 0).astype(np.uint8)
     layer = np.zeros((1024, 512, 4), np.uint8)
     layer[y0:y1, OX + x0:OX + x1] = np.dstack([q, alpha])
     return layer
@@ -81,7 +88,7 @@ def main():
         d.text((14 + c * (cell + 10), 10), name, fill=(255, 230, 160))
     row = 0
     for key, it in ITEMS.items():
-        pal = np.concatenate([cromo, metal_palette(key)])
+        pal = metal_palette(key)
         for kind in (['icone', 'vestido'] if it['crop'] else ['icone']):
             y = 40 + row * (cell + 50)
             hd = Image.open(PREP / f'{key}-hd.png').resize((cell, cell), Image.LANCZOS)

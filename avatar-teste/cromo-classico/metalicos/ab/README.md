@@ -20,3 +20,9 @@ Em cada item há um **ícone** pixel art, gerado a partir do HD. Na camisola e n
 
 1. **O dourado-champanhe vira cobre/laranja.** A paleta partilha cores com a pele. Proposta: nos itens, quantizar só com a paleta metálica do item mais os contornos escuros.
 2. **Nos ícones do Kontext fica um quadrado de fundo claro.** O fundo que gera não é exatamente o bege. Proposta: recortar o fundo por preenchimento a partir das bordas.
+
+## Correções aplicadas (`folha-ab-corrigida-kontext.png`, só o Kontext; `folha-ab.png` atualizada)
+
+1. **Paleta só do HD de origem**: 16 cores do item (preto, cinzas escuros, dourado-champanhe) mais um quase-preto para o contorno. Sem cores de pele nem azul, por isso o dourado já não vira cobre e o preto das chuteiras já não sai azul-marinho.
+2. **Fundo dos ícones**: recortado por preenchimento a partir das bordas, com o tom do fundo gerado.
+3. **Camadas vestidas**: a pele redesenhada dentro da máscara (pescoço, braços) sai da camada, para se ver a pele da base no tom escolhido.
