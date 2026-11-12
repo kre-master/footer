@@ -8694,3 +8694,40 @@ body.boot-refreshing::before {
   .goals-table .goal-suggestion td:first-child { display: none; }
   .goals-table .goal-suggestion td { grid-column: 1 / -1; }
 }
+
+/* Liga Fantasia (2026-11-11): jogo simulado, separado das estatisticas reais. */
+.fantasy-section { margin-top: 20px; }
+.fantasy-section h3 { margin: 0 0 10px; font-size: 1rem; }
+.fantasy-build { display: grid; gap: 12px; }
+.fantasy-build-head { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.fantasy-field { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.fantasy-field :is(input, select) { width: 100%; min-height: 40px; padding: 8px 10px; border: 2px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 1rem; }
+.fantasy-points { margin: 0; color: var(--muted); }
+.fantasy-points strong { color: var(--ink); font-size: 1.2rem; }
+.fantasy-attrs { display: grid; gap: 6px; }
+.fantasy-attr { padding: 4px 0; display: grid; grid-template-columns: minmax(96px, 1fr) 32px 32px 32px minmax(60px, 2fr); align-items: center; gap: 6px; }
+.fantasy-attr strong { text-align: center; }
+.fantasy-bar { height: 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.fantasy-bar span { display: block; height: 100%; background: var(--accent); }
+.fantasy-message { margin: 0; font-weight: 600; }
+.fantasy-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.fantasy-table th, .fantasy-table td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+.fantasy-table th:nth-child(2), .fantasy-table td:nth-child(2) { text-align: left; }
+.fantasy-table tr.is-mine td, .fantasy-fixture.is-mine { background: var(--surface-strong); }
+.fantasy-fixtures, .fantasy-squad { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fantasy-fixture { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; }
+.fantasy-fixture span:last-of-type { text-align: right; }
+.fantasy-fixture small { grid-column: 1 / -1; color: var(--muted); }
+.fantasy-pos { display: inline-block; min-width: 34px; font-size: .75rem; color: var(--muted); }
+.fantasy-me { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: end; }
+.fantasy-me .fantasy-build-head { grid-template-columns: 1fr; }
+.fantasy-avatar { position: relative; display: block; flex: none; }
+.fantasy-avatar img { position: absolute; display: block; max-width: none; }
+.fantasy-avatar-bust { position: relative; display: inline-block; flex: none; overflow: hidden; border-radius: 50%; background: var(--surface-2); border: 2px solid var(--line-strong); vertical-align: middle; }
+.fantasy-avatar-bust .fantasy-avatar { position: absolute; }
+.fantasy-squad li { display: flex; align-items: center; gap: 8px; }
+.fantasy-avatar-fluid { position: absolute; inset: 0; overflow: hidden; }
+.fantasy-avatar-fluid .fantasy-avatar { position: absolute; top: 0; aspect-ratio: 1 / 2; height: auto; }
+.card-photo .fantasy-avatar-fluid img { -webkit-mask-image: none; mask-image: none; object-fit: fill; }
+.fantasy-portrait { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fantasy-portrait .is-on { background: var(--cad-yellow, var(--accent)); }

@@ -1608,6 +1608,7 @@ async function loadRemoteState() {
     updateAccessUi("Supabase indisponivel, modo local");
     return;
   }
+  loadCardPreferences().then(() => { if (cardAvatarUsers.size) render(); }).catch(() => {});
   if (mvpError) console.warn("MVP vote load failed. Run supabase/schema.sql again.", mvpError);
   if (mvpCountError) console.warn("MVP vote count load failed. Run supabase/schema.sql again.", mvpCountError);
   if (feedbackError) console.warn("Postgame feedback load failed. Run supabase/postgame-feedback-migration.sql.", feedbackError);
@@ -3471,6 +3472,7 @@ const VIEW_GROUPS = {
   today: "game",
   "public-games": "game",
   "new-game": "game",
+  fantasy: "game",
   games: "history",
   "history-game": "history",
   gallery: "history",
@@ -3527,6 +3529,7 @@ function showView(viewName, options = {}) {
   if (viewName === "owner") loadOwnerPanel();
   if (viewName === "me") renderMePanel();
   if (viewName === "search") renderSearchPanel();
+  if (viewName === "fantasy") renderFantasyPanel();
   renderGroupBanner();
   playCascade(document.querySelector(`#view-${viewName}`));
   if (viewName === "today") {
@@ -3536,6 +3539,23 @@ function showView(viewName, options = {}) {
   if (navigationHistoryReady && options.push !== false) {
     pushNavigationState();
   }
+}
+
+// Liga Fantasia: jogo simulado, separado das estatisticas reais (fantasy-league.js).
+function renderFantasyPanel() {
+  const panel = document.querySelector("#fantasy-panel");
+  if (!panel || !globalThis.FooterFantasy) return;
+  if (!remoteEnabled || !supabaseClient) {
+    panel.innerHTML = `<p class="empty-state">A liga fantasia precisa de ligação ao servidor.</p>`;
+    return;
+  }
+  globalThis.FooterFantasy.render(panel, {
+    client: supabaseClient,
+    user: currentSession?.user || null,
+    defaultName: getLinkedPlayer()?.name || "",
+    escapeHtml,
+    onCardPortrait: setCardPortrait,
+  });
 }
 
 function toggleAccountMenu(force) {
@@ -9478,7 +9498,40 @@ function hasPlayerPhoto(playerData) {
   return Boolean(playerData.photoThumb || playerData.photoDataUrl || playerData.photoSize > 0);
 }
 
+// Carta: retrato com foto (por omissao) ou com o avatar, a escolha de cada conta (card_preferences).
+const cardAvatarUsers = new Set();
+async function loadCardPreferences() {
+  if (!remoteEnabled || !supabaseClient || !currentSession?.user) return;
+  const { data, error } = await supabaseClient.from("card_preferences").select("user_id").eq("portrait", "avatar");
+  if (error) return; // migracao por aplicar: fica tudo com foto
+  cardAvatarUsers.clear();
+  (data || []).forEach((row) => cardAvatarUsers.add(row.user_id));
+  await loadCardAvatars();
+}
+
+// Aparencia escolhida por cada conta (avatar_profiles); sem linha usa-se a de omissao.
+const cardAvatarProfiles = new Map();
+async function loadCardAvatars() {
+  cardAvatarProfiles.clear();
+  if (!cardAvatarUsers.size) return;
+  const { data, error } = await supabaseClient.from("avatar_profiles")
+    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", [...cardAvatarUsers]);
+  if (error) return;
+  (data || []).forEach((row) => cardAvatarProfiles.set(row.user_id, row));
+}
+
+function setCardPortrait(userId, portrait) {
+  if (portrait === "avatar") cardAvatarUsers.add(userId);
+  else cardAvatarUsers.delete(userId);
+  render();
+  if (portrait === "avatar") loadCardAvatars().then(render).catch(() => {});
+}
+
 function renderPlayerCardPhoto(playerData) {
+  const fantasy = globalThis.FooterFantasy;
+  if (fantasy && playerData.linkedUserId && cardAvatarUsers.has(playerData.linkedUserId)) {
+    return fantasy.avatarHtml(fantasy.appearanceFor({ user_id: playerData.linkedUserId }, cardAvatarProfiles.get(playerData.linkedUserId)), { bust: "fluid" });
+  }
   if (getPlayerPhotoSrc(playerData)) {
     return `<img src="${escapeHtml(getPlayerPhotoSrc(playerData))}" alt="">`;
   }
@@ -11430,9 +11483,10 @@ function bindSwipe(root) {
 // ---- Clubes sem notas (2026-11-05): fora dos Futeboleiros ninguem ve nota nem numeros; todos comecam iguais ----
 const NO_RATING_BASE = 60;
 
-function ratingsVisible(group = getActiveGroup()) {
-  if (!remoteEnabled || !group) return true;
-  return group.slug === LEGACY_GROUP_SLUG || group.settings?.ratings === true;
+// Ratings antigos (OVR e notas) deixam de aparecer em todos os clubes (decidido pelo Jon a 2026-11-11).
+// Os valores continuam na base de dados; as equipas equilibram-se pela forma.
+function ratingsVisible() {
+  return false;
 }
 
 function respondWithMotion(button) {
