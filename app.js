@@ -14819,6 +14819,14 @@ function renderHeartRateStepButtons() {
   return HEART_RATE_ADJUST_STEPS.map((step) => `<button type="button" class="${step === heartRateStep ? "active" : ""}" data-hr-step="${step}" aria-pressed="${step === heartRateStep}">${step >= 60 ? `${step / 60} min` : `${step} s`}</button>`).join("");
 }
 
+// Sinal amarelo (nunca bloqueia): o jogo comeca bem antes do treino ou depois de ele acabar.
+function heartRateTimeMismatch(game, entry) {
+  const gameMs = Date.parse(game.date);
+  const lastT = entry?.series?.length ? Number(entry.series[entry.series.length - 1][0]) : 0;
+  if (!Number.isFinite(gameMs) || !Number.isFinite(entry?.startedAtMs)) return false;
+  return gameMs < entry.startedAtMs - 15 * 60000 || gameMs > entry.startedAtMs + lastT * 1000;
+}
+
 function renderHeartRateBody(game) {
   const entry = heartRateEntries[game.id];
   if (remoteEnabled && !currentSession?.user) return `<p class="tracking-note">Entra na tua conta para carregares o treino do teu relogio.</p>`;
@@ -14872,6 +14880,7 @@ function renderHeartRateBody(game) {
       </label>
       <label class="hr-check"><input type="checkbox" data-hr-overlay-toggle ${readHeartRateSetting("overlay") === "off" ? "" : "checked"}> Mostrar em cima do vídeo</label>
     </div>
+    ${heartRateTimeMismatch(game, entry) ? `<p class="tracking-warning" data-hr-mismatch>⚠ A hora do treino não coincide com a do jogo. Acontece quando o relógio ou a câmara estão com a hora desacertada. Podes continuar; se os batimentos ficarem desalinhados, acerta abaixo.</p>` : ""}
     <p class="tracking-error" data-hr-error ${heartRateNotices[game.id] ? "" : "hidden"}>${escapeHtml(heartRateNotices[game.id] || "")}</p>
     <div class="hr-footer">
       <small>${escapeHtml(entry.fileName || "Treino")} · ${escapeHtml(String(entry.format).toUpperCase())}</small>
@@ -14933,7 +14942,8 @@ function bindHeartRatePanel(game, section) {
       if (!file) return;
       try {
         const result = await importHeartRateFile(game, file);
-        heartRateNotices[game.id] = result === "warn" ? `Este treino nao coincide com a hora do jogo (${formatDate(game.date)}). Confirma se e o ficheiro certo; podes acertar abaixo.` : "";
+        // Hora diferente nao bloqueia: o treino fica guardado e a pagina mostra so um sinal amarelo (ver heartRateTimeMismatch).
+        heartRateNotices[game.id] = "";
         rerender();
       } catch (error) {
         showError(error.message || "Nao foi possivel ler o ficheiro.");
