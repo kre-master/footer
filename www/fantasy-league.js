@@ -128,8 +128,26 @@
     return list[n % list.length];
   }
 
+  // Linha de avatar_profiles (escolhida pelo jogador) -> aparencia; valores fora das listas caem no omissao.
+  function fromProfileRow(row) {
+    if (!row || (row.silhouette !== "m" && row.silhouette !== "f")) return null;
+    const sx = row.silhouette;
+    const d = AVATAR.defaults[sx];
+    const tone = Number(row.skin_tone);
+    const app = {
+      sx,
+      tone: tone >= 1 && tone <= 6 ? tone : d.tone,
+      hair: AVATAR.hair[sx].includes(row.hair_style) ? row.hair_style : d.hair,
+      color: AVATAR.colors.includes(row.hair_color) ? row.hair_color : d.color,
+    };
+    if (sx === "m") app.beard = AVATAR.beards.includes(row.facial_hair) ? row.facial_hair : "bigode";
+    return app;
+  }
+
   function appearanceFor(player, profile) {
     if (profile?.avatar) return profile.avatar;
+    const own = fromProfileRow(profile);
+    if (own) return own;
     if (player?.user_id || !player?.id) return { sx: "m", ...AVATAR.defaults.m };
     const h = hashString(player.id);
     const sx = h % 5 === 0 ? "f" : "m";
@@ -205,6 +223,10 @@
     const names = userIds.length
       ? (await client.from("fantasy_profiles").select("user_id, display_name").in("user_id", userIds)).data || []
       : [];
+    const avatarIds = [...new Set([...userIds, userId].filter(Boolean))];
+    const avatarRows = avatarIds.length
+      ? await client.from("avatar_profiles").select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", avatarIds)
+      : { data: [] };
     const summary = roundsSummary(fixtures.data);
     const lastIds = summary.last.map((f) => f.id);
     const events = lastIds.length
@@ -219,6 +241,7 @@
       profile: profile.data,
       points: Array.isArray(points.data) ? points.data[0] : points.data,
       names: new Map(names.map((n) => [n.user_id, n.display_name])),
+      avatars: new Map((avatarRows.error ? [] : avatarRows.data || []).map((r) => [r.user_id, r])),
       events,
       summary,
       cardPortrait: cardPref?.error ? null : (cardPref?.data?.portrait || "photo"),
@@ -231,7 +254,7 @@
     return `
       <div class="fantasy-build">
         <div class="fantasy-me">
-          ${avatarHtml(appearanceFor(data.mine || { user_id: "me" }), { width: 112 })}
+          ${avatarHtml(appearanceFor(data.mine || { user_id: "me" }, data.avatars?.get(state.userId)), { width: 112 })}
           <div class="fantasy-build-head">
           <label class="fantasy-field">Nome na liga
             <input type="text" maxlength="40" data-fantasy-name value="${esc(state.name)}">
@@ -300,7 +323,7 @@
         <section class="fantasy-section">
           <h3>${esc(teamName.get(mine.team_id))}</h3>
           <ul class="fantasy-squad">
-            ${myTeam.map((p) => `<li>${avatarHtml(appearanceFor(p), { bust: 40 })}<span class="fantasy-pos">${p.position}</span> ${p.user_id ? esc(data.names.get(p.user_id) || "Jogador") : `${esc(p.ai_name)} <span class="muted-pill">IA</span>`}</li>`).join("")}
+            ${myTeam.map((p) => `<li>${avatarHtml(appearanceFor(p, p.user_id ? data.avatars?.get(p.user_id) : null), { bust: 40 })}<span class="fantasy-pos">${p.position}</span> ${p.user_id ? esc(data.names.get(p.user_id) || "Jogador") : `${esc(p.ai_name)} <span class="muted-pill">IA</span>`}</li>`).join("")}
           </ul>
         </section>` : ""}
       <section class="fantasy-section">
@@ -427,5 +450,5 @@
     state.message = "";
   }
 
-  return { AVATAR, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
+  return { AVATAR, fromProfileRow, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
 });

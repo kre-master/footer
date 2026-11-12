@@ -129,3 +129,12 @@ test("carta: preferencias so escritas pela propria conta", async () => {
   assert.match(cp, /with check \(user_id = \(select auth\.uid\(\)\)\)/);
   assert.doesNotMatch(cp, /grant[^;]*delete[^;]*card_preferences/);
 });
+
+test("avatar: aparencia escolhida em avatar_profiles, com valores invalidos no omissao", () => {
+  const row = { silhouette: "f", skin_tone: 2, hair_style: "trancas-3", hair_color: "ruivo", facial_hair: "sem" };
+  assert.deepEqual(F.appearanceFor({ user_id: "u1" }, row), { sx: "f", tone: 2, hair: "trancas-3", color: "ruivo" });
+  const bad = { silhouette: "m", skin_tone: 9, hair_style: "moicano", hair_color: "verde", facial_hair: "pera" };
+  assert.deepEqual(F.fromProfileRow(bad), { sx: "m", tone: 4, hair: "penteado-para-tras", color: "castanho-escuro", beard: "pera" });
+  assert.equal(F.fromProfileRow(null), null);
+  assert.deepEqual(F.appearanceFor({ user_id: "u1" }, null), F.appearanceFor({ user_id: "u2" }));
+});
