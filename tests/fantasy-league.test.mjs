@@ -120,7 +120,12 @@ test("carta: busto do avatar enche o retrato, sem bola nem galhardete", () => {
   const html = F.avatarHtml({ sx: "m", tone: 4, hair: "penteado-para-tras", color: "preto" }, { bust: "fluid" });
   assert.match(html, /fantasy-avatar-fluid/);
   assert.doesNotMatch(html, /galhardete|bola/);
-  assert.match(html, /width:200\.00%;left:-63\.28%/);
+  // Janela de 150 px de largura centrada na cabeca (x 145) e com a cabeca (y 39) a um terco da altura.
+  assert.match(html, /width:170\.67%;height:282\.97%;left:-46\.67%;top:11\.45%/);
+  const [, , wm, hm] = F.cardCrop("m");
+  const [, , wf, hf] = F.cardCrop("f");
+  assert.equal(wm, wf);
+  assert.ok(Math.abs(wm / hm - 0.829) < 1e-9 && hf === hm);
 });
 
 test("carta: preferencias so escritas pela propria conta", async () => {

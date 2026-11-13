@@ -16102,17 +16102,16 @@ async function loadCardAvatarCanvas(playerData) {
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   imgs.forEach((img) => ctx.drawImage(img, 0, 0, canvas.width, canvas.height));
-  return { canvas, bust: fantasy.AVATAR.bust[app.sx === "f" ? "f" : "m"] };
+  return { canvas, crop: fantasy.cardCrop(app.sx) };
 }
 
-function drawCardAvatarBust(ctx, { canvas, bust }, rect) {
-  // Igual ao retrato no ecra: a largura do busto enche o retrato, alinhado ao topo; o peito fica cortado.
-  const [x0, y0, x1] = bust;
-  const srcW = x1 - x0;
-  const srcH = Math.min(canvas.height - y0, (rect.h * srcW) / rect.w);
+function drawCardAvatarBust(ctx, { canvas, crop }, rect) {
+  // Mesma janela que no ecra (FooterFantasy.cardCrop): cabeca centrada, a um terco da altura.
+  const [x0, y0, w] = crop;
+  const scale = rect.w / w;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(canvas, x0, y0, srcW, srcH, rect.x, rect.y, rect.w, (srcH * rect.w) / srcW);
+  ctx.drawImage(canvas, rect.x - x0 * scale, rect.y - y0 * scale, canvas.width * scale, canvas.height * scale);
   ctx.restore();
 }
 

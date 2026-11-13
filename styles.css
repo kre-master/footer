@@ -8727,7 +8727,10 @@ body.boot-refreshing::before {
 .fantasy-avatar-bust .fantasy-avatar { position: absolute; }
 .fantasy-squad li { display: flex; align-items: center; gap: 8px; }
 .fantasy-avatar-fluid { position: absolute; inset: 0; overflow: hidden; }
-.fantasy-avatar-fluid .fantasy-avatar { position: absolute; top: 0; aspect-ratio: 1 / 2; height: auto; }
-.card-photo .fantasy-avatar-fluid img { -webkit-mask-image: none; mask-image: none; object-fit: fill; }
+.fantasy-avatar-fluid .fantasy-avatar { position: absolute; }
+/* A carta estiliza "span" e "img" da foto; o avatar repoe o seu tamanho (a janela ja tem o fundo e o esbatido). */
+.card-photo span.fantasy-avatar-fluid, .card-photo span.fantasy-avatar-fluid span.fantasy-avatar { display: block; border-radius: 0; background: none; -webkit-mask-image: none; mask-image: none; font-size: 0; }
+.card-photo span.fantasy-avatar-fluid { width: 100%; height: 100%; }
+.card-photo .fantasy-avatar-fluid img { -webkit-mask-image: none; mask-image: none; object-fit: fill; image-rendering: pixelated; }
 .fantasy-portrait { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fantasy-portrait .is-on { background: var(--cad-yellow, var(--accent)); }
