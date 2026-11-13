@@ -104,3 +104,17 @@ test("a rpc do cacifo recebe so dados limpos e a migracao tem as mesmas regras",
   assert.ok(cacifoSql.includes("between 1 and 24"));
   assert.equal(B.TIERS.length, 6);
 });
+
+test("so se veste o que se ganhou: o resto cai para o melhor ganho ou para a origem", () => {
+  const owned = new Set(["gear-camisola-01", "gear-camisola-02", "gear-bola-01"]);
+  const eq = { camisola: "gear-camisola-05", calcoes: "gear-calcoes-01", bola: "gear-bola-01", meias: null, galhardete: "gear-galhardete-03" };
+  assert.deepEqual(B.allowedEquipped(eq, owned), { camisola: "gear-camisola-02", bola: "gear-bola-01", meias: null });
+  assert.deepEqual(B.allowedEquipped(eq, null), eq);
+});
+
+test("a migracao do cacifo valida contra owned_items e o servidor recusa o que nao se ganhou", async () => {
+  const owned = await readFile(new URL("../supabase/avatar-cacifo-owned-migration.sql", import.meta.url), "utf8");
+  assert.ok(owned.includes("public.owned_items"));
+  assert.ok(owned.includes("o.user_id = v_uid"));
+  assert.ok(owned.includes("item por ganhar"));
+});

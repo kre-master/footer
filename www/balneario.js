@@ -137,6 +137,23 @@
     return cleanKits(kits).filter((_, i) => i !== index);
   }
 
+  // Itens ganhos: owned e um Set de ids (gear-<slot>-0N) ou null no modo de teste (tudo disponivel).
+  // Um item que ja nao se tem cai para o melhor ainda ganho no slot; sem nenhum, para o kit de origem.
+  function allowedEquipped(eq, owned) {
+    const clean = cleanEquipped(eq);
+    if (!owned) return clean;
+    const out = {};
+    for (const { key } of SLOTS) {
+      if (!(key in clean)) continue;
+      const v = clean[key];
+      if (v === null || owned.has(v)) { out[key] = v; continue; }
+      for (let n = 6; n >= 1; n -= 1) {
+        if (owned.has(itemId(key, n))) { out[key] = itemId(key, n); break; }
+      }
+    }
+    return out;
+  }
+
   function cacifoArgs(eq, kits) {
     return { p_equipped: cleanEquipped(eq), p_kits: cleanKits(kits) };
   }
@@ -151,7 +168,7 @@
   // ---------------------------------------------------------------------------
 
   const state = { userId: undefined, saved: null, choice: null, busy: false, message: "",
-    cacifo: false, eq: {}, savedEq: {}, kits: [], savedKits: [], slot: "camisola" };
+    cacifo: false, owned: null, eq: {}, savedEq: {}, kits: [], savedKits: [], slot: "camisola" };
 
   function optionButton(key, value, current, inner, text) {
     const on = String(current) === String(value);
@@ -162,10 +179,14 @@
     const on = current === value;
     const isTier = value !== "origem" && value !== "nenhum";
     const n = isTier ? Number(value.slice(-1)) : 0;
+    const locked = isTier && state.owned && !state.owned.has(value);
     const text = value === "origem" ? "Cromo clássico" : value === "nenhum" ? "Nenhum" : TIERS[n - 1];
     const icon = isTier
       ? `<img src="assets/avatar/cromo-classico/256/itens/ico-${value}.webp" alt="" width="40" height="40" loading="lazy">`
       : `<span class="balneario-none" aria-hidden="true">${value === "nenhum" ? "∅" : "★"}</span>`;
+    if (locked) {
+      return `<button type="button" class="balneario-opt is-locked" disabled aria-disabled="true" title="${text} · por ganhar"><span class="balneario-locked-icon">${icon}</span><span class="balneario-opt-label">${text} · 🔒</span></button>`;
+    }
     return `<button type="button" class="balneario-opt ${on ? "is-on" : ""}" data-cacifo-item="${value}" aria-pressed="${on}" title="${text}">${icon}<span class="balneario-opt-label">${text}</span></button>`;
   }
 
@@ -205,7 +226,7 @@
         <button type="button" class="primary-btn" data-cacifo-save ${state.busy || !dirty ? "disabled" : ""}>${dirty ? "Guardar cacifo" : "Cacifo guardado"}</button>
         ${dirty ? `<button type="button" class="ghost-btn" data-cacifo-undo ${state.busy ? "disabled" : ""}>Desfazer</button>` : ""}
       </div>
-      <p class="muted">Itens de teste: podes vestir qualquer um. Quando houver inventário, só os que tiveres ganho.</p>`;
+      <p class="muted">${state.owned ? "Os níveis ganham-se a jogar: cada item novo aparece aqui quando o ganhas." : "Itens de teste: podes vestir qualquer um."}</p>`;
   }
 
   function html(esc) {
@@ -299,8 +320,14 @@
       }
       state.choice = initialChoice(data);
       state.saved = data ? { ...state.choice } : null;
-      state.eq = cleanEquipped(data?.equipped);
-      state.savedEq = { ...state.eq };
+      state.owned = null;
+      if (state.cacifo) {
+        // Sem a vista owned_items (migracao dos itens por aplicar): modo de teste, tudo disponivel.
+        const { data: items, error: itemsError } = await client.from("owned_items").select("item_id").eq("user_id", user.id);
+        if (!itemsError) state.owned = new Set((items || []).map((r) => r.item_id));
+      }
+      state.savedEq = cleanEquipped(data?.equipped);
+      state.eq = allowedEquipped(state.savedEq, state.owned);
       state.kits = cleanKits(data?.kits);
       state.savedKits = cleanKits(state.kits);
     }
@@ -330,7 +357,7 @@
     }));
     container.querySelectorAll("[data-cacifo-kit]").forEach((b) => b.addEventListener("click", () => {
       const kit = cleanKits(state.kits)[Number(b.dataset.cacifoKit)];
-      if (kit) state.eq = { ...kit.equipped };
+      if (kit) state.eq = allowedEquipped(kit.equipped, state.owned);
       state.message = "";
       paint(container, ctx);
     }));
@@ -398,5 +425,5 @@
   }
 
   return { SKIN, HAIR_SWATCH, SLOTS, TIERS, label, initialChoice, applyChoice, rpcArgs, sameChoice,
-    cleanEquipped, setSlot, clearAll, sameEquipped, cleanKits, addKit, removeKit, cacifoArgs, slotValue, render, reset };
+    cleanEquipped, allowedEquipped, setSlot, clearAll, sameEquipped, cleanKits, addKit, removeKit, cacifoArgs, slotValue, render, reset };
 });

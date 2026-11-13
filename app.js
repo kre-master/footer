@@ -1321,6 +1321,7 @@ async function initRemote() {
   await loadRemoteState();
   await refreshPendingInvite();
   updateAccessUi();
+  checkXpResults();
 }
 
 function getActiveGroup() {
@@ -2807,6 +2808,7 @@ async function submitLoginForm(event) {
     if (currentViewName === "me" && !pendingInvite?.valid) applyLandingRoute();
     render();
     if (pendingInvite?.valid) await acceptPendingInvite();
+    else checkXpResults();
   } finally {
     if (submit) {
       submit.disabled = false;
@@ -3446,6 +3448,7 @@ async function adminLogout() {
   clearBootCache();
   // So neste aparelho: o telemovel e o computador ficam independentes.
   if (supabaseClient) await supabaseClient.auth.signOut({ scope: "local" });
+  globalThis.FooterXP?.reset();
   isAdmin = false;
   currentSession = null;
   currentProfile = null;
@@ -3559,6 +3562,23 @@ function renderFantasyPanel() {
     escapeHtml,
     onCardPortrait: setCardPortrait,
   });
+}
+
+// Resultados do jogo: EXP, nivel e itens ganhos depois de cada jogo verificado (xp-results.js, reward_ledger).
+function xpContext() {
+  return {
+    client: supabaseClient,
+    user: currentSession?.user || null,
+    escapeHtml,
+    // Equipar leva ao Balneario, onde o cacifo mostra o item novo.
+    onEquip: () => showView("fantasy"),
+    onDone: () => { if (currentViewName === "me") renderMePanel(); },
+  };
+}
+
+function checkXpResults() {
+  if (!remoteEnabled || !supabaseClient || !currentSession?.user || !globalThis.FooterXP) return;
+  globalThis.FooterXP.checkNew(xpContext()).catch(() => {});
 }
 
 // Balneario: cada conta escolhe a aparencia do avatar (balneario.js, tabela avatar_profiles).
@@ -11905,6 +11925,7 @@ function renderMePanel() {
   }
   panel.innerHTML = getMePanelHtml();
   bindMeActions(panel);
+  if (remoteEnabled && currentSession?.user) globalThis.FooterXP?.mountChip(panel, xpContext());
 }
 
 async function saveTraitsDraft() {
