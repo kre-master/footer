@@ -1,0 +1,23 @@
+{
+  "job": "meias-1111202784",
+  "slot": "meias",
+  "seed": 1111202784,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, pixel art footballer, same pose, same legs, vintage burgundy ribbed football socks pulled up to just below the knee with a warm cream band near the top, exactly like the socks in the reference, the socks continue down and cover the whole feet, socked feet, no shoes, no boots",
+  "prompt_id": "7928a0c9-c383-4eea-b761-8f2cb485e2ca",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-descalca-m-flat-4fd5b48ea5.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-meias-inteiras-29736ff7bb.png",
+    "ref": "footer-avatar/2026-11-11/ref-meias-atuais-2x-50aa0ece3c.png"
+  },
+  "sha256": {
+    "base": "4fd5b48ea508e1f06ee42bdd313b308893087e1fbf7667874985fb450c8c4944",
+    "mask": "29736ff7bb10ab00012f0e46e79dfd8610c7720d574a2516bde61a8469a057f9",
+    "ref": "50aa0ece3cc30d8b387c806a21cec55eb14f49ab311e6792a1208c1da76b9fef"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794428367.7893598
+}

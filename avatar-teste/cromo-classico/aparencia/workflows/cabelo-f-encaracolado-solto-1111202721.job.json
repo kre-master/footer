@@ -1,0 +1,21 @@
+{
+  "job": "cabelo-f-encaracolado-solto-1111202721",
+  "slot": "cabelo-f-encaracolado-solto",
+  "seed": 1111202721,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, loose curly dark brown hair falling to the shoulders, the face and the body unchanged",
+  "prompt_id": "59d6045f-6b3d-41e0-ab73-8ad87576fa46",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-rapada-f-flat-81c63750c8.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-penteado-f-93316894de.png"
+  },
+  "sha256": {
+    "base": "81c63750c8e759179354c788c0d32a938a21ff1016f8e512e60ac218ab5ca91a",
+    "mask": "93316894de4a0d6cc9962374937f22d5dda5efee3e0338391accac50889f13b1"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794423466.1255083
+}

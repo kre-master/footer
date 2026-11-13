@@ -1,0 +1,12 @@
+{
+  "klein": {
+    "trabalhos": 10,
+    "media_segundos": 16.6,
+    "vram_pico_gb": 15.23
+  },
+  "kontext": {
+    "trabalhos": 10,
+    "media_segundos": 15.1,
+    "vram_pico_gb": 15.61
+  }
+}

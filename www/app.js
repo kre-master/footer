@@ -3529,7 +3529,10 @@ function showView(viewName, options = {}) {
   if (viewName === "owner") loadOwnerPanel();
   if (viewName === "me") renderMePanel();
   if (viewName === "search") renderSearchPanel();
-  if (viewName === "fantasy") renderFantasyPanel();
+  if (viewName === "fantasy") {
+    renderBalneario();
+    renderFantasyPanel();
+  }
   renderGroupBanner();
   playCascade(document.querySelector(`#view-${viewName}`));
   if (viewName === "today") {
@@ -3555,6 +3558,22 @@ function renderFantasyPanel() {
     defaultName: getLinkedPlayer()?.name || "",
     escapeHtml,
     onCardPortrait: setCardPortrait,
+  });
+}
+
+// Balneario: cada conta escolhe a aparencia do avatar (balneario.js, tabela avatar_profiles).
+function renderBalneario() {
+  const panel = document.querySelector("#balneario-panel");
+  if (!panel || !globalThis.FooterBalneario) return;
+  globalThis.FooterBalneario.render(panel, {
+    client: remoteEnabled ? supabaseClient : null,
+    user: currentSession?.user || null,
+    escapeHtml,
+    onSaved: (userId, row) => {
+      if (row?.user_id) cardAvatarProfiles.set(row.user_id, row);
+      renderFantasyPanel();
+      if (cardAvatarUsers.has(userId)) render();
+    },
   });
 }
 

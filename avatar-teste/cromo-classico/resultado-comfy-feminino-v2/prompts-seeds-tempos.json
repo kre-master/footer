@@ -1,0 +1,68 @@
+[
+  {
+    "peca": "calcoes",
+    "seed": 1111202681,
+    "segundos": 74.043,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband, high waistband reaching up to the jersey hem, the shorts fully cover the underwear, women's fit, worn by an athletic female footballer"
+  },
+  {
+    "peca": "calcoes",
+    "seed": 1111202695,
+    "segundos": 73.319,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband, high waistband reaching up to the jersey hem, the shorts fully cover the underwear, women's fit, worn by an athletic female footballer"
+  },
+  {
+    "peca": "camisola",
+    "seed": 1111202682,
+    "segundos": 76.405,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest, the jersey is long and tucked in, its ribbed burgundy hem reaches down over the waist, women's fit, worn by an athletic female footballer"
+  },
+  {
+    "peca": "camisola",
+    "seed": 1111202695,
+    "segundos": 74.636,
+    "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest, the jersey is long and tucked in, its ribbed burgundy hem reaches down over the waist, women's fit, worn by an athletic female footballer"
+  },
+  {
+    "peca": "manequim-f",
+    "seed": 1111202691,
+    "segundos": 60.099,
+    "prompt": "pixel art female footballer mannequin, exactly the same pose, same height and same scale, arms relaxed at the same angle, slim fit woman, toned and shapely but not muscular, slender smooth arms and legs with no visible muscle definition, smooth flat stomach without a six-pack, slightly wider hips and narrower shoulders, natural feminine curves, feminine face with small eyes the same small size as a man's eyes in this pixel art style, calm expression, dark brown hair tied up in a high bun on top of the head, no hair on the shoulders, wearing only a plain white sports bra top and plain white briefs, same warm tan skin tone, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim-f",
+    "seed": 1111202692,
+    "segundos": 58.901,
+    "prompt": "pixel art female footballer mannequin, exactly the same pose, same height and same scale, arms relaxed at the same angle, slim fit woman, toned and shapely but not muscular, slender smooth arms and legs with no visible muscle definition, smooth flat stomach without a six-pack, slightly wider hips and narrower shoulders, natural feminine curves, feminine face with small eyes the same small size as a man's eyes in this pixel art style, calm expression, dark brown hair tied up in a high bun on top of the head, no hair on the shoulders, wearing only a plain white sports bra top and plain white briefs, same warm tan skin tone, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim-f",
+    "seed": 1111202693,
+    "segundos": 58.878,
+    "prompt": "pixel art female footballer mannequin, exactly the same pose, same height and same scale, arms relaxed at the same angle, slim fit woman, toned and shapely but not muscular, slender smooth arms and legs with no visible muscle definition, smooth flat stomach without a six-pack, slightly wider hips and narrower shoulders, natural feminine curves, feminine face with small eyes the same small size as a man's eyes in this pixel art style, calm expression, dark brown hair tied up in a high bun on top of the head, no hair on the shoulders, wearing only a plain white sports bra top and plain white briefs, same warm tan skin tone, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "manequim-f",
+    "seed": 1111202694,
+    "segundos": 58.833,
+    "prompt": "pixel art female footballer mannequin, exactly the same pose, same height and same scale, arms relaxed at the same angle, slim fit woman, toned and shapely but not muscular, slender smooth arms and legs with no visible muscle definition, smooth flat stomach without a six-pack, slightly wider hips and narrower shoulders, natural feminine curves, feminine face with small eyes the same small size as a man's eyes in this pixel art style, calm expression, dark brown hair tied up in a high bun on top of the head, no hair on the shoulders, wearing only a plain white sports bra top and plain white briefs, same warm tan skin tone, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background"
+  },
+  {
+    "peca": "olhos",
+    "seed": 1111202701,
+    "segundos": 49.975,
+    "prompt": "pixel art, the same young woman's face, same skin, same nose and mouth, redraw only the eyes and eyebrows: small narrow eyes drawn exactly in the same pixel style and the same small size as the reference man's eyes, a thin dark upper eyelid line, a small dark brown iris, very little white, calm natural expression, slim dark eyebrows, no anime eyes, no eyelashes blocks, warm low-colour shading, crisp pixels"
+  },
+  {
+    "peca": "olhos",
+    "seed": 1111202702,
+    "segundos": 48.306,
+    "prompt": "pixel art, the same young woman's face, same skin, same nose and mouth, redraw only the eyes and eyebrows: small narrow eyes drawn exactly in the same pixel style and the same small size as the reference man's eyes, a thin dark upper eyelid line, a small dark brown iris, very little white, calm natural expression, slim dark eyebrows, no anime eyes, no eyelashes blocks, warm low-colour shading, crisp pixels"
+  },
+  {
+    "peca": "olhos",
+    "seed": 1111202703,
+    "segundos": 48.315,
+    "prompt": "pixel art, the same young woman's face, same skin, same nose and mouth, redraw only the eyes and eyebrows: small narrow eyes drawn exactly in the same pixel style and the same small size as the reference man's eyes, a thin dark upper eyelid line, a small dark brown iris, very little white, calm natural expression, slim dark eyebrows, no anime eyes, no eyelashes blocks, warm low-colour shading, crisp pixels"
+  }
+]

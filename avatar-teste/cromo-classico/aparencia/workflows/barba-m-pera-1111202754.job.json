@@ -1,0 +1,21 @@
+{
+  "job": "barba-m-pera-1111202754",
+  "slot": "barba-m-pera",
+  "seed": 1111202754,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, same man, same face shape, eyes, nose and mouth, dark brown facial hair: a small pointed goatee on the chin only, the rest of the face clean-shaven, no moustache, no jaw beard",
+  "prompt_id": "b40a1005-ea6a-4703-807a-5eaa4f56a74e",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-rapada-m-sem-bigode-flat-5f9c0b4374.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-barba-m-pera-0441174b99.png"
+  },
+  "sha256": {
+    "base": "5f9c0b43745aa503a4bcb650f5669527e4f34b291fab9d0f07d447ea528fc24d",
+    "mask": "0441174b990497945f601e6baa14a12f3bad525a778e0d83eb5c68dde8c43cf3"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794426583.1470435
+}

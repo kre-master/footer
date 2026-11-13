@@ -1,0 +1,23 @@
+{
+  "job": "gola-1111202642",
+  "slot": "gola",
+  "seed": 1111202642,
+  "prompt": "pixel art footballer, same pose, vintage burgundy polo jersey with thin gold pinstripes, the ribbed polo collar and the cuff stripes are warm cream (soft ivory beige, like old parchment), clearly not white and not pink, same shapes, dark stepped outlines, warm low-colour shading, crisp pixels",
+  "prompt_id": "bb4e7a50-c359-49d4-a104-2b813cf78013",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-vestido-v2-flat-16c6faa84c.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-gola-punhos-255800a89b.png",
+    "icon": "footer-avatar/2026-11-11/icone-camisola-6b3a650b27.png"
+  },
+  "sha256": {
+    "base": "16c6faa84c3022091b3002a7f5fe4e5a38a8eee03d8a87f7b250bfa4bb573cb6",
+    "mask": "255800a89b84bbdbceb78cd0cd565da36d5790858b4464df861197ee35d33dfd",
+    "icon": "6b3a650b27ea0a4917e1eb6c5de0b1dd926e56320c5a02694c818c29dacd18ff"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794413911.1930714
+}

@@ -1,0 +1,25 @@
+{
+  "job": "calcoes-1111202621",
+  "slot": "calcoes",
+  "seed": 1111202621,
+  "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing navy football shorts with cream side stripes and burgundy waistband, high waistband reaching up to the jersey hem, the shorts fully cover the underwear",
+  "prompt_id": "024984b7-6e99-4062-ac15-9a2a287ce171",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/manequim-v2-flat-2x-e6d9324790.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-calcoes-v2-28cb38c1bd.png",
+    "player": "footer-avatar/2026-11-11/jogador-flat-2x-ed4a9ad1e7.png",
+    "icon": "footer-avatar/2026-11-11/icone-calcoes-66c3208f5a.png"
+  },
+  "sha256": {
+    "base": "e6d93247905c184140e6c67d992656d50217b834bcbf86cb3bec2f3b32848f37",
+    "mask": "28cb38c1bd21da98bfb67a1b8765a451e9510d69d836b7de686d5a5815f29b5a",
+    "player": "ed4a9ad1e7827c7fd452ae9c0f8fc7c7d7a72c7be6aa3d915a0b287b4fe20a8b",
+    "icon": "66c3208f5aac07283ac37c8d2002d47f72b61949377a4b7fdc7296f80f9ff866"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794409498.9626915
+}

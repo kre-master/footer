@@ -1,0 +1,21 @@
+{
+  "job": "base-f-1111202713",
+  "slot": "base-f",
+  "seed": 1111202713,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, same woman, her hair is shaved very short, a close buzz cut with dark stubble showing the round head shape, same ears, no bun",
+  "prompt_id": "de8298fc-f9a3-418f-83ec-110bfe3c220a",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-f-sem-cabelo-prefill-2f101cc33a.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-cabelo-atual-f-49111e2a58.png"
+  },
+  "sha256": {
+    "base": "2f101cc33ad0f5cc69a6004837a66d8684ab1c9ba11308513c7140c1a6d12233",
+    "mask": "49111e2a5806b4d416f6b85031cf4b0783c4324343e8f9f22f26f3ddde35b7a7"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794423341.437003
+}

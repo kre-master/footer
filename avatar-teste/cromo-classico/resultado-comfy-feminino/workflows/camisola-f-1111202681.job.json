@@ -1,0 +1,25 @@
+{
+  "job": "camisola-f-1111202681",
+  "slot": "camisola",
+  "seed": 1111202681,
+  "prompt": "pixel art footballer, same pose, same body, same face and skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, wearing a vintage burgundy polo jersey with thin gold vertical pinstripes, cream ribbed collar and cream cuff stripes, short sleeves, small crest on the chest, the jersey is long and tucked in, its ribbed burgundy hem reaches down over the waist, women's fit, worn by an athletic female footballer",
+  "prompt_id": "7224f7d8-bf0d-4537-b36c-1b8216689524",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-manequim-f-flat-b543199d38.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-camisola-f-2db2107f9a.png",
+    "player": "footer-avatar/2026-11-11/jogador-flat-2x-ed4a9ad1e7.png",
+    "icon": "footer-avatar/2026-11-11/icone-camisola-6b3a650b27.png"
+  },
+  "sha256": {
+    "base": "b543199d38c26cc38ed77cc2b767015a6b93fddf749bef2b5c365fee179f4dbf",
+    "mask": "2db2107f9a8a0d4b8621ebd469461dccad2bd19200e55f06f0609d7c605eac8f",
+    "player": "ed4a9ad1e7827c7fd452ae9c0f8fc7c7d7a72c7be6aa3d915a0b287b4fe20a8b",
+    "icon": "6b3a650b27ea0a4917e1eb6c5de0b1dd926e56320c5a02694c818c29dacd18ff"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794416183.9590344
+}

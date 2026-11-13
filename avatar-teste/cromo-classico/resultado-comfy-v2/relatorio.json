@@ -1,0 +1,30 @@
+{
+  "escolhidas": {
+    "camisola": 1111202621,
+    "calcoes": 1111202621,
+    "meias-chuteiras": 1111202601,
+    "manequim": 1111202612
+  },
+  "webp_kb": {
+    "manequim": 248.1,
+    "camisola": 64.1,
+    "calcoes": 34.2,
+    "meias-chuteiras": 42.1,
+    "composicao": 273.1,
+    "metade": 82.2,
+    "busto": 14.1
+  },
+  "png_kb": {
+    "manequim": 482.2,
+    "camisola": 93.7,
+    "calcoes": 54.4,
+    "meias-chuteiras": 66.3,
+    "composicao": 382.1
+  },
+  "pixels_de_manequim_a_vista_na_cintura": 195,
+  "diferenca_max_fora_da_camada": {
+    "camisola": 0,
+    "calcoes": 0,
+    "meias-chuteiras": 0
+  }
+}

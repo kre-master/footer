@@ -1,0 +1,42 @@
+{
+  "masculino": {
+    "tela": "512x1024",
+    "centro_cabeca": [
+      290,
+      78
+    ],
+    "caixa_cabeca": [
+      236,
+      20,
+      344,
+      136
+    ],
+    "busto_256": [
+      162,
+      0,
+      418,
+      256
+    ],
+    "nota": "busto: recortar a caixa busto_256 da tela 512x1024 e reduzir para 128x128; em meia escala (256x512) dividir as coordenadas por 2"
+  },
+  "feminino": {
+    "tela": "512x1024",
+    "centro_cabeca": [
+      256,
+      122
+    ],
+    "caixa_cabeca": [
+      207,
+      62,
+      305,
+      182
+    ],
+    "busto_256": [
+      128,
+      0,
+      384,
+      256
+    ],
+    "nota": "busto: recortar a caixa busto_256 da tela 512x1024 e reduzir para 128x128; em meia escala (256x512) dividir as coordenadas por 2"
+  }
+}

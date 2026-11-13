@@ -1,0 +1,21 @@
+{
+  "job": "cabelo2-m-comprido-apanhado-1111202764",
+  "slot": "cabelo2-m-comprido-apanhado",
+  "seed": 1111202764,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, long dark brown hair combed straight back from the forehead with volume on top, covering the whole top of the head, gathered into a ponytail at the back of the head, the ponytail hangs behind the head and the neck, not on the side, the face and the body unchanged",
+  "prompt_id": "85d62707-ebf1-4317-83de-dc47d280d7ed",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-careca-m-flat-320db0a06c.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-penteado-m-747811374e.png"
+  },
+  "sha256": {
+    "base": "320db0a06c69009bc826fe403e92855bf2388969966ee3ef8ace23b35c10b7d9",
+    "mask": "747811374e203de71ea28983569c571e717665d7fe91680b47cfecaf69319550"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794426620.532421
+}

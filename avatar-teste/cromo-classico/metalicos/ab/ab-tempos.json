@@ -1,0 +1,102 @@
+{
+  "klein-gear-shirts-03-icone-1111202901": {
+    "segundos": 37.251,
+    "vram_pico_gb": 13.42,
+    "estado": "success"
+  },
+  "klein-gear-shirts-03-icone-1111202902": {
+    "segundos": 14.216,
+    "vram_pico_gb": 12.36,
+    "estado": "success"
+  },
+  "klein-gear-shirts-03-vestido-1111202901": {
+    "segundos": 23.07,
+    "vram_pico_gb": 14.48,
+    "estado": "success"
+  },
+  "klein-gear-shirts-03-vestido-1111202902": {
+    "segundos": 21.732,
+    "vram_pico_gb": 12.03,
+    "estado": "success"
+  },
+  "klein-gear-boots-04-icone-1111202901": {
+    "segundos": 14.414,
+    "vram_pico_gb": 14.59,
+    "estado": "success"
+  },
+  "klein-gear-boots-04-icone-1111202902": {
+    "segundos": 13.479,
+    "vram_pico_gb": 13.76,
+    "estado": "success"
+  },
+  "klein-gear-boots-04-vestido-1111202901": {
+    "segundos": 0.025,
+    "vram_pico_gb": 11.51,
+    "estado": "success"
+  },
+  "klein-gear-boots-04-vestido-1111202902": {
+    "segundos": 14.991,
+    "vram_pico_gb": 12.81,
+    "estado": "success"
+  },
+  "klein-gear-pennants-06-icone-1111202901": {
+    "segundos": 13.643,
+    "vram_pico_gb": 15.23,
+    "estado": "success"
+  },
+  "klein-gear-pennants-06-icone-1111202902": {
+    "segundos": 12.889,
+    "vram_pico_gb": 13.55,
+    "estado": "success"
+  },
+  "kontext-gear-shirts-03-icone-1111202901": {
+    "segundos": 15.2,
+    "vram_pico_gb": 15.21,
+    "estado": "success"
+  },
+  "kontext-gear-shirts-03-icone-1111202902": {
+    "segundos": 11.583,
+    "vram_pico_gb": 14.68,
+    "estado": "success"
+  },
+  "kontext-gear-shirts-03-vestido-1111202901": {
+    "segundos": 21.733,
+    "vram_pico_gb": 15.33,
+    "estado": "success"
+  },
+  "kontext-gear-shirts-03-vestido-1111202902": {
+    "segundos": 19.474,
+    "vram_pico_gb": 14.88,
+    "estado": "success"
+  },
+  "kontext-gear-boots-04-icone-1111202901": {
+    "segundos": 14.923,
+    "vram_pico_gb": 15.55,
+    "estado": "success"
+  },
+  "kontext-gear-boots-04-icone-1111202902": {
+    "segundos": 11.254,
+    "vram_pico_gb": 14.72,
+    "estado": "success"
+  },
+  "kontext-gear-boots-04-vestido-1111202901": {
+    "segundos": 17.4,
+    "vram_pico_gb": 15.61,
+    "estado": "success"
+  },
+  "kontext-gear-boots-04-vestido-1111202902": {
+    "segundos": 13.871,
+    "vram_pico_gb": 14.7,
+    "estado": "success"
+  },
+  "kontext-gear-pennants-06-icone-1111202901": {
+    "segundos": 13.609,
+    "vram_pico_gb": 15.22,
+    "estado": "success"
+  },
+  "kontext-gear-pennants-06-icone-1111202902": {
+    "segundos": 11.524,
+    "vram_pico_gb": 14.74,
+    "estado": "success"
+  }
+}

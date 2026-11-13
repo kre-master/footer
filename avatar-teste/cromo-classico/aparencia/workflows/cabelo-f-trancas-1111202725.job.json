@@ -1,0 +1,21 @@
+{
+  "job": "cabelo-f-trancas-1111202725",
+  "slot": "cabelo-f-trancas",
+  "seed": 1111202725,
+  "prompt": "pixel art footballer, same face, same eyes, same skin, dark stepped outlines, warm low-colour shading, crisp pixels, plain flat beige background, two long thick dark brown braids, one on each side, hanging down in front of the shoulders to the chest, hair on top tightly braided back, the face and the body unchanged",
+  "prompt_id": "02ab9878-0b2d-4be9-8f4c-a096cb10f99a",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-base-rapada-f-flat-81c63750c8.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-penteado-f-trancas-5981c23908.png"
+  },
+  "sha256": {
+    "base": "81c63750c8e759179354c788c0d32a938a21ff1016f8e512e60ac218ab5ca91a",
+    "mask": "5981c239088aa1a78b7f1668ecb0819d2c7224aa6b9ac16285fffbcd4a6e4a17"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794424099.3841934
+}

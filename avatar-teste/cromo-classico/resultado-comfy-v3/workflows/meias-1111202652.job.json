@@ -1,0 +1,23 @@
+{
+  "job": "meias-1111202652",
+  "slot": "meias",
+  "seed": 1111202652,
+  "prompt": "pixel art footballer, same pose, ribbed burgundy football socks pulled up below the knee with a band of warm cream (soft ivory beige, like old parchment), clearly not white and not pink near the top, the same cream as the jersey collar, dark stepped outlines, warm low-colour shading, crisp pixels",
+  "prompt_id": "2b08b9a2-95d5-42e6-82bc-7707a8cc209e",
+  "inputs": {
+    "base": "footer-avatar/2026-11-11/2x-vestido-v2-flat-16c6faa84c.png",
+    "mask": "footer-avatar/2026-11-11/2x-mascara-meias-a2f7c7320e.png",
+    "player": "footer-avatar/2026-11-11/jogador-flat-2x-ed4a9ad1e7.png"
+  },
+  "sha256": {
+    "base": "16c6faa84c3022091b3002a7f5fe4e5a38a8eee03d8a87f7b250bfa4bb573cb6",
+    "mask": "a2f7c7320e97561dcf9d0885d8208a51aba92945f9e7b77b379cc03102c869c0",
+    "player": "ed4a9ad1e7827c7fd452ae9c0f8fc7c7d7a72c7be6aa3d915a0b287b4fe20a8b"
+  },
+  "width": 768,
+  "height": 2048,
+  "steps": 20,
+  "cfg": 5.0,
+  "model": "flux-2-klein-base-4b-fp8.safetensors",
+  "submitted_at_unix": 1794413911.3988533
+}
