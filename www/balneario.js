@@ -168,7 +168,7 @@
   // ---------------------------------------------------------------------------
 
   const state = { userId: undefined, saved: null, choice: null, busy: false, message: "",
-    cacifo: false, owned: null, eq: {}, savedEq: {}, kits: [], savedKits: [], slot: "camisola" };
+    cacifo: false, owned: null, progress: null, editing: false, eq: {}, savedEq: {}, kits: [], savedKits: [], slot: "camisola" };
 
   function optionButton(key, value, current, inner, text) {
     const on = String(current) === String(value);
@@ -229,26 +229,13 @@
       <p class="muted">${state.owned ? "Os níveis ganham-se a jogar: cada item novo aparece aqui quando o ganhas." : "Itens de teste: podes vestir qualquer um."}</p>`;
   }
 
-  function html(esc) {
+  function appearanceHtml(esc) {
     const F = avatarApi();
     const A = F.AVATAR;
     const c = state.choice;
     const bust = (over) => F.avatarHtml({ ...c, ...over }, { bust: 56 });
     const dirty = !state.saved || !sameChoice(c, state.saved);
-    const worn = { ...c, equipped: state.eq };
     return `
-      <div class="panel-head">
-        <div>
-          <p class="eyebrow">Balneário</p>
-          <h2>A tua aparência</h2>
-        </div>
-      </div>
-      <div class="balneario">
-        <div class="balneario-stage">
-          ${F.avatarHtml(worn, { width: 128 })}
-          ${F.avatarHtml(worn, { bust: 64 })}
-        </div>
-        <div class="balneario-controls">
           <fieldset class="balneario-group">
             <legend>Silhueta</legend>
             <div class="balneario-row">
@@ -285,9 +272,43 @@
             <button type="button" class="primary-btn" data-balneario-save ${state.busy || !dirty ? "disabled" : ""}>${dirty ? "Guardar aparência" : "Aparência guardada"}</button>
             ${dirty && state.saved ? `<button type="button" class="ghost-btn" data-balneario-undo ${state.busy ? "disabled" : ""}>Desfazer</button>` : ""}
           </div>
+          <p class="muted">A aparência é grátis e podes mudá-la quando quiseres. Aparece na liga fantasia e na tua carta, se escolheres "Avatar".</p>`;
+  }
+
+  function xpHtml() {
+    const p = state.progress;
+    if (!p) return "";
+    const span = Math.max(1, p.next - p.start);
+    const pct = p.next > p.start ? Math.min(100, Math.round(((p.total - p.start) / span) * 100)) : 100;
+    return `<div class="balneario-xp"><div class="balneario-xp-row"><span>Nível <b>${p.level}</b></span><span>${p.next > p.start ? `${p.total - p.start} / ${span} EXP` : `${p.total} EXP`}</span></div><div class="balneario-xp-bar" role="progressbar" aria-label="Progresso do nível" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div style="width:${pct}%"></div></div></div>`;
+  }
+
+  function html(esc) {
+    const F = avatarApi();
+    const A = F.AVATAR;
+    const c = state.choice;
+    const bust = (over) => F.avatarHtml({ ...c, ...over }, { bust: 56 });
+    const dirty = !state.saved || !sameChoice(c, state.saved);
+    const worn = { ...c, equipped: state.eq };
+    const showAppearance = !state.saved || state.editing;
+    return `
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Balneário</p>
+          <h2>${state.saved ? "O teu balneário" : "A tua aparência"}</h2>
+        </div>
+        ${state.saved ? `<button type="button" class="ghost-btn balneario-edit" data-balneario-edit aria-expanded="${state.editing ? "true" : "false"}">${state.editing ? "Fechar aparência" : "Aparência"}</button>` : ""}
+      </div>
+      <div class="balneario">
+        <div class="balneario-stage">
+          ${F.avatarHtml(worn, { width: 128 })}
+          ${F.avatarHtml(worn, { bust: 64 })}
+        </div>
+        <div class="balneario-controls">
+          ${xpHtml()}
+          ${showAppearance ? appearanceHtml(esc) : ""}
           ${state.message ? `<p class="fantasy-message" role="status">${esc(state.message)}</p>` : ""}
           ${cacifoHtml(esc)}
-          <p class="muted">A aparência é grátis e podes mudá-la quando quiseres. Aparece na liga fantasia e na tua carta, se escolheres "Avatar".</p>
         </div>
       </div>`;
   }
@@ -321,6 +342,12 @@
       state.choice = initialChoice(data);
       state.saved = data ? { ...state.choice } : null;
       state.owned = null;
+      state.editing = false;
+      state.progress = null;
+      {
+        const { data: xp } = await client.from("my_progress").select("total_xp, level, level_start_xp, next_level_xp").eq("user_id", user.id).maybeSingle();
+        if (xp) state.progress = { total: Number(xp.total_xp) || 0, level: Number(xp.level) || 1, start: Number(xp.level_start_xp) || 0, next: Number(xp.next_level_xp) || 0 };
+      }
       if (state.cacifo) {
         // Sem a vista owned_items (migracao dos itens por aplicar): modo de teste, tudo disponivel.
         const { data: items, error: itemsError } = await client.from("owned_items").select("item_id").eq("user_id", user.id);
@@ -341,6 +368,12 @@
       state.message = "";
       paint(container, ctx);
     }));
+    container.querySelector("[data-balneario-edit]")?.addEventListener("click", () => {
+      state.editing = !state.editing;
+      if (!state.editing && state.saved) state.choice = { ...state.saved };
+      state.message = "";
+      paint(container, ctx);
+    });
     container.querySelector("[data-balneario-undo]")?.addEventListener("click", () => {
       state.choice = { ...state.saved };
       state.message = "";
@@ -406,6 +439,7 @@
         state.message = `Não foi possível guardar (${error.message || error}).`;
       } else {
         state.saved = { ...state.choice };
+        state.editing = false;
         state.message = "Aparência guardada.";
         ctx.onSaved?.(ctx.user.id, data);
       }
@@ -422,6 +456,8 @@
     state.savedEq = {};
     state.kits = [];
     state.savedKits = [];
+    state.progress = null;
+    state.editing = false;
   }
 
   return { SKIN, HAIR_SWATCH, SLOTS, TIERS, label, initialChoice, applyChoice, rpcArgs, sameChoice,

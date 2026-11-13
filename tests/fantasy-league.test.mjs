@@ -101,6 +101,15 @@ test("avatar: camadas pela ordem do manifesto e rapado sem cabelo", () => {
   assert.ok(!f.some((src) => src.startsWith("barba/")));
 });
 
+test("avatar: a base masculina leva o cabelo rente na cor escolhida por baixo do penteado", () => {
+  const src = (a) => F.avatarLayers({ tone: 3, beard: "sem", ...a }).map((l) => l.src);
+  assert.deepEqual(src({ sx: "m", hair: "rapado", color: "loiro" }).filter((x) => x.startsWith("cabelo/")), ["cabelo/m-base-loiro.webp"]);
+  const curly = src({ sx: "m", hair: "encaracolado", color: "ruivo" }).filter((x) => x.startsWith("cabelo/"));
+  assert.deepEqual(curly, ["cabelo/m-base-ruivo.webp", "cabelo/m-encaracolado-ruivo.webp"]);
+  assert.ok(!src({ sx: "m", hair: "encaracolado", color: "preto" }).some((x) => x.includes("m-base-")));
+  assert.ok(!src({ sx: "f", hair: "coque", color: "loiro" }).some((x) => x.includes("-base-")));
+});
+
 test("avatar: todos os ficheiros usados existem", async () => {
   const { access } = await import("node:fs/promises");
   for (const sx of ["m", "f"]) {

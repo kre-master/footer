@@ -8753,6 +8753,11 @@ body.boot-refreshing::before {
 .balneario-opt img { image-rendering: pixelated; }
 .balneario-opt.is-locked { opacity: .55; cursor: not-allowed; }
 .balneario-locked-icon { display: inline-grid; filter: grayscale(1); }
+.balneario-edit { margin-left: auto; }
+.balneario-xp { display: grid; gap: 4px; padding: 8px 10px; border: 2px solid var(--line-strong); border-radius: 10px; background: var(--surface); }
+.balneario-xp-row { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; }
+.balneario-xp-bar { height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); overflow: hidden; }
+.balneario-xp-bar > div { height: 100%; background: var(--cad-red, var(--accent)); }
 .balneario-none { display: inline-grid; place-items: center; width: 40px; height: 40px; font-size: 1.4rem; }
 .balneario-kit { display: inline-flex; align-items: stretch; gap: 2px; }
 .balneario-kit-del { min-width: 32px; border: 2px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 1rem; cursor: pointer; }
@@ -8810,3 +8815,6 @@ body.boot-refreshing::before {
 .xpr-chipcard-bar span { display: block; height: 100%; background: var(--accent); }
 .xpr-chipcard-xp { grid-column: 1 / -1; font-size: 12px; font-weight: 700; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .xpr-line, .xpr-fill { transition: none; } .xpr-pop { animation: none; } }
+
+.subtab[hidden] { display: none; }
+.no-fantasy .xpr-equip { display: none; }
