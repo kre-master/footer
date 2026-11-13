@@ -1457,6 +1457,7 @@ async function loadAccountState() {
   if (!supabaseClient) return;
   const { data } = await supabaseClient.auth.getSession();
   currentSession = data?.session || null;
+  syncFantasyAccess();
   if (!currentSession?.user) return;
 
   const user = currentSession.user;
@@ -3490,8 +3491,22 @@ const VIEW_GROUPS = {
 };
 let currentTabGroup = "me";
 
+// A Liga fantasia e o Balneario estao em teste: so aparecem a estas contas (ids de utilizador).
+const FANTASY_TESTER_IDS = ["5bf492ca-0db5-41f7-96d4-94149168cbbe"];
+
+function isFantasyTester() {
+  return FANTASY_TESTER_IDS.includes(currentSession?.user?.id);
+}
+
+function syncFantasyAccess() {
+  document.querySelectorAll('.subtab[data-view="fantasy"]').forEach((button) => { button.hidden = !isFantasyTester(); });
+  document.body.classList.toggle("no-fantasy", !isFantasyTester());
+}
+
 function showView(viewName, options = {}) {
   if (viewName === "owner" && !isPlatformAdmin) viewName = "me";
+  syncFantasyAccess();
+  if (viewName === "fantasy" && !isFantasyTester()) viewName = "events";
   // "O meu mes" vive agora no perfil do proprio jogador, no periodo deste mes.
   const linkedForMonthly = viewName === "monthly" ? getLinkedPlayer() : null;
   if (linkedForMonthly) {
@@ -3570,7 +3585,7 @@ function xpContext() {
     client: supabaseClient,
     user: currentSession?.user || null,
     escapeHtml,
-    // Equipar leva ao Balneario, onde o cacifo mostra o item novo.
+    // Equipar leva ao Balneario, onde o cacifo mostra o item novo (so contas de teste).
     onEquip: () => showView("fantasy"),
     onDone: () => { if (currentViewName === "me") renderMePanel(); },
   };

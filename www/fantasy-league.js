@@ -186,6 +186,8 @@
     ];
     const beard = sx === "m" ? app.beard || "bigode" : "sem";
     if (beard !== "sem") layers.push({ src: `barba/m-${beard}-${app.beardColor || app.color}.webp` });
+    // A base masculina traz cabelo rente a preto: noutras cores pinta-se por baixo do penteado (e e o proprio rapado).
+    if (sx === "m" && app.color !== "preto") layers.push({ src: `cabelo/m-base-${app.color}.webp` });
     if (!(sx === "m" && app.hair === "rapado")) layers.push({ src: `cabelo/${sx}-${app.hair}-${app.color}.webp` });
     layers.push(slotLayer("bola", sx, eq, { src: "kit/bola.webp", box: [212, 462, 40, 40] }));
     return layers.filter(Boolean);
