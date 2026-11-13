@@ -56,3 +56,51 @@ test("listas da app batem certo com as da migracao", () => {
 test("todos os penteados e barbas tem nome legivel", () => {
   for (const h of [...A.hair.m, ...A.hair.f, ...A.beards]) assert.notEqual(B.label(h), h);
 });
+
+// Cacifo: itens vestidos e kits (2026-11-13), iguais as regras da migracao avatar-cacifo.
+const cacifoSql = (await readFile(new URL("../supabase/avatar-cacifo-migration.sql", import.meta.url), "utf8")).replaceAll("\r\n", "\n");
+
+test("vestir um item troca a camada, origem apaga a chave e nenhum poe null", () => {
+  let eq = B.setSlot({}, "camisola", "gear-camisola-06");
+  assert.deepEqual(eq, { camisola: "gear-camisola-06" });
+  eq = B.setSlot(eq, "meias", "nenhum");
+  assert.deepEqual(eq, { camisola: "gear-camisola-06", meias: null });
+  eq = B.setSlot(eq, "camisola", "origem");
+  assert.deepEqual(eq, { meias: null });
+  assert.equal(B.slotValue(eq, "camisola"), "origem");
+  assert.equal(B.slotValue(eq, "meias"), "nenhum");
+});
+
+test("ids invalidos ou de outro slot nao entram", () => {
+  assert.deepEqual(B.setSlot({}, "meias", "gear-camisola-01"), {});
+  assert.deepEqual(B.setSlot({}, "bola", "gear-bola-07"), {});
+  assert.deepEqual(B.setSlot({}, "capa", "gear-capa-01"), {});
+  assert.deepEqual(B.cleanEquipped({ camisola: "x", bola: "gear-bola-02", capa: null }), { bola: "gear-bola-02" });
+  assert.deepEqual(B.cleanEquipped([1]), {});
+});
+
+test("tirar tudo poe os 6 slots a null", () => {
+  const all = B.clearAll();
+  assert.equal(Object.keys(all).length, 6);
+  assert.ok(Object.values(all).every((v) => v === null));
+});
+
+test("kits: guardar da nome novo, apagar e limite de 8", () => {
+  let kits = B.addKit([], { camisola: "gear-camisola-03" });
+  kits = B.addKit(kits, {});
+  assert.deepEqual(kits.map((k) => k.nome), ["Kit 1", "Kit 2"]);
+  kits = B.removeKit(kits, 0);
+  kits = B.addKit(kits, {});
+  assert.deepEqual(kits.map((k) => k.nome), ["Kit 2", "Kit 3"]);
+  for (let i = 0; i < 12; i += 1) kits = B.addKit(kits, {});
+  assert.equal(kits.length, 8);
+});
+
+test("a rpc do cacifo recebe so dados limpos e a migracao tem as mesmas regras", () => {
+  const args = B.cacifoArgs({ camisola: "gear-camisola-01", lixo: 1 }, [{ nome: "  A  ", equipped: { bola: null } }]);
+  assert.deepEqual(args, { p_equipped: { camisola: "gear-camisola-01" }, p_kits: [{ nome: "A", equipped: { bola: null } }] });
+  for (const { key } of B.SLOTS) assert.ok(cacifoSql.includes(`'${key}'`), key);
+  assert.ok(cacifoSql.includes("<= 8"));
+  assert.ok(cacifoSql.includes("between 1 and 24"));
+  assert.equal(B.TIERS.length, 6);
+});
