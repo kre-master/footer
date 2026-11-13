@@ -141,6 +141,7 @@
       color: AVATAR.colors.includes(row.hair_color) ? row.hair_color : d.color,
     };
     if (sx === "m") app.beard = AVATAR.beards.includes(row.facial_hair) ? row.facial_hair : "bigode";
+    if (row.equipped && typeof row.equipped === "object" && !Array.isArray(row.equipped)) app.equipped = row.equipped;
     return app;
   }
 
@@ -155,21 +156,35 @@
       ...(sx === "m" ? { beard: pick(AVATAR.approved.beards, h >>> 17) } : {}) };
   }
 
+  // Itens equipados (avatar_profiles.equipped, slot -> "gear-<slot>-0N"): chave em falta = kit Cromo
+  // classico de origem; null = tirado (nao se desenha). Camisola e calcoes tem versao por silhueta.
+  const ITEM_SLOTS = ["camisola", "calcoes", "meias", "chuteiras", "bola", "galhardete"];
+  const ITEM_BY_SX = new Set(["camisola", "calcoes"]);
+
+  function slotLayer(slot, sx, equipped, fallback) {
+    if (!equipped || !Object.prototype.hasOwnProperty.call(equipped, slot)) return fallback;
+    const id = equipped[slot];
+    if (id === null) return null;
+    if (typeof id !== "string" || !new RegExp(`^gear-${slot}-0[1-6]$`).test(id)) return fallback;
+    return { ...fallback, src: `itens/${id}${ITEM_BY_SX.has(slot) ? `-${sx}` : ""}.webp` };
+  }
+
   function avatarLayers(app) {
     const sx = app.sx === "f" ? "f" : "m";
+    const eq = app.equipped;
     const layers = [
-      { src: "kit/galhardete.webp", box: [197, 70, 43, 55] },
+      slotLayer("galhardete", sx, eq, { src: "kit/galhardete.webp", box: [197, 70, 43, 55] }),
       { src: `bases/${sx}-pele-${app.tone}.webp` },
-      { src: "kit/meias.webp" },
-      { src: "kit/chuteiras.webp" },
-      { src: `kit/${sx}-calcoes.webp` },
-      { src: `kit/${sx}-camisola.webp` },
+      slotLayer("meias", sx, eq, { src: "kit/meias.webp" }),
+      slotLayer("chuteiras", sx, eq, { src: "kit/chuteiras.webp" }),
+      slotLayer("calcoes", sx, eq, { src: `kit/${sx}-calcoes.webp` }),
+      slotLayer("camisola", sx, eq, { src: `kit/${sx}-camisola.webp` }),
     ];
     const beard = sx === "m" ? app.beard || "bigode" : "sem";
     if (beard !== "sem") layers.push({ src: `barba/m-${beard}-${app.beardColor || app.color}.webp` });
     if (!(sx === "m" && app.hair === "rapado")) layers.push({ src: `cabelo/${sx}-${app.hair}-${app.color}.webp` });
-    layers.push({ src: "kit/bola.webp", box: [212, 462, 40, 40] });
-    return layers;
+    layers.push(slotLayer("bola", sx, eq, { src: "kit/bola.webp", box: [212, 462, 40, 40] }));
+    return layers.filter(Boolean);
   }
 
   // width = largura do corpo inteiro em px; bust = recorte quadrado da cabeca com esse lado em px.
@@ -225,7 +240,7 @@
       : [];
     const avatarIds = [...new Set([...userIds, userId].filter(Boolean))];
     const avatarRows = avatarIds.length
-      ? await client.from("avatar_profiles").select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", avatarIds)
+      ? await client.from("avatar_profiles").select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair, equipped").in("user_id", avatarIds)
       : { data: [] };
     const summary = roundsSummary(fixtures.data);
     const lastIds = summary.last.map((f) => f.id);
@@ -450,5 +465,5 @@
     state.message = "";
   }
 
-  return { AVATAR, fromProfileRow, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
+  return { AVATAR, ITEM_SLOTS, fromProfileRow, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
 });

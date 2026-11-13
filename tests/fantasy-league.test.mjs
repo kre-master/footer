@@ -138,3 +138,18 @@ test("avatar: aparencia escolhida em avatar_profiles, com valores invalidos no o
   assert.equal(F.fromProfileRow(null), null);
   assert.deepEqual(F.appearanceFor({ user_id: "u1" }, null), F.appearanceFor({ user_id: "u2" }));
 });
+
+test("avatar: itens equipados trocam a camada do slot; null tira; id invalido fica o kit", () => {
+  const base = { sx: "f", tone: 3, hair: "coque", color: "preto" };
+  const srcs = (equipped) => F.avatarLayers({ ...base, equipped }).map((l) => l.src);
+  assert.deepEqual(srcs({}), srcs(undefined));
+  const eq = srcs({ camisola: "gear-camisola-06", meias: "gear-meias-02", bola: "gear-bola-01", calcoes: null, chuteiras: "../x" });
+  assert.ok(eq.includes("itens/gear-camisola-06-f.webp"));
+  assert.ok(eq.includes("itens/gear-meias-02.webp"));
+  assert.ok(!eq.some((s) => s.includes("calcoes")));
+  assert.ok(eq.includes("kit/chuteiras.webp"));
+  const ball = F.avatarLayers({ ...base, equipped: { bola: "gear-bola-01" } }).find((l) => l.src.includes("bola"));
+  assert.deepEqual(ball.box, [212, 462, 40, 40]);
+  const row = { silhouette: "m", skin_tone: 4, hair_style: "rapado", hair_color: "preto", facial_hair: "sem", equipped: { galhardete: "gear-galhardete-03" } };
+  assert.ok(F.avatarLayers(F.fromProfileRow(row)).some((l) => l.src === "itens/gear-galhardete-03.webp"));
+});

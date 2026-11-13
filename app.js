@@ -9573,7 +9573,7 @@ async function loadCardAvatars() {
   cardAvatarProfiles.clear();
   if (!cardAvatarUsers.size) return;
   const { data, error } = await supabaseClient.from("avatar_profiles")
-    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", [...cardAvatarUsers]);
+    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair, equipped").in("user_id", [...cardAvatarUsers]);
   if (error) return;
   (data || []).forEach((row) => cardAvatarProfiles.set(row.user_id, row));
 }
@@ -15845,8 +15845,11 @@ async function drawPlayerDot(ctx, playerData, pos, color, game = null) {
   ctx.save();
   roundRect(ctx, photo.x, photo.y, photo.w, photo.h, Math.max(6, width * 0.05));
   ctx.clip();
-  const cardPhotoSrc = hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
-  if (cardPhotoSrc) {
+  const cardAvatar = await loadCardAvatarCanvas(playerData).catch(() => null);
+  const cardPhotoSrc = !cardAvatar && hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
+  if (cardAvatar) {
+    drawCardAvatarBust(ctx, cardAvatar, photo);
+  } else if (cardPhotoSrc) {
     try {
       const img = await loadPhoto(cardPhotoSrc);
       drawSoftImageCover(ctx, img, photo.x, photo.y, photo.w, photo.h, 6);
@@ -16083,6 +16086,34 @@ async function loadMissingPhotosInBackground() {
   } finally {
     photoBackfillRunning = false;
   }
+}
+
+// Imagem exportada da carta: quem escolheu "Avatar" sai com o busto do avatar, como no ecra.
+async function loadCardAvatarCanvas(playerData) {
+  const fantasy = globalThis.FooterFantasy;
+  const userId = playerData?.linkedUserId;
+  if (!fantasy || !userId || !cardAvatarUsers.has(userId)) return null;
+  const app = fantasy.appearanceFor({ user_id: userId }, cardAvatarProfiles.get(userId));
+  const layers = fantasy.avatarLayers(app).filter((layer) => !layer.box);
+  const imgs = await Promise.all(layers.map((layer) => loadPhoto(fantasy.AVATAR.root + layer.src)));
+  const canvas = document.createElement("canvas");
+  canvas.width = fantasy.AVATAR.w;
+  canvas.height = fantasy.AVATAR.h;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  imgs.forEach((img) => ctx.drawImage(img, 0, 0, canvas.width, canvas.height));
+  return { canvas, bust: fantasy.AVATAR.bust[app.sx === "f" ? "f" : "m"] };
+}
+
+function drawCardAvatarBust(ctx, { canvas, bust }, rect) {
+  // Igual ao retrato no ecra: a largura do busto enche o retrato, alinhado ao topo; o peito fica cortado.
+  const [x0, y0, x1] = bust;
+  const srcW = x1 - x0;
+  const srcH = Math.min(canvas.height - y0, (rect.h * srcW) / rect.w);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(canvas, x0, y0, srcW, srcH, rect.x, rect.y, rect.w, (srcH * rect.w) / srcW);
+  ctx.restore();
 }
 
 function loadPhoto(src) {
