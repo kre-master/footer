@@ -13,6 +13,7 @@ const files = [
   "month-review.js",
   "fantasy-league.js",
   "balneario.js",
+  "xp-results.js",
   "tracking-metrics.js",
   "heart-rate.js",
   "notifications.js",

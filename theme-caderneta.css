@@ -282,3 +282,14 @@ input[type="date"], input[type="time"], input[type="datetime-local"], .game-date
 .admin-mode:not(.visitor-mode) .account-chip { border-color: var(--role-admin); }
 .owner-mode.admin-mode .account-chip { border-color: var(--role-owner); }
 .owner-confirm { background: #fff1f1; border-color: var(--red); }
+
+/* Resultados do jogo: cromo com contorno a tinta. */
+.xpr { background: rgba(26, 31, 43, .45); }
+.xpr-card, .xpr-chipcard { background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: var(--shadow); }
+.xpr-head { background: var(--cad-yellow-soft); border-bottom: 2px solid var(--cad-ink); }
+.xpr-xp { color: var(--cad-blue); }
+.xpr-bar, .xpr-chipcard-bar { border: 2px solid var(--cad-ink); }
+.xpr-levelup { border: 2px solid var(--cad-ink); box-shadow: 3px 3px 0 var(--cad-ink); }
+.xpr-item { border: 2px solid var(--cad-ink); border-left: 4px solid var(--rc, #7b8494); background: var(--cad-paper); box-shadow: var(--shadow-soft); }
+.xpr-items, .xpr-line { border-color: var(--line); }
+.xpr-chip { border: 1.5px solid var(--cad-ink); }
