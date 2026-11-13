@@ -4192,7 +4192,9 @@ function render() {
   prefillEventLocation();
   renderGallery();
   renderAccountPanel();
+  syncThemeFromAccount();
   renderAccountVisibility();
+  renderAppearancePanel();
   renderClaimsList();
   renderAccountsList();
   renderPaymentsPanel();
@@ -4229,6 +4231,62 @@ function getMyPendingClaim() {
 }
 
 // Visibilidade na pesquisa: por defeito a conta esta escondida; so aparece em Procurar se a pessoa escolher.
+const THEME_STORAGE_KEY = "footer-theme";
+const THEMES = {
+  caderneta: { label: "Caderneta", hint: "Claro, cartões como cromos, vermelho de destaque.", color: "#eef1f6" },
+  holofote: { label: "Holofote", hint: "Escuro, estádio à noite, azul da chama do logo.", color: "#0a1222" },
+};
+
+function getStoredTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    return THEMES[saved] ? saved : "caderneta";
+  } catch (error) {
+    return "caderneta";
+  }
+}
+
+// O ficheiro theme-caderneta.css vai por cima do styles.css (Holofote): desligá-lo repõe o Holofote.
+function applyTheme(theme) {
+  const name = THEMES[theme] ? theme : "caderneta";
+  const link = document.querySelector("#theme-caderneta-link");
+  if (link) link.disabled = name !== "caderneta";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEMES[name].color);
+  try { localStorage.setItem(THEME_STORAGE_KEY, name); } catch (error) { /* sem armazenamento local */ }
+}
+
+// A escolha da conta (user_metadata.theme) manda sobre a do aparelho.
+function syncThemeFromAccount() {
+  const saved = currentSession?.user?.user_metadata?.theme;
+  if (THEMES[saved] && saved !== getStoredTheme()) applyTheme(saved);
+}
+
+function renderAppearancePanel() {
+  const holder = document.querySelector("#account-appearance");
+  if (!holder) return;
+  const current = getStoredTheme();
+  holder.innerHTML = `
+    <div class="account-card">
+      <h3>Aspeto da app</h3>
+      ${Object.entries(THEMES).map(([key, item]) => `
+        <label class="club-check"><input type="radio" name="app-theme" value="${key}" ${key === current ? "checked" : ""}>
+          <span><strong>${item.label}</strong>: ${item.hint}</span></label>`).join("")}
+      <p data-theme-status>${currentSession?.user ? "Fica guardado na tua conta e vale em todos os aparelhos." : "Fica guardado neste aparelho. Entra para o levares contigo."}</p>
+    </div>`;
+  holder.querySelectorAll('input[name="app-theme"]').forEach((input) => input.addEventListener("change", async () => {
+    applyTheme(input.value);
+    const status = holder.querySelector("[data-theme-status]");
+    if (!currentSession?.user || !supabaseClient) return;
+    const { data, error } = await supabaseClient.auth.updateUser({ data: { theme: input.value } });
+    if (error) {
+      if (status) status.textContent = `Mudou aqui, mas não consegui guardar na conta: ${error.message}`;
+      return;
+    }
+    if (data?.user) currentSession.user = data.user;
+    if (status) status.textContent = "Guardado na tua conta.";
+  }));
+}
+
 function renderAccountVisibility() {
   const holder = document.querySelector("#account-visibility");
   if (!holder) return;
@@ -9515,7 +9573,7 @@ async function loadCardAvatars() {
   cardAvatarProfiles.clear();
   if (!cardAvatarUsers.size) return;
   const { data, error } = await supabaseClient.from("avatar_profiles")
-    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair").in("user_id", [...cardAvatarUsers]);
+    .select("user_id, silhouette, skin_tone, hair_style, hair_color, facial_hair, equipped").in("user_id", [...cardAvatarUsers]);
   if (error) return;
   (data || []).forEach((row) => cardAvatarProfiles.set(row.user_id, row));
 }
@@ -14819,6 +14877,14 @@ function renderHeartRateStepButtons() {
   return HEART_RATE_ADJUST_STEPS.map((step) => `<button type="button" class="${step === heartRateStep ? "active" : ""}" data-hr-step="${step}" aria-pressed="${step === heartRateStep}">${step >= 60 ? `${step / 60} min` : `${step} s`}</button>`).join("");
 }
 
+// Sinal amarelo (nunca bloqueia): o jogo comeca bem antes do treino ou depois de ele acabar.
+function heartRateTimeMismatch(game, entry) {
+  const gameMs = Date.parse(game.date);
+  const lastT = entry?.series?.length ? Number(entry.series[entry.series.length - 1][0]) : 0;
+  if (!Number.isFinite(gameMs) || !Number.isFinite(entry?.startedAtMs)) return false;
+  return gameMs < entry.startedAtMs - 15 * 60000 || gameMs > entry.startedAtMs + lastT * 1000;
+}
+
 function renderHeartRateBody(game) {
   const entry = heartRateEntries[game.id];
   if (remoteEnabled && !currentSession?.user) return `<p class="tracking-note">Entra na tua conta para carregares o treino do teu relogio.</p>`;
@@ -14872,6 +14938,7 @@ function renderHeartRateBody(game) {
       </label>
       <label class="hr-check"><input type="checkbox" data-hr-overlay-toggle ${readHeartRateSetting("overlay") === "off" ? "" : "checked"}> Mostrar em cima do vídeo</label>
     </div>
+    ${heartRateTimeMismatch(game, entry) ? `<p class="tracking-warning" data-hr-mismatch>⚠ A hora do treino não coincide com a do jogo. Acontece quando o relógio ou a câmara estão com a hora desacertada. Podes continuar; se os batimentos ficarem desalinhados, acerta abaixo.</p>` : ""}
     <p class="tracking-error" data-hr-error ${heartRateNotices[game.id] ? "" : "hidden"}>${escapeHtml(heartRateNotices[game.id] || "")}</p>
     <div class="hr-footer">
       <small>${escapeHtml(entry.fileName || "Treino")} · ${escapeHtml(String(entry.format).toUpperCase())}</small>
@@ -14933,7 +15000,8 @@ function bindHeartRatePanel(game, section) {
       if (!file) return;
       try {
         const result = await importHeartRateFile(game, file);
-        heartRateNotices[game.id] = result === "warn" ? `Este treino nao coincide com a hora do jogo (${formatDate(game.date)}). Confirma se e o ficheiro certo; podes acertar abaixo.` : "";
+        // Hora diferente nao bloqueia: o treino fica guardado e a pagina mostra so um sinal amarelo (ver heartRateTimeMismatch).
+        heartRateNotices[game.id] = "";
         rerender();
       } catch (error) {
         showError(error.message || "Nao foi possivel ler o ficheiro.");
@@ -15777,8 +15845,11 @@ async function drawPlayerDot(ctx, playerData, pos, color, game = null) {
   ctx.save();
   roundRect(ctx, photo.x, photo.y, photo.w, photo.h, Math.max(6, width * 0.05));
   ctx.clip();
-  const cardPhotoSrc = hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
-  if (cardPhotoSrc) {
+  const cardAvatar = await loadCardAvatarCanvas(playerData).catch(() => null);
+  const cardPhotoSrc = !cardAvatar && hasPlayerPhoto(playerData) ? await getFullPhotoSrc(playerData) : "";
+  if (cardAvatar) {
+    drawCardAvatarBust(ctx, cardAvatar, photo);
+  } else if (cardPhotoSrc) {
     try {
       const img = await loadPhoto(cardPhotoSrc);
       drawSoftImageCover(ctx, img, photo.x, photo.y, photo.w, photo.h, 6);
@@ -16015,6 +16086,34 @@ async function loadMissingPhotosInBackground() {
   } finally {
     photoBackfillRunning = false;
   }
+}
+
+// Imagem exportada da carta: quem escolheu "Avatar" sai com o busto do avatar, como no ecra.
+async function loadCardAvatarCanvas(playerData) {
+  const fantasy = globalThis.FooterFantasy;
+  const userId = playerData?.linkedUserId;
+  if (!fantasy || !userId || !cardAvatarUsers.has(userId)) return null;
+  const app = fantasy.appearanceFor({ user_id: userId }, cardAvatarProfiles.get(userId));
+  const layers = fantasy.avatarLayers(app).filter((layer) => !layer.box);
+  const imgs = await Promise.all(layers.map((layer) => loadPhoto(fantasy.AVATAR.root + layer.src)));
+  const canvas = document.createElement("canvas");
+  canvas.width = fantasy.AVATAR.w;
+  canvas.height = fantasy.AVATAR.h;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  imgs.forEach((img) => ctx.drawImage(img, 0, 0, canvas.width, canvas.height));
+  return { canvas, bust: fantasy.AVATAR.bust[app.sx === "f" ? "f" : "m"] };
+}
+
+function drawCardAvatarBust(ctx, { canvas, bust }, rect) {
+  // Igual ao retrato no ecra: a largura do busto enche o retrato, alinhado ao topo; o peito fica cortado.
+  const [x0, y0, x1] = bust;
+  const srcW = x1 - x0;
+  const srcH = Math.min(canvas.height - y0, (rect.h * srcW) / rect.w);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(canvas, x0, y0, srcW, srcH, rect.x, rect.y, rect.w, (srcH * rect.w) / srcW);
+  ctx.restore();
 }
 
 function loadPhoto(src) {
