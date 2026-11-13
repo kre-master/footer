@@ -113,6 +113,10 @@
     },
     defaults: { m: { tone: 4, hair: "penteado-para-tras", color: "castanho-escuro" }, f: { tone: 4, hair: "coque", color: "castanho-escuro" } },
     bust: { m: [81, 0, 209, 128], f: [64, 0, 192, 128] },
+    // Retrato da carta (janela largura/altura = ratio): recorte centrado na cabeca (manifesto centro_cabeca),
+    // com a cabeca a um terco da altura, para ficar centrado e com a mesma escala nas duas silhuetas.
+    head: { m: [145, 39], f: [128, 61] },
+    card: { ratio: 0.829, width: 150, headAt: 0.33 },
   };
 
   function hashString(value) {
@@ -188,6 +192,14 @@
   }
 
   // width = largura do corpo inteiro em px; bust = recorte quadrado da cabeca com esse lado em px.
+  // Janela do retrato da carta em pixeis da tela do avatar: [x0, y0, largura, altura] (y0 pode ser < 0).
+  function cardCrop(sx) {
+    const [cx, cy] = AVATAR.head[sx === "f" ? "f" : "m"];
+    const { ratio, width, headAt } = AVATAR.card;
+    const height = width / ratio;
+    return [cx - width / 2, cy - height * headAt, width, height];
+  }
+
   function avatarHtml(app, { width = 128, bust = 0 } = {}) {
     const sx = app.sx === "f" ? "f" : "m";
     const pct = (v, total) => `${((v / total) * 100).toFixed(3)}%`;
@@ -200,9 +212,9 @@
     }).join("");
     if (bust === "fluid") {
       // Enche o contentor: a largura do busto = largura do contentor; o peito fica por baixo, cortado.
-      const [x0, , x1] = AVATAR.bust[sx];
-      const k = AVATAR.w / (x1 - x0);
-      return `<span class="fantasy-avatar-fluid" aria-hidden="true"><span class="fantasy-avatar" style="width:${(k * 100).toFixed(2)}%;left:${(-(x0 / (x1 - x0)) * 100).toFixed(2)}%">${imgs}</span></span>`;
+      const [x0, y0, w, h] = cardCrop(sx);
+      const pc = (v) => `${(v * 100).toFixed(2)}%`;
+      return `<span class="fantasy-avatar-fluid" aria-hidden="true"><span class="fantasy-avatar" style="width:${pc(AVATAR.w / w)};height:${pc(AVATAR.h / h)};left:${pc(-x0 / w)};top:${pc(-y0 / h)}">${imgs}</span></span>`;
     }
     if (bust) {
       const [x0, y0, x1] = AVATAR.bust[sx];
@@ -465,5 +477,5 @@
     state.message = "";
   }
 
-  return { AVATAR, ITEM_SLOTS, fromProfileRow, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
+  return { AVATAR, ITEM_SLOTS, cardCrop, fromProfileRow, appearanceFor, avatarLayers, avatarHtml, ATTRS, POSITIONS, emptyBuild, pointsSpent, validateBuild, stepAttr, sortStandings, roundsSummary, scorersLine, formatKickoff, render, reset };
 });
