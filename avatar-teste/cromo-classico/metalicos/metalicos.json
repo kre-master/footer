@@ -1,0 +1,582 @@
+{
+  "colecao": "cromo-classico-metalicos",
+  "familia": "preto e dourado-champanhe",
+  "modelo": "FLUX.1 Kontext dev FP8, seed 1111202911",
+  "tela": {
+    "512": [
+      512,
+      1024
+    ],
+    "256": [
+      256,
+      512
+    ]
+  },
+  "nota": "Camadas de corpo com a tela inteira, empilham-se em (0,0). Bola e galhardete sao objetos com o tamanho da caixa do manifesto (512: 80x80 e 86x110; 256: 40x40 e 43x55). Meias e chuteiras sao partilhadas pelas duas silhuetas.",
+  "itens": [
+    {
+      "slot": "shirts",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-shirts-01",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-01.png",
+      "icone": "icones/gear-shirts-01.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-01-m.webp",
+          "256": "256/gear-shirts-01-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-01-f.webp",
+          "256": "256/gear-shirts-01-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-shorts-01",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-01.png",
+      "icone": "icones/gear-shorts-01.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-01-m.webp",
+          "256": "256/gear-shorts-01-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-01-f.webp",
+          "256": "256/gear-shorts-01-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-socks-01",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-01.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-01.webp",
+          "256": "256/gear-socks-01.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-boots-01",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-01.png",
+      "icone": "icones/gear-boots-01.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-01.webp",
+          "256": "256/gear-boots-01.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-balls-01",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-01.png",
+      "icone": "icones/gear-balls-01.png",
+      "camadas": {
+        "512": "512/gear-balls-01.webp",
+        "256": "256/gear-balls-01.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "01",
+      "grau": "Common",
+      "nome": "gear-pennants-01",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-01.png",
+      "icone": "icones/gear-pennants-01.png",
+      "camadas": {
+        "512": "512/gear-pennants-01.webp",
+        "256": "256/gear-pennants-01.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "shirts",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-shirts-02",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-02.png",
+      "icone": "icones/gear-shirts-02.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-02-m.webp",
+          "256": "256/gear-shirts-02-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-02-f.webp",
+          "256": "256/gear-shirts-02-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-shorts-02",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-02.png",
+      "icone": "icones/gear-shorts-02.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-02-m.webp",
+          "256": "256/gear-shorts-02-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-02-f.webp",
+          "256": "256/gear-shorts-02-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-socks-02",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-02.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-02.webp",
+          "256": "256/gear-socks-02.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-boots-02",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-02.png",
+      "icone": "icones/gear-boots-02.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-02.webp",
+          "256": "256/gear-boots-02.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-balls-02",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-02.png",
+      "icone": "icones/gear-balls-02.png",
+      "camadas": {
+        "512": "512/gear-balls-02.webp",
+        "256": "256/gear-balls-02.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "02",
+      "grau": "Special",
+      "nome": "gear-pennants-02",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-02.png",
+      "icone": "icones/gear-pennants-02.png",
+      "camadas": {
+        "512": "512/gear-pennants-02.webp",
+        "256": "256/gear-pennants-02.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "shirts",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-shirts-03",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-03.png",
+      "icone": "icones/gear-shirts-03.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-03-m.webp",
+          "256": "256/gear-shirts-03-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-03-f.webp",
+          "256": "256/gear-shirts-03-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-shorts-03",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-03.png",
+      "icone": "icones/gear-shorts-03.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-03-m.webp",
+          "256": "256/gear-shorts-03-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-03-f.webp",
+          "256": "256/gear-shorts-03-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-socks-03",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-03.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-03.webp",
+          "256": "256/gear-socks-03.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-boots-03",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-03.png",
+      "icone": "icones/gear-boots-03.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-03.webp",
+          "256": "256/gear-boots-03.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-balls-03",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-03.png",
+      "icone": "icones/gear-balls-03.png",
+      "camadas": {
+        "512": "512/gear-balls-03.webp",
+        "256": "256/gear-balls-03.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "03",
+      "grau": "Rare",
+      "nome": "gear-pennants-03",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-03.png",
+      "icone": "icones/gear-pennants-03.png",
+      "camadas": {
+        "512": "512/gear-pennants-03.webp",
+        "256": "256/gear-pennants-03.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "shirts",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-shirts-04",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-04.png",
+      "icone": "icones/gear-shirts-04.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-04-m.webp",
+          "256": "256/gear-shirts-04-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-04-f.webp",
+          "256": "256/gear-shirts-04-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-shorts-04",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-04.png",
+      "icone": "icones/gear-shorts-04.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-04-m.webp",
+          "256": "256/gear-shorts-04-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-04-f.webp",
+          "256": "256/gear-shorts-04-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-socks-04",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-04.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-04.webp",
+          "256": "256/gear-socks-04.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-boots-04",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-04.png",
+      "icone": "icones/gear-boots-04.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-04.webp",
+          "256": "256/gear-boots-04.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-balls-04",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-04.png",
+      "icone": "icones/gear-balls-04.png",
+      "camadas": {
+        "512": "512/gear-balls-04.webp",
+        "256": "256/gear-balls-04.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "04",
+      "grau": "Epic",
+      "nome": "gear-pennants-04",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-04.png",
+      "icone": "icones/gear-pennants-04.png",
+      "camadas": {
+        "512": "512/gear-pennants-04.webp",
+        "256": "256/gear-pennants-04.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "shirts",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-shirts-05",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-05.png",
+      "icone": "icones/gear-shirts-05.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-05-m.webp",
+          "256": "256/gear-shirts-05-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-05-f.webp",
+          "256": "256/gear-shirts-05-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-shorts-05",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-05.png",
+      "icone": "icones/gear-shorts-05.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-05-m.webp",
+          "256": "256/gear-shorts-05-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-05-f.webp",
+          "256": "256/gear-shorts-05-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-socks-05",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-05.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-05.webp",
+          "256": "256/gear-socks-05.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-boots-05",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-05.png",
+      "icone": "icones/gear-boots-05.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-05.webp",
+          "256": "256/gear-boots-05.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-balls-05",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-05.png",
+      "icone": "icones/gear-balls-05.png",
+      "camadas": {
+        "512": "512/gear-balls-05.webp",
+        "256": "256/gear-balls-05.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "05",
+      "grau": "Legendary",
+      "nome": "gear-pennants-05",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-05.png",
+      "icone": "icones/gear-pennants-05.png",
+      "camadas": {
+        "512": "512/gear-pennants-05.webp",
+        "256": "256/gear-pennants-05.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "shirts",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-shirts-06",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shirts-06.png",
+      "icone": "icones/gear-shirts-06.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shirts-06-m.webp",
+          "256": "256/gear-shirts-06-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shirts-06-f.webp",
+          "256": "256/gear-shirts-06-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "shorts",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-shorts-06",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-shorts-06.png",
+      "icone": "icones/gear-shorts-06.png",
+      "camadas": {
+        "m": {
+          "512": "512/gear-shorts-06-m.webp",
+          "256": "256/gear-shorts-06-m.webp"
+        },
+        "f": {
+          "512": "512/gear-shorts-06-f.webp",
+          "256": "256/gear-shorts-06-f.webp"
+        }
+      },
+      "silhueta": "por sexo (m, f)"
+    },
+    {
+      "slot": "socks",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-socks-06",
+      "hd_origem": null,
+      "icone": "icones/gear-socks-06.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-socks-06.webp",
+          "256": "256/gear-socks-06.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "boots",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-boots-06",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-boots-06.png",
+      "icone": "icones/gear-boots-06.png",
+      "camadas": {
+        "partilhada": {
+          "512": "512/gear-boots-06.webp",
+          "256": "256/gear-boots-06.webp"
+        }
+      },
+      "silhueta": "partilhada (m e f)"
+    },
+    {
+      "slot": "balls",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-balls-06",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-balls-06.png",
+      "icone": "icones/gear-balls-06.png",
+      "camadas": {
+        "512": "512/gear-balls-06.webp",
+        "256": "256/gear-balls-06.webp"
+      },
+      "silhueta": "objeto"
+    },
+    {
+      "slot": "pennants",
+      "nivel": "06",
+      "grau": "Mythic",
+      "nome": "gear-pennants-06",
+      "hd_origem": "footer-original-catalogue/metallic/masters/gear-pennants-06.png",
+      "icone": "icones/gear-pennants-06.png",
+      "camadas": {
+        "512": "512/gear-pennants-06.webp",
+        "256": "256/gear-pennants-06.webp"
+      },
+      "silhueta": "objeto"
+    }
+  ]
+}
