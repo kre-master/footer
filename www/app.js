@@ -11196,6 +11196,8 @@ function renderGoalSelects(players, value, kind, attrs) {
     </select>`;
 }
 
+const goalsTableOpen = new Set();
+
 function renderGoalsSection(game) {
   // Fica sempre um lugar marcado: carregar ou mudar um golo so redesenha este bloco (o video continua a dar).
   const placeholder = `<div data-goals-section hidden></div>`;
@@ -11288,10 +11290,27 @@ function renderGoalsSection(game) {
 
   const pending = suggestions.length;
   const howTo = hasVideo ? "Com o vídeo a dar, carrega em «⚽ Golo A/B agora» no momento do golo e escolhe depois quem marcou." : "Quando houver vídeo, cada golo pode guardar o momento.";
+  // Resumo a vista (quantos tem marcador e os golos ja identificados); a tabela de registo abre a pedido.
+  const totalGoals = counts.A + counts.B;
+  const filledGoals = ["A", "B"].flatMap((side) => Array.from({ length: counts[side] }, (_, index) => getGameGoal(game.id, side, index + 1))
+    .map((goal) => ({ side, goal })).filter(({ goal }) => isGoalFilled(goal)));
+  const missing = totalGoals - filledGoals.length;
+  const tableOpen = goalsTableOpen.has(game.id);
+  if (!isAdmin && !totalGoals) return placeholder;
   return `
-    <section class="profile-section goals-section" data-goals-section>
+    <section class="profile-section goals-section gd-goals" data-goals-section>
+      <header class="gd-level-head">
+        <span class="gd-level-icon gd-icon-game" aria-hidden="true">⚽</span>
+        <h3>Golos</h3>
+        ${isAdmin && pending ? `<span class="metric warn-pill">${pending} ${pending === 1 ? "sugestão" : "sugestões"}</span>` : ""}
+        ${totalGoals ? `<span class="gd-pill">${filledGoals.length} de ${totalGoals} com marcador</span>` : ""}
+      </header>
+      ${totalGoals ? `<div class="gd-progress" role="img" aria-label="${filledGoals.length} de ${totalGoals} golos com marcador"><i style="width:${Math.round((filledGoals.length / totalGoals) * 100)}%"></i></div>` : `<p class="gd-scope">Sem golos neste jogo.</p>`}
+      ${totalGoals || isAdmin ? `
+      <details class="gd-group" data-goals-details ${tableOpen ? "open" : ""}>
+        <summary><strong>${isAdmin ? "Editar golos" : canRegister && missing ? "Registar golos" : "Ver todos os golos"}</strong><em>${missing ? `${missing} por identificar` : "por equipa"}</em></summary>
+        <div class="gd-group-body">
       <div class="goals-head">
-        <h3>Golos${isAdmin && pending ? ` <span class="metric warn-pill">${pending} ${pending === 1 ? "sugestão" : "sugestões"}</span>` : ""}</h3>
         ${isAdmin ? `
           <label class="goals-toggle admin-actions">
             <input type="checkbox" data-goals-enabled ${enabled ? "checked" : ""} ${remote ? "" : "disabled"}>
@@ -11305,6 +11324,8 @@ function renderGoalsSection(game) {
           : "Desligado: só os admins veem e registam."} ${howTo} AG = autogolo.</p>`
         : canRegister ? `<p class="hint">${howTo} Um golo já registado só o admin muda; se achares que está mal, carrega em «Possível erro?».</p>` : ""}
       <div class="goals-grid">${table("A")}${table("B")}</div>
+        </div>
+      </details>` : ""}
     </section>`;
 }
 
@@ -11313,9 +11334,15 @@ function refreshGoalsSection(game) {
   if (!current) return;
   current.outerHTML = renderGoalsSection(game);
   bindGoalsSection(game, els.historyGameDetail);
+  const scorers = els.historyGameDetail.querySelector("[data-gd-scorers]");
+  if (scorers) scorers.outerHTML = renderGameDetailScorers(game);
 }
 
 function bindGoalsSection(game, root) {
+  root?.querySelector("[data-goals-details]")?.addEventListener("toggle", (event) => {
+    if (event.target.open) goalsTableOpen.add(game.id);
+    else goalsTableOpen.delete(game.id);
+  });
   const section = root?.querySelector("[data-goals-section]");
   if (!section) return;
   const key = (element) => [element.dataset.goalSide, Number(element.dataset.goalPosition)];
@@ -12931,7 +12958,8 @@ function getTrackingVideoTeamSide(entry, game, videoTeam) {
   return best ? best[0] : null;
 }
 
-function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = null } = {}) {
+// grouped: no detalhe do jogo, numeros e grafico a vista e o resto em Movimento / Posicionamento / Com bola.
+function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = null, grouped = false } = {}) {
   const tracking = window.FooterTracking;
   const others = entry.result.players;
   const rank = (key) => {
@@ -12942,6 +12970,61 @@ function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = nu
   const rival = p.rival ? escapeHtml(getTrackingPlayerName(entry, p.rival.label)) : null;
   const late = p.lateRatio != null ? Math.round((p.lateRatio - 1) * 100) : null;
   const tag = (key) => tracking.statusTag(entry.result, key);
+  if (grouped) {
+    const lowCoverage = p.validMinutes != null && p.validMinutes < tracking.MIN_MINUTES_FOR_HIGHLIGHT;
+    const passBlock = renderPlayerPassBlock(entry, p, rank);
+    const group = (title, hint, content) => content.trim() ? `
+      <details class="gd-group">
+        <summary><strong>${title}</strong><em>${hint}</em></summary>
+        <div class="gd-group-body">${content}</div>
+      </details>` : "";
+    const seekable = p.maxSustainedAtS != null && videoGameId
+      && Boolean(tracking.videoSeekTarget(getGameVideoParts(videoGameId), p.maxSustainedAtS));
+    // Um lance com contexto: o pico de velocidade, com salto para o video quando a parte e reproduzivel.
+    const peak = p.maxSustainedKmh != null ? `
+      <${seekable ? `button type="button" data-video-seek="${Math.max(0, p.maxSustainedAtS - 3).toFixed(1)}"` : "div"} class="gd-lance${seekable ? "" : " static"}">
+        <span class="gd-lance-play" aria-hidden="true">${seekable ? "▶" : "⚡"}</span>
+        <span class="gd-lance-text"><b>Pico de velocidade · ${formatTrackingNumber(p.maxSustainedKmh, 1)} km/h</b><small>${seekable ? "Ver este lance no vídeo" : `Sustentado ${formatTrackingNumber(p.maxSustainedWindowS, 0)} s`}</small></span>
+        ${p.maxSustainedAtS != null ? `<span class="gd-lance-time">${formatVideoClock(p.maxSustainedAtS)}</span>` : ""}
+      </${seekable ? "button" : "div"}>` : "";
+    return `
+    <div class="tracking-player gd-player">
+      <p class="gd-coverage${lowCoverage ? " low" : ""}"><i aria-hidden="true"></i>${lowCoverage
+        ? `Só ${formatTrackingNumber(p.validMinutes, 0)} min identificado pela câmara · lê estes números com cuidado`
+        : `Identificado ${formatTrackingNumber(p.validMinutes, 0)} min pela câmara (não são minutos jogados)`}</p>
+      <div class="tracking-highlights gd-highlights">
+        ${trackingCard("Distância observada", p.distanceM == null ? null : p.distanceM / 1000, "km", { digits: 2, note: rank("distanceM"), tag: tag("distance") })}
+        ${trackingCard("Sprints ≥20 km/h", p.sprints, "", { note: p.highRuns != null ? `${formatTrackingNumber(p.highRuns)} arranques ≥15 km/h` : "", tag: tag("sprints") })}
+        ${p.passesMade != null
+          ? trackingCard("Passes detetados", p.passesMade, "", { note: rank("passesMade"), tag: tag("passes") })
+          : trackingCard("Ritmo", p.metersPerMin, "m/min", { digits: 1, note: rank("metersPerMin"), tag: tag("pace") })}
+      </div>
+      ${peak}
+      <details class="gd-group gd-analysis-more" id="gd-analysis-more-${escapeHtml(videoGameId || "x")}" ${videoGameId ? gdKeep({ id: videoGameId }, "analysis") : ""}>
+        <summary><strong>Análise completa</strong><em>ao longo do jogo, movimento, posição, bola</em></summary>
+        <div class="gd-group-body">
+      ${renderPlayerTimeline(entry, p, videoGameId)}
+      <div class="gd-groups">
+        ${group("Movimento", "ritmo, velocidade, faixas", `${renderTrackingStories(entry, p, videoGameId)}${renderTrackingBands(p)}`)}
+        ${group("Posicionamento", "mapa, papel, parceiro", `      <div class="tracking-profile-map">
+        ${renderPlayerPitch(entry, p)}
+        <dl>
+          ${p.passesMade != null ? `<dt>Ritmo</dt><dd>${formatTrackingNumber(p.metersPerMin, 1)} m/min · ${rank("metersPerMin")}</dd>` : ""}
+          <dt>Papel em campo</dt><dd>${escapeHtml(tracking.roleLabel(p) || "–")}</dd>
+          ${p.zoneSharePct ? `<dt>Defesa / meio / ataque</dt><dd>${formatTrackingNumber(p.zoneSharePct.defensiva, 0)} / ${formatTrackingNumber(p.zoneSharePct.media, 0)} / ${formatTrackingNumber(p.zoneSharePct.ofensiva, 0)}%</dd>` : ""}
+          ${p.goalkeeperMin ? `<dt>Na baliza</dt><dd>${formatTrackingNumber(p.goalkeeperMin, 1)} min</dd>` : ""}
+          ${late != null ? `<dt>Ritmo no fim vs início</dt><dd>${late > 0 ? "+" : ""}${late}%</dd>` : ""}
+          ${partner ? `<dt>Parceiro de jogo</dt><dd>${partner} · ${formatTrackingNumber(p.partner.sharePct, 0)}% do tempo a &lt;5 m</dd>` : ""}
+          ${rival ? `<dt>Rival do jogo</dt><dd>${rival} · ${formatTrackingNumber(p.rival.seconds / 60, 1)} min a &lt;3 m</dd>` : ""}
+        </dl>
+      </div>
+`)}
+        ${group("Com bola", "passes e ligações", passBlock)}
+      </div>
+        </div>
+      </details>
+    </div>`;
+  }
   return `
     <div class="tracking-player">
       <p class="tracking-note">${gameLink ? `${gameLink} · ` : ""}${formatTrackingNumber(p.validMinutes, 1)} min vistos pela câmara (não são minutos jogados).</p>
@@ -13048,16 +13131,27 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   const hrEntry = hrGame ? heartRateEntries[hrGame.id] : null;
   const ownId = getLinkedPlayer()?.id;
   const hrOwn = Boolean(hrEntry && ownId && entry.mapping?.[p.label] === ownId);
-  const hrAttrs = hrOwn ? ` data-hr-timeline data-hr-game="${escapeHtml(hrGame.id)}" data-hr-minutes="${n}"` : "";
-  const hrLine = hrOwn ? `<g data-hr-line>${renderHeartRateTimelineLine(hrGame, hrEntry, n)}</g>` : "";
-  const chart = `<svg class="tracking-rhythm" viewBox="-2 0 ${n * 4 + 4} 40"${hrAttrs} role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints${hrOwn ? "; a linha de cor são os teus batimentos" : ""}">${bars}${hrLine}${ticks}</svg>`;
+  // Dois paineis alinhados no mesmo eixo de minutos, cada um com a sua unidade (sem dois eixos no mesmo grafico):
+  // em cima metros por minuto e sprints, em baixo os batimentos. Um cursor comum percorre os dois.
+  const width = n * 4 + 4;
+  const cursor = `<line class="tp-cursor" x1="0" x2="0" y1="0" y2="40" hidden/>`;
+  const chart = `<svg class="tracking-rhythm" data-tp-panel viewBox="-2 0 ${width} 40" role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints">${bars}${ticks}${cursor}</svg>`;
+  const hrToggleId = `${id}-hr`;
+  const hrPanel = hrOwn ? `
+      <input type="checkbox" class="tp-hr-in" id="${hrToggleId}" checked>
+      <div class="tp-hr-panel">
+        <span class="tp-unit">bpm · só tu vês</span>
+        <svg class="tracking-rhythm tracking-hr-panel" data-tp-panel viewBox="-2 0 ${width} 36" data-hr-timeline data-hr-labels="1" data-hr-game="${escapeHtml(hrGame.id)}" data-hr-minutes="${n}" role="img" aria-label="Os teus batimentos em cada minuto do jogo, a cor é a zona de esforço">
+          <g data-hr-line>${renderHeartRateTimelineLine(hrGame, hrEntry, n, { labels: true })}</g>${cursor.replace('y2="40"', 'y2="36"')}
+        </svg>
+      </div>` : "";
   const hrControls = hrOwn ? `
       <div class="hr-adjust hr-tl-adjust">
         <div class="hr-cal-head">
-          <span class="hr-adjust-title">♥ Os teus batimentos sobre o movimento</span>
+          <span class="hr-adjust-title">♥ Acertar os batimentos com o movimento</span>
           <button type="button" class="ghost-btn" data-hr-cal-open="${escapeHtml(hrGame.id)}">⛶ Acertar em ecrã cheio</button>
         </div>
-        <p class="tracking-fineprint">A linha de cor são os teus batimentos (a cor é a zona de esforço). Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
+        <p class="tracking-fineprint">O painel de baixo são os teus batimentos (a cor é a zona de esforço), no mesmo minuto que as barras de cima. Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
         <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">${renderHeartRateStepButtons()}</div>
         <div class="hr-adjust-move">
           <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(hrGame.id)}">◀ Atrasar</button>
@@ -13076,13 +13170,15 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   }).join("");
   return `
     <div class="tracking-timeline">
-      <h4>Ao longo do jogo</h4>
+      <div class="tp-headline"><h4>Ao longo do jogo</h4>${hrOwn ? `<label class="tp-hr-toggle" for="${hrToggleId}">♥ Batimentos</label>` : ""}</div>
       ${periods.map((q) => `<input type="radio" class="tp-in tp-in-${q.key}" name="${id}" id="${id}-${q.key}" ${q.key === 0 ? "checked" : ""}>`).join("")}
       <div class="tracking-pitch-tabs tp-tabs" role="group" aria-label="Período do jogo">
         ${periods.map((q) => `<label for="${id}-${q.key}" class="tp-tab-${q.key}">${escapeHtml(q.label)}</label>`).join("")}
       </div>
       <div class="tp-body">
+        <span class="tp-unit">m/min</span>
         ${chart}
+        ${hrPanel}
         ${variants}
       </div>
       ${hrControls}
@@ -13258,10 +13354,13 @@ function renderPlayerPassBlock(entry, p, rank) {
   `;
 }
 
-function renderTrackingTestSection(game) {
+// part: "personal" (a analise de quem esta a ver, no cartao Video e analise) ou "admin" (relatorio das equipas e
+// ferramentas de publicacao, em Gerir jogo). O relatorio coletivo ficou reservado ao admin.
+function renderTrackingTestSection(game, part = "admin") {
   if (!window.FooterTracking) return "";
   const entry = getTrackingEntry(game.id);
   if (!entry) {
+    if (part !== "admin") return "";
     return `
       <section class="profile-section tracking-section admin-only">
         <div class="tracking-head"><h3>Tracking de vídeo</h3>${getTrackingBadge(null)}</div>
@@ -13308,9 +13407,9 @@ function renderTrackingTestSection(game) {
     const inB = roster.has(b.id) ? 0 : 1;
     return inA - inB || a.name.localeCompare(b.name, "pt");
   });
-  return `
+  const collective = `
     <section class="profile-section tracking-section">
-      <div class="tracking-head"><h3>Tracking de vídeo</h3>${getTrackingBadge(entry)}</div>
+      <div class="tracking-head"><h3>Relatório das equipas</h3>${getTrackingBadge(entry)}</div>
       <p class="tracking-note">${escapeHtml(result.label)} · ${trackingRemote ? (entry.status === "published" ? `versão ${entry.revision}, publicada a ${formatDate(entry.publishedAt)}` : `estás a ver o rascunho da versão ${entry.revision} (só os admins o veem)`) : `carregado neste dispositivo a ${formatDate(entry.importedAt)}, não gravado na base de dados`}. Valores ainda por validar.</p>
       ${result.ball ? `
         <div class="tracking-summary">
@@ -13349,9 +13448,9 @@ function renderTrackingTestSection(game) {
         ${result.players.some((p) => p.verticalPasses != null) ? highlight("Mais passes verticais", highlights.vertical, "passes", 0, tracking.statusTag(result, "vertical_passes")) : ""}
       </div>
       <p class="tracking-fineprint">Destaques entre quem teve pelo menos ${tracking.MIN_MINUTES_FOR_HIGHLIGHT} min observados e não esteve na baliza a maior parte do tempo.${result.ball ? " Passes detetados automaticamente; o total real é maior." : ""}</p>
-    </section>
-
-    <section class="profile-section tracking-section">
+    </section>`;
+  const personal = `
+    <section class="tracking-section gd-analysis" id="gd-analysis-${escapeHtml(game.id)}">
       <div class="tracking-head">
         <h3>${isOwn ? "A tua análise" : viewName ? `Análise de ${escapeHtml(viewName)}` : "A tua análise"}</h3>
         ${isAdmin && mappedPlayers.length ? `
@@ -13361,9 +13460,9 @@ function renderTrackingTestSection(game) {
             </select>
           </label>` : ""}
       </div>
-      ${viewP ? renderPlayerTrackingBlock(entry, viewP, { videoGameId: game.id }) : `<p class="tracking-note">${linked ? "Não estás associado a nenhum jogador neste vídeo." : "Entra com uma conta ligada a um jogador para veres a tua análise."}</p>`}
-    </section>
-
+      ${viewP ? renderPlayerTrackingBlock(entry, viewP, { videoGameId: game.id, grouped: true }) : `<p class="tracking-note">${linked ? "Não estás associado a nenhum jogador neste vídeo." : "Entra com uma conta ligada a um jogador para veres a tua análise."}</p>`}
+    </section>`;
+  const teams = `
     <section class="profile-section tracking-section">
       <div class="tracking-head"><h3>Equipas no vídeo</h3></div>
       ${renderTeamFaceOff(entry, game)}
@@ -13382,8 +13481,8 @@ function renderTrackingTestSection(game) {
       </div>
       ${renderBallZones(entry, game)}
       <p class="tracking-fineprint">Mapas por tempo passado em cada metro quadrado; a câmara está do lado de baixo.${result.ball?.middleThirdPct != null ? ` A bola esteve ${formatTrackingNumber(result.ball.middleThirdPct, 0)}% do tempo no terço do meio.` : ""}</p>
-    </section>
-
+    </section>`;
+  const tools = `
     <section class="profile-section tracking-section admin-only">
       <details class="tracking-mapping tracking-admin" ${isDraft || problems.unmapped.length ? "open" : ""}>
         <summary>Atualizar a análise de vídeo · só admin</summary>
@@ -13439,6 +13538,8 @@ function renderTrackingTestSection(game) {
       </details>
     </section>
   `;
+  if (part === "personal") return personal;
+  return isAdmin ? collective + teams + tools : "";
 }
 
 function bindTrackingTestSection(game, container) {
@@ -14743,7 +14844,7 @@ function syncHeartRateViews(game, entry) {
   document.querySelectorAll("svg[data-hr-timeline]").forEach((svg) => {
     if (svg.dataset.hrGame !== game.id) return;
     const group = svg.querySelector("[data-hr-line]");
-    if (group) group.innerHTML = renderHeartRateTimelineLine(game, entry, Number(svg.dataset.hrMinutes) || 0);
+    if (group) group.innerHTML = renderHeartRateTimelineLine(game, entry, Number(svg.dataset.hrMinutes) || 0, { labels: svg.dataset.hrLabels === "1" });
   });
 }
 
@@ -14777,7 +14878,7 @@ document.addEventListener("click", (event) => {
 
 // Linha dos batimentos por cima do grafico "Ao longo do jogo" (mesmo eixo: minutos da analise, 4 unidades por
 // minuto). Uma leitura a cada 6 s; onde o relogio nao tem leitura a linha parte-se.
-function renderHeartRateTimelineLine(game, entry, minutes) {
+function renderHeartRateTimelineLine(game, entry, minutes, { labels = false } = {}) {
   const api = window.FooterHeartRate;
   const samples = getHeartRateSamples(entry);
   const offset = getHeartRateOffset(game, entry);
@@ -14805,7 +14906,12 @@ function renderHeartRateTimelineLine(game, entry, minutes) {
     run.points.push(coordinate);
   });
   const shape = (extra) => runs.map((item) => `<polyline fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" ${extra(item)} points="${item.points.join(" ")}"/>`).join("");
-  return `<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="3.6"')}${shape((item) => `stroke="${item.color}" stroke-width="2"`)}</g>`;
+  // Painel proprio (labels): a escala de bpm a esquerda e os minutos sem batimentos ficam como falha visivel.
+  const scale = labels ? `<g class="hr-tl-scale" font-size="3" fill="var(--muted)">
+    <line x1="0" x2="${minutes * 4}" y1="6" y2="6" stroke="var(--line)" stroke-width="0.15" stroke-dasharray="0.8 0.8"/>
+    <line x1="0" x2="${minutes * 4}" y1="33" y2="33" stroke="var(--line)" stroke-width="0.15"/>
+    <text x="0.4" y="5">${Math.round(high)}</text><text x="0.4" y="32">${Math.round(low)}</text></g>` : "";
+  return `${scale}<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="3.6"')}${shape((item) => `stroke="${item.color}" stroke-width="2"`)}</g>`;
 }
 
 // Jogador do utilizador no video analisado (para acertar os batimentos com o movimento): null sem analise ou sem ligacao.
@@ -15033,7 +15139,8 @@ function bindHeartRatePanel(game, section) {
   // a pagina do jogo redesenha-se para o mostrar ou tirar.
   const rerender = () => {
     panelState.scopeKey = "";
-    if (document.querySelector("svg.tracking-rhythm") && currentHistoryGameId === game.id) {
+    // O resumo do cartao "O meu treino" (e o grafico de movimento) dependem do treino: redesenha a pagina do jogo.
+    if (currentHistoryGameId === game.id && els.historyGameDetail?.contains(panel)) {
       renderHistoryGameDetail();
       return;
     }
@@ -15279,7 +15386,8 @@ function tickHeartRatePanels() {
       updateHeartRateOverlay(state.section, null, null, false);
       return;
     }
-    if (!panel.offsetParent && !state.section.querySelector(".is-fullscreen")) return;
+    // O detalhe do treino pode estar fechado; com video no ecra a pilula de FC continua a acompanhar.
+    if (!panel.offsetParent && !state.section.querySelector(".is-fullscreen, [data-video-stage], .lab-video")) return;
     const api = window.FooterHeartRate;
     const samples = getHeartRateSamples(entry);
     const offset = getHeartRateOffset(state.game, entry);
@@ -15324,16 +15432,14 @@ function tickHeartRatePanels() {
 
 function renderGameVideoSection(game) {
   const parts = getGameVideoParts(game.id);
-  // Sem video o treino ja se pode carregar; quando houver video, liga-se pela hora do jogo.
-  if (!parts.length && !isAdmin) {
-    return canMarkMoments() ? `<section class="game-video-section" data-game-video-section>${renderHeartRateSection(game)}</section>` : "";
-  }
+  // O treino do relogio tem o seu proprio cartao (renderGameTrainingLevel); sem video so o admin ve isto, em Gerir jogo.
+  if (!parts.length && !isAdmin) return "";
   const first = parts[0];
   const savedCount = getSavedGameVideoParts(game.id).length;
   const timeText = (s) => formatVideoClock(s);
   return `
     <section class="profile-section tracking-section game-video-section${parts.length ? "" : " admin-only"}" data-game-video-section>
-      <div class="tracking-head"><h3>Vídeo do jogo</h3>${parts.length ? "" : `<span class="tracking-badge">Só admins veem</span>`}</div>
+      ${parts.length ? "" : `<div class="tracking-head"><h3>Vídeo do jogo</h3><span class="tracking-badge">Só admins veem</span></div>`}
       ${parts.length ? `
         ${parts.length > 1 ? `
           <div class="tracking-pitch-tabs game-video-parts" role="group" aria-label="Parte do vídeo">
@@ -15353,9 +15459,8 @@ function renderGameVideoSection(game) {
         </div>
         <p class="tracking-fineprint">Vídeo no YouTube.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
         ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
-        ${renderMomentsBlock(game)}`}` : `
+        ${renderGameDetailMoments(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
-      ${canMarkMoments() ? renderHeartRateSection(game) : ""}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
           <summary>${parts.length ? "Gerir vídeo · só admin" : "Juntar vídeo · só admin"}</summary>
@@ -15427,7 +15532,6 @@ function bindGameVideoSection(game, container) {
     renderHistoryGameDetail();
   }));
   const bunny = getActiveHomeVideo(game.id);
-  bindHeartRatePanel(game, section);
   if (bunny) section.gamePlayer = mountGamePlayer(section.querySelector("[data-bunny-player]"), bunny);
   else {
     frame?.addEventListener("load", () => { frame.dataset.ready = "1"; });
@@ -15522,47 +15626,356 @@ function bindGameVideoSection(game, container) {
 }
 
 
+// ---- Detalhe do jogo em 3 niveis: Jogo (todos), O meu treino (so o proprio) e Video e analise (regras do clube) ----
+// Cada nivel so aparece quando ha dados para este jogo e para esta conta. Gestao (data, equipas, faltas, relatorio
+// das equipas, publicar a analise) fica em "Gerir jogo", no menu ⋯, so para admins.
+const gameDetailTrainingOpen = new Set();
+// Que blocos <details data-gd-keep="..."> estao abertos (por jogo), para nao fecharem quando a pagina se redesenha.
+const gameDetailOpenBlocks = new Set();
+const gdKeep = (game, key, defaultOpen = false) => {
+  const id = `${game.id}:${key}`;
+  const open = gameDetailOpenBlocks.has(id) || (defaultOpen && !gameDetailOpenBlocks.has(`${id}:closed`));
+  return `data-gd-keep="${escapeHtml(key)}" ${open ? "open" : ""}`;
+};
+
+function getPlayerSideInGame(game, playerId) {
+  if (!game || !playerId) return null;
+  ensureGameShape(game);
+  if (game.teamA.includes(playerId) || game.benchA.includes(playerId)) return "A";
+  if (game.teamB.includes(playerId) || game.benchB.includes(playerId)) return "B";
+  return null;
+}
+
+function getGameDetailLevels(game) {
+  const hasTraining = canMarkMoments() && !(remoteEnabled && !currentSession?.user)
+    && (Boolean(heartRateEntries[game.id]) || gameDetailTrainingOpen.has(game.id));
+  const parts = getGameVideoParts(game.id);
+  const tracking = window.FooterTracking ? getTrackingEntry(game.id) : null;
+  const hasVideo = parts.length > 0 || Boolean(tracking && (tracking.status !== "draft" || isAdmin));
+  return { training: hasTraining, video: hasVideo };
+}
+
+function renderGameDetailHero(game) {
+  const linked = getLinkedPlayer();
+  const side = getPlayerSideInGame(game, linked?.id);
+  const hasScore = game.scoreA != null && game.scoreB != null;
+  let outcome = null;
+  if (side && hasScore) {
+    const mine = Number(side === "A" ? game.scoreA : game.scoreB);
+    const theirs = Number(side === "A" ? game.scoreB : game.scoreA);
+    outcome = mine > theirs ? ["win", "Vitória"] : mine < theirs ? ["loss", "Derrota"] : ["draw", "Empate"];
+  }
+  const when = new Date(game.date);
+  const whenText = Number.isFinite(when.getTime())
+    ? when.toLocaleString("pt-PT", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "";
+  ensureGameShape(game);
+  // Equipas numa fila de mini fotos sobrepostas (foto ou iniciais); tocar abre o perfil. Suplentes mais esbatidos.
+  // Cabem 4 por equipa num ecra de 360 px; o resto fica num "+N" que abre a fila completa.
+  const FACES_SHOWN = 4;
+  const faces = (key) => {
+    const starters = hydrate(game[`team${key}`] || []);
+    const bench = hydrate(game[`bench${key}`] || []);
+    const face = (p, isBench, extra = "") => `<span class="gd-face${p.id === linked?.id ? " me" : ""}${isBench ? " bench" : ""}${extra}" data-open-field-player="${p.id}" role="button" tabindex="0" title="${escapeHtml(p.name)}${isBench ? " (suplente)" : ""}">${renderAvatar(p)}</span>`;
+    const all = [...starters.map((p) => [p, false]), ...bench.map((p) => [p, true])];
+    // O proprio jogador fica sempre a vista, mesmo que seja suplente.
+    const mineIndex = all.findIndex(([p]) => p.id === linked?.id);
+    if (mineIndex >= FACES_SHOWN) all.unshift(...all.splice(mineIndex, 1));
+    const hiddenCount = Math.max(0, all.length - FACES_SHOWN);
+    return `<div class="gd-faces${hiddenCount ? "" : " all"}" data-gd-faces>${all.map(([p, isBench], i) => face(p, isBench, i >= FACES_SHOWN ? " extra" : "")).join("")}${hiddenCount ? `<button type="button" class="gd-face-more" data-gd-faces-more aria-label="Ver mais ${hiddenCount}">+${hiddenCount}</button>` : ""}</div>`;
+  };
+  const team = (key) => `
+    <div class="gd-team gd-team-${key.toLowerCase()}${side === key ? " mine" : ""}">
+      <span class="gd-team-name"><i class="gd-dot gd-dot-${key.toLowerCase()}"></i>Equipa ${key}</span>
+      ${faces(key)}
+    </div>`;
+  return `
+    <section class="gd-hero" id="gd-level-jogo">
+      <p class="gd-when">${escapeHtml(whenText)}</p>
+      <div class="gd-score">
+        ${team("A")}
+        <div class="gd-digits" aria-label="Resultado ${hasScore ? `${game.scoreA} a ${game.scoreB}` : "em aberto"}">
+          ${hasScore ? `<b>${game.scoreA}</b><i>–</i><b>${game.scoreB}</b>` : `<i>vs</i>`}
+        </div>
+        ${team("B")}
+      </div>
+      ${outcome ? `<p class="gd-outcome-line"><span class="gd-outcome gd-outcome-${outcome[0]}">${outcome[1]}</span><span>Jogaste na Equipa ${side}</span></p>` : ""}
+      ${renderGameDetailScorers(game)}
+      ${renderMvpPanel(game)}
+    </section>`;
+}
+
+// Marcadores e assistencias por equipa, so com o registo de golos ligado no clube (desligado, nem aparece).
+function renderGameDetailScorers(game) {
+  const goals = gameGoals[game.id] || [];
+  const linkedId = getLinkedPlayer()?.id;
+  if (!goalsEnabledForGroup() || !goals.some(isGoalFilled)) return `<div class="gd-scorers" data-gd-scorers hidden></div>`;
+  const column = (side) => {
+    const filled = goals.filter((goal) => goal.side === side && isGoalFilled(goal)).sort((x, y) => x.position - y.position);
+    const scorers = new Map();
+    const assists = new Map();
+    filled.forEach((goal) => {
+      const key = goal.ownGoal ? "AG" : goal.scorerId;
+      scorers.set(key, (scorers.get(key) || 0) + 1);
+      if (goal.assistId) assists.set(goal.assistId, (assists.get(goal.assistId) || 0) + 1);
+    });
+    const label = (id, count) => {
+      const name = id === "AG" ? "Autogolo" : findPlayer(id)?.name || "Jogador";
+      return `<li class="${id === linkedId ? "me" : ""}">${escapeHtml(name)}${count > 1 ? ` <b>×${count}</b>` : ""}</li>`;
+    };
+    return `
+      <div class="gd-scorer-col gd-scorer-col-${side.toLowerCase()}">
+        ${scorers.size ? `<ul class="gd-scorer-list"><span aria-hidden="true">⚽</span>${[...scorers].map(([id, n]) => label(id, n)).join("")}</ul>` : ""}
+        ${assists.size ? `<ul class="gd-scorer-list gd-assist-list"><span aria-label="Assistências">A</span>${[...assists].map(([id, n]) => label(id, n)).join("")}</ul>` : ""}
+      </div>`;
+  };
+  return `<div class="gd-scorers" data-gd-scorers>${column("A")}${column("B")}</div>`;
+}
+
+function renderGameDetailMenu(game) {
+  const canAddTraining = canMarkMoments() && !(remoteEnabled && !currentSession?.user)
+    && !heartRateEntries[game.id] && !gameDetailTrainingOpen.has(game.id);
+  const items = [
+    canAddTraining ? `<button type="button" role="menuitem" data-gd-add-training>♥ Adicionar treino do relógio <small>.fit .tcx .gpx</small></button>` : "",
+    isAdmin ? `<button type="button" role="menuitem" data-gd-open-manage>⚙ Gerir jogo <small>só admin</small></button>` : "",
+  ].filter(Boolean);
+  if (!items.length) return "";
+  return `
+    <div class="gd-menu">
+      <button type="button" class="gd-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações do jogo" data-gd-menu>⋯</button>
+      <div class="gd-menu-list" role="menu" hidden data-gd-menu-list>${items.join("")}</div>
+    </div>`;
+}
+
+function renderGameDetailJump(game, levels) {
+  const chips = [["jogo", "Jogo"], levels.training && ["treino", "Treino"], levels.video && ["video", "Vídeo"]].filter(Boolean);
+  if (chips.length < 2) return "";
+  return `
+    <nav class="gd-jump" aria-label="Ir para">
+      ${chips.map(([key, label], i) => `<button type="button" class="${i === 0 ? "active" : ""}" data-gd-jump="${key}">${label}</button>`).join("")}
+    </nav>`;
+}
+
+function renderGameDetailLevelHead(icon, kind, title, extra = "") {
+  return `<header class="gd-level-head"><span class="gd-level-icon gd-icon-${kind}" aria-hidden="true">${icon}</span><h3>${title}</h3>${extra}</header>`;
+}
+
+// As equipas e o resultado vivem no cartao do topo; aqui fica so o registo de golos (quando o clube o usa).
+function renderGameDetailGameLevel(game) {
+  return renderGoalsSection(game);
+}
+
+function renderGameDetailTrainingLevel(game) {
+  const entry = heartRateEntries[game.id];
+  let summary = "";
+  if (entry) {
+    const api = window.FooterHeartRate;
+    const samples = getHeartRateSamples(entry);
+    const maxHr = getHeartRateMax(entry);
+    const values = samples.map((sample) => sample.hr);
+    const seconds = api.zoneSeconds(samples, maxHr);
+    const total = seconds.reduce((sum, value) => sum + value, 0);
+    const high = (seconds[3] || 0) + (seconds[4] || 0);
+    let weighted = 0;
+    samples.forEach((sample, index) => {
+      const next = samples[index + 1];
+      const dt = next ? Math.min(next.t - sample.t, api.MAX_GAP_S) : 0;
+      weighted += sample.hr * dt;
+    });
+    const avg = total ? Math.round(weighted / total) : Math.round(values.reduce((a, b) => a + b, 0) / (values.length || 1));
+    const durationMin = samples.length ? Math.round((samples[samples.length - 1].t - samples[0].t) / 60) : 0;
+    const chosenMax = Number(readHeartRateSetting("max")) >= 100;
+    summary = `
+      <div class="gd-stats">
+        <div><b>${avg}<small>bpm</small></b><span>Média</span></div>
+        <div><b>${Math.max(...values)}<small>bpm</small></b><span>Pico</span></div>
+        <div><b>${Math.round(high / 60)}<small>min</small></b><span>Intenso e máximo</span></div>
+      </div>
+      <div class="hr-zones-bar" role="img" aria-label="Tempo em cada zona de esforço">
+        ${api.ZONES.map((zone, index) => seconds[index] ? `<span style="flex:${seconds[index].toFixed(1)};background:${zone.color}"></span>` : "").join("")}
+      </div>
+      <p class="gd-scope">Treino completo · ${durationMin} min · zonas com FC máx. ${maxHr} ${chosenMax ? "(a tua)" : "(o pico deste treino)"}${heartRateTimeMismatch(game, entry) ? ` · <span class="gd-warn">hora por confirmar</span>` : ""}</p>`;
+  }
+  return `
+    <section class="gd-level gd-level-treino" id="gd-level-treino" data-gd-level="treino">
+      ${renderGameDetailLevelHead("♥", "hr", "O meu treino", `<span class="gd-private">🔒 Só tu vês</span>`)}
+      ${summary}
+      <details class="gd-group" ${entry ? gdKeep(game, "training") : "open"}>
+        <summary><strong>${entry ? "Abrir treino" : "Carregar o treino"}</strong><em>${entry ? "curva, acerto, trocar ou remover" : ".fit, .tcx ou .gpx do relógio"}</em></summary>
+        <div class="gd-group-body hr-panel" data-hr-panel><div data-hr-body>${renderHeartRateBody(game)}</div></div>
+      </details>
+    </section>`;
+}
+
+// Os momentos marcados abrem a pedido; a contagem fica a vista no resumo.
+function renderGameDetailMoments(game) {
+  const block = renderMomentsBlock(game);
+  if (!block) return "";
+  const count = getGameBookmarks(game.id).length;
+  return `
+    <details class="gd-group gd-moments" id="gd-moments-${escapeHtml(game.id)}" ${gdKeep(game, "moments")}>
+      <summary><strong>Momentos</strong><em>${count ? `${count} marcado${count === 1 ? "" : "s"}` : "marca os teus lances"}</em></summary>
+      <div class="gd-group-body">${block}</div>
+    </details>`;
+}
+
+function renderGameDetailVideoLevel(game) {
+  const parts = getGameVideoParts(game.id);
+  const personal = renderTrackingTestSection(game, "personal");
+  const hasAnalysis = personal.includes("gd-analysis-more");
+  // Dois percursos explicitos: ver o jogo e os momentos, ou ir aos dados de quem esta a ver.
+  const paths = [
+    parts.length && !getActiveHomeVideo(game.id) ? `<button type="button" class="gd-path gd-path-video" data-gd-open="gd-moments-${escapeHtml(game.id)}">▶ Ver momentos</button>` : "",
+    hasAnalysis ? `<button type="button" class="gd-path" data-gd-open="gd-analysis-more-${escapeHtml(game.id)}">A minha análise ›</button>` : "",
+  ].filter(Boolean);
+  return `
+    <section class="gd-level gd-level-video" id="gd-level-video" data-gd-level="video">
+      ${renderGameDetailLevelHead("▶", "video", "Vídeo e análise", parts.length > 1 ? `<span class="gd-pill">${parts.length} partes</span>` : "")}
+      ${parts.length ? renderGameVideoSection(game) : `<p class="tracking-note">Sem gravação para ver. Os tempos da análise aparecem em texto.</p>`}
+      ${personal}
+      ${paths.length ? `<div class="gd-paths">${paths.join("")}</div>` : ""}
+    </section>`;
+}
+
+function renderGameDetailManage(game) {
+  if (!isAdmin) return "";
+  const hasParts = getGameVideoParts(game.id).length > 0;
+  return `
+    <details class="gd-manage admin-only" id="gd-manage" data-gd-manage>
+      <summary><strong>⚙ Gerir jogo</strong><em>só admin</em></summary>
+      <div class="gd-manage-body">
+        <div class="history-game-date-edit admin-actions">
+          <label class="game-date-control">
+            <span>Data/hora</span>
+            <input type="datetime-local" data-history-game-date="${game.id}" value="${toDateTimeLocalInput(game.date)}">
+          </label>
+          <button class="ghost-btn" data-save-history-game-date="${game.id}">Guardar data</button>
+        </div>
+        ${renderHistoryRosterEditor(game)}
+        ${renderNoShowSection(game)}
+        ${hasParts ? "" : renderGameVideoSection(game)}
+        ${renderTrackingTestSection(game, "admin")}
+      </div>
+    </details>`;
+}
+
+function bindGameDetailChrome(game, root) {
+  const menuButton = root.querySelector("[data-gd-menu]");
+  const menuList = root.querySelector("[data-gd-menu-list]");
+  const closeMenu = () => {
+    if (!menuList) return;
+    menuList.hidden = true;
+    menuButton?.setAttribute("aria-expanded", "false");
+  };
+  on(menuButton, "click", (event) => {
+    event.stopPropagation();
+    const open = menuList.hidden;
+    menuList.hidden = !open;
+    menuButton.setAttribute("aria-expanded", String(open));
+  });
+  if (root.dataset.gdMenuBound !== "1") {
+    root.dataset.gdMenuBound = "1";
+    document.addEventListener("click", (event) => {
+      const list = root.querySelector("[data-gd-menu-list]");
+      if (list && !list.hidden && !event.target.closest?.(".gd-menu")) {
+        list.hidden = true;
+        root.querySelector("[data-gd-menu]")?.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
+  on(root.querySelector("[data-gd-add-training]"), "click", () => {
+    gameDetailTrainingOpen.add(game.id);
+    renderHistoryGameDetail();
+    root.querySelector("#gd-level-treino")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  on(root.querySelector("[data-gd-open-manage]"), "click", () => {
+    closeMenu();
+    const manage = root.querySelector("[data-gd-manage]");
+    if (!manage) return;
+    manage.open = true;
+    manage.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  root.querySelectorAll("details[data-gd-keep]").forEach((details) => on(details, "toggle", () => {
+    const id = `${game.id}:${details.dataset.gdKeep}`;
+    if (details.open) { gameDetailOpenBlocks.add(id); gameDetailOpenBlocks.delete(`${id}:closed`); }
+    else { gameDetailOpenBlocks.delete(id); gameDetailOpenBlocks.add(`${id}:closed`); }
+  }));
+  root.querySelectorAll("[data-gd-open]").forEach((button) => on(button, "click", () => {
+    const target = root.querySelector(`#${CSS.escape(button.dataset.gdOpen)}`);
+    if (!target) return;
+    target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+  root.querySelectorAll("[data-gd-faces-more]").forEach((button) => on(button, "click", (event) => {
+    event.stopPropagation();
+    button.closest("[data-gd-faces]")?.classList.add("all");
+    button.remove();
+  }));
+  // Cursor comum aos paineis de "Ao longo do jogo" (movimento e batimentos).
+  root.querySelectorAll(".tp-body").forEach((body) => {
+    const panels = [...body.querySelectorAll("svg[data-tp-panel]")];
+    if (panels.length < 2) return;
+    const move = (event) => {
+      const box = event.currentTarget.getBoundingClientRect();
+      const view = event.currentTarget.viewBox.baseVal;
+      const x = view.x + ((event.clientX - box.left) / (box.width || 1)) * view.width;
+      panels.forEach((svg) => {
+        const line = svg.querySelector(".tp-cursor");
+        if (!line) return;
+        line.setAttribute("x1", x.toFixed(2));
+        line.setAttribute("x2", x.toFixed(2));
+        line.removeAttribute("hidden");
+      });
+    };
+    const leave = () => panels.forEach((svg) => svg.querySelector(".tp-cursor")?.setAttribute("hidden", ""));
+    panels.forEach((svg) => {
+      on(svg, "pointermove", move);
+      on(svg, "pointerleave", leave);
+    });
+  });
+  const jumps = [...root.querySelectorAll("[data-gd-jump]")];
+  jumps.forEach((button) => on(button, "click", () => {
+    jumps.forEach((item) => item.classList.toggle("active", item === button));
+    root.querySelector(`#gd-level-${button.dataset.gdJump}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+}
+
 function renderHistoryGameDetail() {
   if (!els.historyGameDetail) return;
   const game = state.games.find((item) => item.id === currentHistoryGameId);
   if (!game) {
-    els.historyGameDetail.innerHTML = `<div class="empty-state">Escolhe um jogo finalizado no historico.</div>`;
+    els.historyGameDetail.innerHTML = `<div class="empty-state">Escolhe um jogo finalizado no histórico.</div>`;
     return;
   }
-  const gameTitle = getGameTitle(game);
+  const levels = getGameDetailLevels(game);
   els.historyGameDetail.innerHTML = `
-    <div class="history-game-title">
-      <p class="eyebrow">Historico de jogo</p>
-      <h3>${escapeHtml(gameTitle)}</h3>
-      <div class="history-game-date-edit admin-actions">
-        <label class="game-date-control">
-          <span>Data/hora</span>
-          <input type="datetime-local" data-history-game-date="${game.id}" value="${toDateTimeLocalInput(game.date)}">
-        </label>
-        <button class="ghost-btn" data-save-history-game-date="${game.id}">Guardar data</button>
+    <div class="gd-top">
+      <div>
+        <p class="eyebrow">Histórico de jogo</p>
+        <h3>${escapeHtml(getGameTitle(game))}</h3>
       </div>
+      ${renderGameDetailMenu(game)}
     </div>
-    <div class="field-card history-field-card">
-      ${renderField(game, { radarPosition: "none", clickablePlayers: true })}
-    </div>
-    ${renderHistoryRosterEditor(game)}
-    ${renderNoShowSection(game)}
-    ${renderGameVideoSection(game)}
-    ${renderGoalsSection(game)}
-    ${renderTrackingTestSection(game)}
+    ${renderGameDetailHero(game)}
+    ${renderGameDetailJump(game, levels)}
+    ${renderGameDetailGameLevel(game)}
+    ${levels.training ? renderGameDetailTrainingLevel(game) : ""}
+    ${levels.video ? renderGameDetailVideoLevel(game) : ""}
+    ${renderGameDetailManage(game)}
   `;
-  els.historyGameDetail.querySelector("[data-save-history-game-date]")?.addEventListener("click", async (buttonEvent) => {
+  const root = els.historyGameDetail;
+  root.querySelector("[data-save-history-game-date]")?.addEventListener("click", async (buttonEvent) => {
     const gameId = buttonEvent.currentTarget.dataset.saveHistoryGameDate;
-    const input = [...els.historyGameDetail.querySelectorAll("[data-history-game-date]")]
+    const input = [...root.querySelectorAll("[data-history-game-date]")]
       .find((item) => item.dataset.historyGameDate === gameId);
     const date = fromDateTimeLocalInput(input?.value);
     if (!date) {
-      alert("Escolhe uma data e hora valida.");
+      alert("Escolhe uma data e hora válida.");
       return;
     }
     await updateGameDate(gameId, date);
   });
-  els.historyGameDetail.querySelectorAll("[data-open-field-player]").forEach((card) => {
+  root.querySelectorAll("[data-open-field-player]").forEach((card) => {
     card.addEventListener("click", () => openPlayerProfile(card.dataset.openFieldPlayer));
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -15571,12 +15984,14 @@ function renderHistoryGameDetail() {
       }
     });
   });
+  bindGameDetailChrome(game, root);
   bindHistoryRosterEditorActions(game);
-  bindNoShowSection(els.historyGameDetail);
-  bindMvpPanelActions(game, els.historyGameDetail);
-  bindTrackingTestSection(game, els.historyGameDetail);
-  bindGameVideoSection(game, els.historyGameDetail);
-  bindGoalsSection(game, els.historyGameDetail);
+  bindNoShowSection(root);
+  bindMvpPanelActions(game, root);
+  bindTrackingTestSection(game, root);
+  bindGameVideoSection(game, root);
+  bindHeartRatePanel(game, root);
+  bindGoalsSection(game, root);
 }
 
 function renderHistoryRosterEditor(game) {
