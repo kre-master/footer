@@ -293,3 +293,21 @@ input[type="date"], input[type="time"], input[type="datetime-local"], .game-date
 .xpr-item { border: 2px solid var(--cad-ink); border-left: 4px solid var(--rc, #7b8494); background: var(--cad-paper); box-shadow: var(--shadow-soft); }
 .xpr-items, .xpr-line { border-color: var(--line); }
 .xpr-chip { border: 1.5px solid var(--cad-ink); }
+
+/* ---------- Detalhe do jogo (3 niveis) ---------- */
+.gd-hero, .gd-level { background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: var(--shadow-soft); }
+.gd-level-treino { box-shadow: 3px 3px 0 var(--orange); }
+.gd-level-video { box-shadow: 3px 3px 0 var(--cad-blue); }
+.gd-hero .mvp-panel { background: var(--cad-yellow-soft); border: 2px solid var(--cad-ink); }
+.gd-hero .mvp-panel .eyebrow { color: var(--cad-ink); }
+.gd-outcome { border: 2px solid var(--cad-ink); }
+.gd-face { box-shadow: 0 0 0 2px var(--cad-paper); }
+.gd-face .avatar { border: 1.5px solid var(--cad-ink); }
+.gd-face-more { background: var(--cad-yellow); color: var(--cad-ink); border: 1.5px solid var(--cad-ink); box-shadow: 0 0 0 2px var(--cad-paper); }
+.gd-lance { background: rgba(31, 95, 214, .1); border: 2px solid var(--cad-ink); }
+.gd-lance-play { background: var(--cad-blue); }
+.gd-path { background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.gd-path-video { background: var(--cad-blue); color: #fff; }
+.tp-hr-toggle { border: 2px solid var(--cad-ink); }
+.gd-jump button { border: 2px solid var(--cad-ink); }
+.gd-jump button.active { background: var(--cad-yellow); border-color: var(--cad-ink); color: var(--cad-ink); }

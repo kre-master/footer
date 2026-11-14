@@ -12978,17 +12978,31 @@ function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = nu
         <summary><strong>${title}</strong><em>${hint}</em></summary>
         <div class="gd-group-body">${content}</div>
       </details>` : "";
+    const seekable = p.maxSustainedAtS != null && videoGameId
+      && Boolean(tracking.videoSeekTarget(getGameVideoParts(videoGameId), p.maxSustainedAtS));
+    // Um lance com contexto: o pico de velocidade, com salto para o video quando a parte e reproduzivel.
+    const peak = p.maxSustainedKmh != null ? `
+      <${seekable ? `button type="button" data-video-seek="${Math.max(0, p.maxSustainedAtS - 3).toFixed(1)}"` : "div"} class="gd-lance${seekable ? "" : " static"}">
+        <span class="gd-lance-play" aria-hidden="true">${seekable ? "▶" : "⚡"}</span>
+        <span class="gd-lance-text"><b>Pico de velocidade · ${formatTrackingNumber(p.maxSustainedKmh, 1)} km/h</b><small>${seekable ? "Ver este lance no vídeo" : `Sustentado ${formatTrackingNumber(p.maxSustainedWindowS, 0)} s`}</small></span>
+        ${p.maxSustainedAtS != null ? `<span class="gd-lance-time">${formatVideoClock(p.maxSustainedAtS)}</span>` : ""}
+      </${seekable ? "button" : "div"}>` : "";
     return `
     <div class="tracking-player gd-player">
-      <p class="gd-coverage${lowCoverage ? " low" : ""}"><i aria-hidden="true"></i>Visto ${formatTrackingNumber(p.validMinutes, 0)} min pela câmara${lowCoverage ? " · pouca cobertura, lê estes números com cuidado" : " (não são minutos jogados)"}</p>
-      <div class="tracking-highlights">
+      <p class="gd-coverage${lowCoverage ? " low" : ""}"><i aria-hidden="true"></i>${lowCoverage
+        ? `Só ${formatTrackingNumber(p.validMinutes, 0)} min identificado pela câmara · lê estes números com cuidado`
+        : `Identificado ${formatTrackingNumber(p.validMinutes, 0)} min pela câmara (não são minutos jogados)`}</p>
+      <div class="tracking-highlights gd-highlights">
         ${trackingCard("Distância observada", p.distanceM == null ? null : p.distanceM / 1000, "km", { digits: 2, note: rank("distanceM"), tag: tag("distance") })}
-        ${trackingCard(`Mais rápido (${formatTrackingNumber(p.maxSustainedWindowS, 0)} s)`, p.maxSustainedKmh, "km/h", { digits: 1, note: p.maxSustainedAtS != null ? `aos ${videoClockLink(videoGameId, p.maxSustainedAtS)} do vídeo` : "", tag: tag("max_speed") })}
         ${trackingCard("Sprints ≥20 km/h", p.sprints, "", { note: p.highRuns != null ? `${formatTrackingNumber(p.highRuns)} arranques ≥15 km/h` : "", tag: tag("sprints") })}
         ${p.passesMade != null
           ? trackingCard("Passes detetados", p.passesMade, "", { note: rank("passesMade"), tag: tag("passes") })
           : trackingCard("Ritmo", p.metersPerMin, "m/min", { digits: 1, note: rank("metersPerMin"), tag: tag("pace") })}
       </div>
+      ${peak}
+      <details class="gd-group gd-analysis-more" id="gd-analysis-more-${escapeHtml(videoGameId || "x")}" ${videoGameId ? gdKeep({ id: videoGameId }, "analysis") : ""}>
+        <summary><strong>Análise completa</strong><em>ao longo do jogo, movimento, posição, bola</em></summary>
+        <div class="gd-group-body">
       ${renderPlayerTimeline(entry, p, videoGameId)}
       <div class="gd-groups">
         ${group("Movimento", "ritmo, velocidade, faixas", `${renderTrackingStories(entry, p, videoGameId)}${renderTrackingBands(p)}`)}
@@ -13007,6 +13021,8 @@ function renderPlayerTrackingBlock(entry, p, { gameLink = null, videoGameId = nu
 `)}
         ${group("Com bola", "passes e ligações", passBlock)}
       </div>
+        </div>
+      </details>
     </div>`;
   }
   return `
@@ -13115,16 +13131,27 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   const hrEntry = hrGame ? heartRateEntries[hrGame.id] : null;
   const ownId = getLinkedPlayer()?.id;
   const hrOwn = Boolean(hrEntry && ownId && entry.mapping?.[p.label] === ownId);
-  const hrAttrs = hrOwn ? ` data-hr-timeline data-hr-game="${escapeHtml(hrGame.id)}" data-hr-minutes="${n}"` : "";
-  const hrLine = hrOwn ? `<g data-hr-line>${renderHeartRateTimelineLine(hrGame, hrEntry, n)}</g>` : "";
-  const chart = `<svg class="tracking-rhythm" viewBox="-2 0 ${n * 4 + 4} 40"${hrAttrs} role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints${hrOwn ? "; a linha de cor são os teus batimentos" : ""}">${bars}${hrLine}${ticks}</svg>`;
+  // Dois paineis alinhados no mesmo eixo de minutos, cada um com a sua unidade (sem dois eixos no mesmo grafico):
+  // em cima metros por minuto e sprints, em baixo os batimentos. Um cursor comum percorre os dois.
+  const width = n * 4 + 4;
+  const cursor = `<line class="tp-cursor" x1="0" x2="0" y1="0" y2="40" hidden/>`;
+  const chart = `<svg class="tracking-rhythm" data-tp-panel viewBox="-2 0 ${width} 40" role="img" aria-label="Metros por minuto observado em cada minuto do jogo; pontos laranja são sprints">${bars}${ticks}${cursor}</svg>`;
+  const hrToggleId = `${id}-hr`;
+  const hrPanel = hrOwn ? `
+      <input type="checkbox" class="tp-hr-in" id="${hrToggleId}" checked>
+      <div class="tp-hr-panel">
+        <span class="tp-unit">bpm · só tu vês</span>
+        <svg class="tracking-rhythm tracking-hr-panel" data-tp-panel viewBox="-2 0 ${width} 36" data-hr-timeline data-hr-labels="1" data-hr-game="${escapeHtml(hrGame.id)}" data-hr-minutes="${n}" role="img" aria-label="Os teus batimentos em cada minuto do jogo, a cor é a zona de esforço">
+          <g data-hr-line>${renderHeartRateTimelineLine(hrGame, hrEntry, n, { labels: true })}</g>${cursor.replace('y2="40"', 'y2="36"')}
+        </svg>
+      </div>` : "";
   const hrControls = hrOwn ? `
       <div class="hr-adjust hr-tl-adjust">
         <div class="hr-cal-head">
-          <span class="hr-adjust-title">♥ Os teus batimentos sobre o movimento</span>
+          <span class="hr-adjust-title">♥ Acertar os batimentos com o movimento</span>
           <button type="button" class="ghost-btn" data-hr-cal-open="${escapeHtml(hrGame.id)}">⛶ Acertar em ecrã cheio</button>
         </div>
-        <p class="tracking-fineprint">A linha de cor são os teus batimentos (a cor é a zona de esforço). Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
+        <p class="tracking-fineprint">O painel de baixo são os teus batimentos (a cor é a zona de esforço), no mesmo minuto que as barras de cima. Devem subir logo depois dos sprints e das barras altas. Se sobem depois do que vês, carrega em Adiantar; se sobem antes, em Atrasar.</p>
         <div class="hr-adjust-steps" role="group" aria-label="Tamanho do passo">${renderHeartRateStepButtons()}</div>
         <div class="hr-adjust-move">
           <button type="button" class="ghost-btn" data-hr-move="-1" data-hr-game="${escapeHtml(hrGame.id)}">◀ Atrasar</button>
@@ -13143,13 +13170,15 @@ function renderPlayerTimeline(entry, p, videoGameId = null) {
   }).join("");
   return `
     <div class="tracking-timeline">
-      <h4>Ao longo do jogo</h4>
+      <div class="tp-headline"><h4>Ao longo do jogo</h4>${hrOwn ? `<label class="tp-hr-toggle" for="${hrToggleId}">♥ Batimentos</label>` : ""}</div>
       ${periods.map((q) => `<input type="radio" class="tp-in tp-in-${q.key}" name="${id}" id="${id}-${q.key}" ${q.key === 0 ? "checked" : ""}>`).join("")}
       <div class="tracking-pitch-tabs tp-tabs" role="group" aria-label="Período do jogo">
         ${periods.map((q) => `<label for="${id}-${q.key}" class="tp-tab-${q.key}">${escapeHtml(q.label)}</label>`).join("")}
       </div>
       <div class="tp-body">
+        <span class="tp-unit">m/min</span>
         ${chart}
+        ${hrPanel}
         ${variants}
       </div>
       ${hrControls}
@@ -14815,7 +14844,7 @@ function syncHeartRateViews(game, entry) {
   document.querySelectorAll("svg[data-hr-timeline]").forEach((svg) => {
     if (svg.dataset.hrGame !== game.id) return;
     const group = svg.querySelector("[data-hr-line]");
-    if (group) group.innerHTML = renderHeartRateTimelineLine(game, entry, Number(svg.dataset.hrMinutes) || 0);
+    if (group) group.innerHTML = renderHeartRateTimelineLine(game, entry, Number(svg.dataset.hrMinutes) || 0, { labels: svg.dataset.hrLabels === "1" });
   });
 }
 
@@ -14849,7 +14878,7 @@ document.addEventListener("click", (event) => {
 
 // Linha dos batimentos por cima do grafico "Ao longo do jogo" (mesmo eixo: minutos da analise, 4 unidades por
 // minuto). Uma leitura a cada 6 s; onde o relogio nao tem leitura a linha parte-se.
-function renderHeartRateTimelineLine(game, entry, minutes) {
+function renderHeartRateTimelineLine(game, entry, minutes, { labels = false } = {}) {
   const api = window.FooterHeartRate;
   const samples = getHeartRateSamples(entry);
   const offset = getHeartRateOffset(game, entry);
@@ -14877,7 +14906,12 @@ function renderHeartRateTimelineLine(game, entry, minutes) {
     run.points.push(coordinate);
   });
   const shape = (extra) => runs.map((item) => `<polyline fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" ${extra(item)} points="${item.points.join(" ")}"/>`).join("");
-  return `<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="3.6"')}${shape((item) => `stroke="${item.color}" stroke-width="2"`)}</g>`;
+  // Painel proprio (labels): a escala de bpm a esquerda e os minutos sem batimentos ficam como falha visivel.
+  const scale = labels ? `<g class="hr-tl-scale" font-size="3" fill="var(--muted)">
+    <line x1="0" x2="${minutes * 4}" y1="6" y2="6" stroke="var(--line)" stroke-width="0.15" stroke-dasharray="0.8 0.8"/>
+    <line x1="0" x2="${minutes * 4}" y1="33" y2="33" stroke="var(--line)" stroke-width="0.15"/>
+    <text x="0.4" y="5">${Math.round(high)}</text><text x="0.4" y="32">${Math.round(low)}</text></g>` : "";
+  return `${scale}<g class="hr-tl-line" pointer-events="none">${shape(() => 'stroke="rgba(5,10,20,.7)" stroke-width="3.6"')}${shape((item) => `stroke="${item.color}" stroke-width="2"`)}</g>`;
 }
 
 // Jogador do utilizador no video analisado (para acertar os batimentos com o movimento): null sem analise ou sem ligacao.
@@ -15425,7 +15459,7 @@ function renderGameVideoSection(game) {
         </div>
         <p class="tracking-fineprint">Vídeo no YouTube.${getTrackingEntry(game.id) ? " Os tempos com ▶ na análise abaixo saltam para esse momento." : ""}</p>
         ${homeVideoIndexError ? `<p class="tracking-error">O vídeo de casa não respondeu (${escapeHtml(homeVideoIndexError)}), por isso estás a ver o YouTube. <button type="button" class="link-btn" data-home-retry>Tentar outra vez</button></p>` : ""}
-        ${renderMomentsBlock(game)}`}` : `
+        ${renderGameDetailMoments(game)}`}` : `
         <p class="tracking-note">Ainda sem vídeo. Envia o jogo para o YouTube como <strong>não listado</strong> e cola aqui a ligação.</p>`}
       ${isAdmin ? `
         <details class="tracking-admin admin-only" ${parts.length ? "" : "open"}>
@@ -15596,6 +15630,13 @@ function bindGameVideoSection(game, container) {
 // Cada nivel so aparece quando ha dados para este jogo e para esta conta. Gestao (data, equipas, faltas, relatorio
 // das equipas, publicar a analise) fica em "Gerir jogo", no menu ⋯, so para admins.
 const gameDetailTrainingOpen = new Set();
+// Que blocos <details data-gd-keep="..."> estao abertos (por jogo), para nao fecharem quando a pagina se redesenha.
+const gameDetailOpenBlocks = new Set();
+const gdKeep = (game, key, defaultOpen = false) => {
+  const id = `${game.id}:${key}`;
+  const open = gameDetailOpenBlocks.has(id) || (defaultOpen && !gameDetailOpenBlocks.has(`${id}:closed`));
+  return `data-gd-keep="${escapeHtml(key)}" ${open ? "open" : ""}`;
+};
 
 function getPlayerSideInGame(game, playerId) {
   if (!game || !playerId) return null;
@@ -15629,15 +15670,22 @@ function renderGameDetailHero(game) {
     ? when.toLocaleString("pt-PT", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "";
   ensureGameShape(game);
-  // Equipas em miniatura (foto ou iniciais); tocar abre o perfil. Suplentes mais esbatidos.
+  // Equipas numa fila de mini fotos sobrepostas (foto ou iniciais); tocar abre o perfil. Suplentes mais esbatidos.
+  // Cabem 4 por equipa num ecra de 360 px; o resto fica num "+N" que abre a fila completa.
+  const FACES_SHOWN = 4;
   const faces = (key) => {
     const starters = hydrate(game[`team${key}`] || []);
     const bench = hydrate(game[`bench${key}`] || []);
-    const face = (p, isBench) => `<span class="gd-face${p.id === linked?.id ? " me" : ""}${isBench ? " bench" : ""}" data-open-field-player="${p.id}" role="button" tabindex="0" title="${escapeHtml(p.name)}${isBench ? " (suplente)" : ""}">${renderAvatar(p)}</span>`;
-    return `<div class="gd-faces">${starters.map((p) => face(p, false)).join("")}${bench.map((p) => face(p, true)).join("")}</div>`;
+    const face = (p, isBench, extra = "") => `<span class="gd-face${p.id === linked?.id ? " me" : ""}${isBench ? " bench" : ""}${extra}" data-open-field-player="${p.id}" role="button" tabindex="0" title="${escapeHtml(p.name)}${isBench ? " (suplente)" : ""}">${renderAvatar(p)}</span>`;
+    const all = [...starters.map((p) => [p, false]), ...bench.map((p) => [p, true])];
+    // O proprio jogador fica sempre a vista, mesmo que seja suplente.
+    const mineIndex = all.findIndex(([p]) => p.id === linked?.id);
+    if (mineIndex >= FACES_SHOWN) all.unshift(...all.splice(mineIndex, 1));
+    const hiddenCount = Math.max(0, all.length - FACES_SHOWN);
+    return `<div class="gd-faces${hiddenCount ? "" : " all"}" data-gd-faces>${all.map(([p, isBench], i) => face(p, isBench, i >= FACES_SHOWN ? " extra" : "")).join("")}${hiddenCount ? `<button type="button" class="gd-face-more" data-gd-faces-more aria-label="Ver mais ${hiddenCount}">+${hiddenCount}</button>` : ""}</div>`;
   };
   const team = (key) => `
-    <div class="gd-team${side === key ? " mine" : ""}">
+    <div class="gd-team gd-team-${key.toLowerCase()}${side === key ? " mine" : ""}">
       <span class="gd-team-name"><i class="gd-dot gd-dot-${key.toLowerCase()}"></i>Equipa ${key}</span>
       ${faces(key)}
     </div>`;
@@ -15651,7 +15699,7 @@ function renderGameDetailHero(game) {
         </div>
         ${team("B")}
       </div>
-      ${outcome ? `<span class="gd-outcome gd-outcome-${outcome[0]}">${outcome[1]}</span>` : ""}
+      ${outcome ? `<p class="gd-outcome-line"><span class="gd-outcome gd-outcome-${outcome[0]}">${outcome[1]}</span><span>Jogaste na Equipa ${side}</span></p>` : ""}
       ${renderGameDetailScorers(game)}
       ${renderMvpPanel(game)}
     </section>`;
@@ -15749,23 +15797,43 @@ function renderGameDetailTrainingLevel(game) {
       <p class="gd-scope">Treino completo · ${durationMin} min · zonas com FC máx. ${maxHr} ${chosenMax ? "(a tua)" : "(o pico deste treino)"}${heartRateTimeMismatch(game, entry) ? ` · <span class="gd-warn">hora por confirmar</span>` : ""}</p>`;
   }
   return `
-    <section class="gd-level" id="gd-level-treino" data-gd-level="treino">
-      ${renderGameDetailLevelHead("♥", "hr", "O meu treino", `<span class="gd-private">Só tu vês</span>`)}
+    <section class="gd-level gd-level-treino" id="gd-level-treino" data-gd-level="treino">
+      ${renderGameDetailLevelHead("♥", "hr", "O meu treino", `<span class="gd-private">🔒 Só tu vês</span>`)}
       ${summary}
-      <details class="gd-group" ${entry ? "" : "open"}>
+      <details class="gd-group" ${entry ? gdKeep(game, "training") : "open"}>
         <summary><strong>${entry ? "Abrir treino" : "Carregar o treino"}</strong><em>${entry ? "curva, acerto, trocar ou remover" : ".fit, .tcx ou .gpx do relógio"}</em></summary>
         <div class="gd-group-body hr-panel" data-hr-panel><div data-hr-body>${renderHeartRateBody(game)}</div></div>
       </details>
     </section>`;
 }
 
+// Os momentos marcados abrem a pedido; a contagem fica a vista no resumo.
+function renderGameDetailMoments(game) {
+  const block = renderMomentsBlock(game);
+  if (!block) return "";
+  const count = getGameBookmarks(game.id).length;
+  return `
+    <details class="gd-group gd-moments" id="gd-moments-${escapeHtml(game.id)}" ${gdKeep(game, "moments")}>
+      <summary><strong>Momentos</strong><em>${count ? `${count} marcado${count === 1 ? "" : "s"}` : "marca os teus lances"}</em></summary>
+      <div class="gd-group-body">${block}</div>
+    </details>`;
+}
+
 function renderGameDetailVideoLevel(game) {
   const parts = getGameVideoParts(game.id);
+  const personal = renderTrackingTestSection(game, "personal");
+  const hasAnalysis = personal.includes("gd-analysis-more");
+  // Dois percursos explicitos: ver o jogo e os momentos, ou ir aos dados de quem esta a ver.
+  const paths = [
+    parts.length && !getActiveHomeVideo(game.id) ? `<button type="button" class="gd-path gd-path-video" data-gd-open="gd-moments-${escapeHtml(game.id)}">▶ Ver momentos</button>` : "",
+    hasAnalysis ? `<button type="button" class="gd-path" data-gd-open="gd-analysis-more-${escapeHtml(game.id)}">A minha análise ›</button>` : "",
+  ].filter(Boolean);
   return `
-    <section class="gd-level" id="gd-level-video" data-gd-level="video">
+    <section class="gd-level gd-level-video" id="gd-level-video" data-gd-level="video">
       ${renderGameDetailLevelHead("▶", "video", "Vídeo e análise", parts.length > 1 ? `<span class="gd-pill">${parts.length} partes</span>` : "")}
       ${parts.length ? renderGameVideoSection(game) : `<p class="tracking-note">Sem gravação para ver. Os tempos da análise aparecem em texto.</p>`}
-      ${renderTrackingTestSection(game, "personal")}
+      ${personal}
+      ${paths.length ? `<div class="gd-paths">${paths.join("")}</div>` : ""}
     </section>`;
 }
 
@@ -15826,6 +15894,44 @@ function bindGameDetailChrome(game, root) {
     if (!manage) return;
     manage.open = true;
     manage.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  root.querySelectorAll("details[data-gd-keep]").forEach((details) => on(details, "toggle", () => {
+    const id = `${game.id}:${details.dataset.gdKeep}`;
+    if (details.open) { gameDetailOpenBlocks.add(id); gameDetailOpenBlocks.delete(`${id}:closed`); }
+    else { gameDetailOpenBlocks.delete(id); gameDetailOpenBlocks.add(`${id}:closed`); }
+  }));
+  root.querySelectorAll("[data-gd-open]").forEach((button) => on(button, "click", () => {
+    const target = root.querySelector(`#${CSS.escape(button.dataset.gdOpen)}`);
+    if (!target) return;
+    target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+  root.querySelectorAll("[data-gd-faces-more]").forEach((button) => on(button, "click", (event) => {
+    event.stopPropagation();
+    button.closest("[data-gd-faces]")?.classList.add("all");
+    button.remove();
+  }));
+  // Cursor comum aos paineis de "Ao longo do jogo" (movimento e batimentos).
+  root.querySelectorAll(".tp-body").forEach((body) => {
+    const panels = [...body.querySelectorAll("svg[data-tp-panel]")];
+    if (panels.length < 2) return;
+    const move = (event) => {
+      const box = event.currentTarget.getBoundingClientRect();
+      const view = event.currentTarget.viewBox.baseVal;
+      const x = view.x + ((event.clientX - box.left) / (box.width || 1)) * view.width;
+      panels.forEach((svg) => {
+        const line = svg.querySelector(".tp-cursor");
+        if (!line) return;
+        line.setAttribute("x1", x.toFixed(2));
+        line.setAttribute("x2", x.toFixed(2));
+        line.removeAttribute("hidden");
+      });
+    };
+    const leave = () => panels.forEach((svg) => svg.querySelector(".tp-cursor")?.setAttribute("hidden", ""));
+    panels.forEach((svg) => {
+      on(svg, "pointermove", move);
+      on(svg, "pointerleave", leave);
+    });
   });
   const jumps = [...root.querySelectorAll("[data-gd-jump]")];
   jumps.forEach((button) => on(button, "click", () => {
