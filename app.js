@@ -9519,7 +9519,7 @@ function renderField(game, options = {}) {
   const radarPosition = options.radarPosition || "top";
 
   return `
-    ${options.hideHead ? "" : `<div class="field-head">
+    <div class="field-head">
       <div>
         <strong>Equipa A</strong>
       </div>
@@ -9530,13 +9530,13 @@ function renderField(game, options = {}) {
       <div class="right">
         <strong>Equipa B</strong>
       </div>
-    </div>`}
+    </div>
     ${radarPosition === "top" ? radar : ""}
     <div class="pitch">
       ${orderTeamForField(squadA).map((p, i) => renderDot(p, "team-a", getPosition("a", i, squadA.length), game, options)).join("")}
       ${orderTeamForField(squadB).map((p, i) => renderDot(p, "team-b", getPosition("b", i, squadB.length), game, options)).join("")}
     </div>
-    ${options.hideMvp ? "" : renderMvpPanel(game)}
+    ${renderMvpPanel(game)}
     ${radarPosition === "bottom" ? radar : ""}
   `;
 }
@@ -11296,6 +11296,7 @@ function renderGoalsSection(game) {
     .map((goal) => ({ side, goal })).filter(({ goal }) => isGoalFilled(goal)));
   const missing = totalGoals - filledGoals.length;
   const tableOpen = goalsTableOpen.has(game.id);
+  if (!isAdmin && !totalGoals) return placeholder;
   return `
     <section class="profile-section goals-section gd-goals" data-goals-section>
       <header class="gd-level-head">
@@ -11305,15 +11306,6 @@ function renderGoalsSection(game) {
         ${totalGoals ? `<span class="gd-pill">${filledGoals.length} de ${totalGoals} com marcador</span>` : ""}
       </header>
       ${totalGoals ? `<div class="gd-progress" role="img" aria-label="${filledGoals.length} de ${totalGoals} golos com marcador"><i style="width:${Math.round((filledGoals.length / totalGoals) * 100)}%"></i></div>` : `<p class="gd-scope">Sem golos neste jogo.</p>`}
-      ${filledGoals.length ? `
-        <ul class="gd-goal-list">
-          ${filledGoals.map(({ side, goal }) => `
-            <li>
-              <span class="gd-goal-side gd-goal-side-${side.toLowerCase()}">${side}</span>
-              <span><strong>${escapeHtml(goalPersonText(goal))}</strong><small>${escapeHtml(goalAssistText(goal))}</small></span>
-              ${goal.gameS != null ? `<span class="gd-goal-time">${videoClockLink(game.id, goal.gameS)}</span>` : ""}
-            </li>`).join("")}
-        </ul>` : ""}
       ${totalGoals || isAdmin ? `
       <details class="gd-group" data-goals-details ${tableOpen ? "open" : ""}>
         <summary><strong>${isAdmin ? "Editar golos" : canRegister && missing ? "Registar golos" : "Ver todos os golos"}</strong><em>${missing ? `${missing} por identificar` : "por equipa"}</em></summary>
@@ -11342,8 +11334,8 @@ function refreshGoalsSection(game) {
   if (!current) return;
   current.outerHTML = renderGoalsSection(game);
   bindGoalsSection(game, els.historyGameDetail);
-  const mine = els.historyGameDetail.querySelector("[data-gd-mine]");
-  if (mine) mine.outerHTML = renderGameDetailMine(game);
+  const scorers = els.historyGameDetail.querySelector("[data-gd-scorers]");
+  if (scorers) scorers.outerHTML = renderGameDetailScorers(game);
 }
 
 function bindGoalsSection(game, root) {
@@ -15636,13 +15628,21 @@ function renderGameDetailHero(game) {
   const whenText = Number.isFinite(when.getTime())
     ? when.toLocaleString("pt-PT", { weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "";
+  ensureGameShape(game);
+  // Equipas em miniatura (foto ou iniciais); tocar abre o perfil. Suplentes mais esbatidos.
+  const faces = (key) => {
+    const starters = hydrate(game[`team${key}`] || []);
+    const bench = hydrate(game[`bench${key}`] || []);
+    const face = (p, isBench) => `<span class="gd-face${p.id === linked?.id ? " me" : ""}${isBench ? " bench" : ""}" data-open-field-player="${p.id}" role="button" tabindex="0" title="${escapeHtml(p.name)}${isBench ? " (suplente)" : ""}">${renderAvatar(p)}</span>`;
+    return `<div class="gd-faces">${starters.map((p) => face(p, false)).join("")}${bench.map((p) => face(p, true)).join("")}</div>`;
+  };
   const team = (key) => `
     <div class="gd-team${side === key ? " mine" : ""}">
-      <span class="gd-crest gd-crest-${key.toLowerCase()}">${key}</span>
-      <span>Equipa ${key}${side === key ? " · tu" : ""}</span>
+      <span class="gd-team-name"><i class="gd-dot gd-dot-${key.toLowerCase()}"></i>Equipa ${key}</span>
+      ${faces(key)}
     </div>`;
   return `
-    <section class="gd-hero">
+    <section class="gd-hero" id="gd-level-jogo">
       <p class="gd-when">${escapeHtml(whenText)}</p>
       <div class="gd-score">
         ${team("A")}
@@ -15652,22 +15652,36 @@ function renderGameDetailHero(game) {
         ${team("B")}
       </div>
       ${outcome ? `<span class="gd-outcome gd-outcome-${outcome[0]}">${outcome[1]}</span>` : ""}
-      ${renderGameDetailMine(game)}
+      ${renderGameDetailScorers(game)}
       ${renderMvpPanel(game)}
     </section>`;
 }
 
-// Golos e assistencias do proprio, so com o que o clube registou (os golos carregam depois da pagina).
-function renderGameDetailMine(game) {
-  const linked = getLinkedPlayer();
+// Marcadores e assistencias por equipa, so com o registo de golos ligado no clube (desligado, nem aparece).
+function renderGameDetailScorers(game) {
   const goals = gameGoals[game.id] || [];
-  const myGoals = linked ? goals.filter((goal) => !goal.ownGoal && goal.scorerId === linked.id).length : 0;
-  const myAssists = linked ? goals.filter((goal) => goal.assistId === linked.id).length : 0;
-  const chips = [
-    myGoals ? `⚽ ${myGoals} ${myGoals === 1 ? "golo registado" : "golos registados"}` : "",
-    myAssists ? `${myAssists} ${myAssists === 1 ? "assistência" : "assistências"}` : "",
-  ].filter(Boolean);
-  return `<div class="gd-mine" data-gd-mine ${chips.length ? "" : "hidden"}>${chips.map((text) => `<span>${escapeHtml(text)}</span>`).join("")}</div>`;
+  const linkedId = getLinkedPlayer()?.id;
+  if (!goalsEnabledForGroup() || !goals.some(isGoalFilled)) return `<div class="gd-scorers" data-gd-scorers hidden></div>`;
+  const column = (side) => {
+    const filled = goals.filter((goal) => goal.side === side && isGoalFilled(goal)).sort((x, y) => x.position - y.position);
+    const scorers = new Map();
+    const assists = new Map();
+    filled.forEach((goal) => {
+      const key = goal.ownGoal ? "AG" : goal.scorerId;
+      scorers.set(key, (scorers.get(key) || 0) + 1);
+      if (goal.assistId) assists.set(goal.assistId, (assists.get(goal.assistId) || 0) + 1);
+    });
+    const label = (id, count) => {
+      const name = id === "AG" ? "Autogolo" : findPlayer(id)?.name || "Jogador";
+      return `<li class="${id === linkedId ? "me" : ""}">${escapeHtml(name)}${count > 1 ? ` <b>×${count}</b>` : ""}</li>`;
+    };
+    return `
+      <div class="gd-scorer-col gd-scorer-col-${side.toLowerCase()}">
+        ${scorers.size ? `<ul class="gd-scorer-list"><span aria-hidden="true">⚽</span>${[...scorers].map(([id, n]) => label(id, n)).join("")}</ul>` : ""}
+        ${assists.size ? `<ul class="gd-scorer-list gd-assist-list"><span aria-label="Assistências">A</span>${[...assists].map(([id, n]) => label(id, n)).join("")}</ul>` : ""}
+      </div>`;
+  };
+  return `<div class="gd-scorers" data-gd-scorers>${column("A")}${column("B")}</div>`;
 }
 
 function renderGameDetailMenu(game) {
@@ -15698,31 +15712,9 @@ function renderGameDetailLevelHead(icon, kind, title, extra = "") {
   return `<header class="gd-level-head"><span class="gd-level-icon gd-icon-${kind}" aria-hidden="true">${icon}</span><h3>${title}</h3>${extra}</header>`;
 }
 
+// As equipas e o resultado vivem no cartao do topo; aqui fica so o registo de golos (quando o clube o usa).
 function renderGameDetailGameLevel(game) {
-  const linkedId = getLinkedPlayer()?.id;
-  const roster = (key, benchKey) => {
-    const starters = hydrate(game[key] || []);
-    const bench = hydrate(game[benchKey] || []);
-    const name = (p, extra = "") => `<li class="${p.id === linkedId ? "me" : ""}${extra}" data-open-field-player="${p.id}" role="button" tabindex="0">${escapeHtml(p.name)}${p.id === linkedId ? " (tu)" : ""}</li>`;
-    return `
-      <div class="gd-roster">
-        <strong>Equipa ${key === "teamA" ? "A" : "B"}</strong>
-        <ul>${starters.map((p) => name(p)).join("")}${bench.map((p) => name(p, " bench")).join("")}</ul>
-      </div>`;
-  };
-  ensureGameShape(game);
-  return `
-    <section class="gd-level" id="gd-level-jogo" data-gd-level="jogo">
-      ${renderGameDetailLevelHead("●", "game", "Equipas")}
-      <div class="gd-rosters">${roster("teamA", "benchA")}${roster("teamB", "benchB")}</div>
-      <details class="gd-group gd-field">
-        <summary><strong>Ver no campo</strong><em>cartas dos jogadores</em></summary>
-        <div class="gd-group-body field-card history-field-card">
-          ${renderField(game, { radarPosition: "none", clickablePlayers: true, hideHead: true, hideMvp: true })}
-        </div>
-      </details>
-    </section>
-    ${renderGoalsSection(game)}`;
+  return renderGoalsSection(game);
 }
 
 function renderGameDetailTrainingLevel(game) {
