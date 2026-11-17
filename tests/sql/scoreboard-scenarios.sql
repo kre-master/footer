@@ -100,13 +100,28 @@ do $$ begin
      <> array['A1:120', 'A2:500', 'B1:300'] then
     raise exception 'FALHA: golos depois do anular: %', (select array_agg(side || position || ':' || game_s order by side, position) from public.game_goals);
   end if;
-  if (select (score_a, score_b, score_saved_at) from public.games where id = 'g-hoje') <> row(2, 1, '2026-11-20 21:55+00'::timestamptz) then
+  if (select (score_a, score_b, score_saved_at, status) from public.games where id = 'g-hoje') <> row(2, 1, '2026-11-20 21:55+00'::timestamptz, 'finished'::text) then
     raise exception 'FALHA: FIM nao gravou o resultado';
   end if;
   if (select status from public.scoreboard_sessions) <> 'finished' then
     raise exception 'FALHA: sessao devia estar terminada';
   end if;
 end $$;
+
+-- Uma copia antiga da app (sem resultado) nao apaga o resultado do placard; uma correcao mais recente passa.
+update public.games set score_a = null, score_b = null, score_saved_at = null, status = 'open' where id = 'g-hoje';
+do $$ begin
+  if (select (score_a, score_b, status) from public.games where id = 'g-hoje') <> row(2, 1, 'finished'::text) then
+    raise exception 'FALHA: copia antiga apagou o resultado do placard';
+  end if;
+end $$;
+update public.games set score_a = 3, score_b = 1 where id = 'g-hoje';
+do $$ begin
+  if (select score_a from public.games where id = 'g-hoje') <> 3 then
+    raise exception 'FALHA: correcao do admin (mesma hora gravada) foi bloqueada';
+  end if;
+end $$;
+update public.games set score_a = 2, score_b = 1 where id = 'g-hoje';
 
 -- Admin muda o jogo: os golos saem do anterior e vao para o novo.
 set test.uid = '00000000-0000-0000-0000-00000000000a';

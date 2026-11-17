@@ -14,6 +14,7 @@ const files = [
   "fantasy-league.js",
   "balneario.js",
   "xp-results.js",
+  "placard.js",
   "tracking-metrics.js",
   "heart-rate.js",
   "notifications.js",

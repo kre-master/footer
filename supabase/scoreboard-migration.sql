@@ -195,12 +195,16 @@ begin
       v_target := null;
 
     elsif e.type = 'fim' then
+      -- Como na app: resultado gravado = jogo terminado.
+      perform set_config('footer.placard_write', 'on', true);
       update public.games
       set score_a = coalesce(e.score_a, s.score_a),
           score_b = coalesce(e.score_b, s.score_b),
           score_saved_at = e.at,
+          status = 'finished',
           updated_at = now()
       where id = s.game_id;
+      perform set_config('footer.placard_write', 'off', true);
       update public.game_scoreboard_events set applied_game_id = s.game_id, applied_at = now() where id = e.id;
 
     else
@@ -426,5 +430,35 @@ $$;
 
 revoke all on function public.placard_confirm_session(uuid, text) from public, anon;
 grant execute on function public.placard_confirm_session(uuid, text) to authenticated;
+
+-- 9. A app grava todos os jogos de uma vez a partir da copia local. Uma copia antiga (aberta antes do FIM)
+--    nao pode apagar o resultado que o placard gravou: num jogo com placard, o resultado so muda para um
+--    resultado gravado igual ou mais recente. O admin corrige normalmente (a app grava a hora da correcao).
+create or replace function private.games_placard_guard()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('footer.placard_write', true), '') = 'on' then
+    return new;
+  end if;
+  if old.score_saved_at is not null
+     and (new.score_saved_at is null or new.score_saved_at < old.score_saved_at)
+     and exists (select 1 from public.scoreboard_sessions where game_id = old.id) then
+    new.score_a := old.score_a;
+    new.score_b := old.score_b;
+    new.score_saved_at := old.score_saved_at;
+    new.status := old.status;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.games_placard_guard() from public, anon, authenticated;
+
+drop trigger if exists games_placard_guard on public.games;
+create trigger games_placard_guard
+before update on public.games
+for each row execute function private.games_placard_guard();
 
 commit;

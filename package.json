@@ -26,7 +26,7 @@
     "test:fantasy": "node --test tests/fantasy-league.test.mjs",
     "test:balneario": "node --test tests/balneario.test.mjs",
     "test:xp": "node --test tests/xp-results.test.mjs",
-    "test:placard": "node --test tests/scoreboard-schema.test.mjs",
+    "test:placard": "node --test tests/scoreboard-schema.test.mjs tests/placard.test.mjs",
     "placard:simular": "node scripts/placard-simulador.mjs"
   },
   "dependencies": {
