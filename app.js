@@ -1707,6 +1707,7 @@ async function loadRemoteState() {
     loadNoShows(),
     loadGroupFeedbackAnswers(),
     loadPublicEvents(),
+    loadPlacardSessions(),
   ]);
   await refreshPendingInvite();
   saveState();
@@ -8834,7 +8835,8 @@ function renderCurrentGame() {
   }
   els.scoreA.value = game.scoreA ?? "";
   els.scoreB.value = game.scoreB ?? "";
-  els.fieldCard.innerHTML = renderField(game);
+  els.fieldCard.innerHTML = `<div id="placard-live">${renderPlacardBanner(game)}</div>${renderField(game)}`;
+  bindPlacardActions(els.fieldCard.querySelector("#placard-live"));
   bindMvpPanelActions(game);
   renderRosterEditor(game);
   renderAddPlayerSelect(game);
@@ -10715,6 +10717,7 @@ function renderClubPanel() {
       </div>
     </section>
     ${canEdit ? '<section class="club-block club-after" id="club-join-requests"></section>' : ""}
+    ${canEdit ? '<section class="club-block club-after" id="club-placard"></section>' : ""}
     <div class="actions club-after"><button type="button" class="ghost-btn" data-club-find>Procurar outros clubes</button></div>
     ${group.role === "owner" && remoteEnabled ? `
       <section class="club-block club-danger club-after">
@@ -10724,6 +10727,7 @@ function renderClubPanel() {
       </section>` : ""}`;
   bindClubSearch(panel);
   if (canEdit) loadClubJoinRequests(group);
+  if (canEdit) loadClubPlacard(group);
 
   panel.querySelector("[data-edit-club]")?.addEventListener("click", () => {
     clubEditing = true;
@@ -10939,6 +10943,153 @@ function renderReliability(playerData) {
     </div>`;
 }
 
+// ---- Placard (2026-11-17): sessoes e eventos do placard fisico; supabase/scoreboard-migration.sql e placard.js ----
+// O admin cria a chave do placard em Clube e liga cada sessao do placard a um jogo. Enquanto ha uma sessao ao vivo,
+// a app volta a perguntar a cada 20 s; quando o placard faz FIM, o jogo e recarregado com o resultado.
+let placardSessions = [];
+let placardDevices = [];
+let placardRemote = null;
+let placardNewKey = "";
+let placardTimer = null;
+let placardGroupId = null;
+
+async function loadPlacardSessions() {
+  if (!supabaseClient || !currentSession?.user || !activeGroupId || placardRemote === false) return false;
+  const since = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await supabaseClient.from("scoreboard_sessions").select("*")
+    .eq("group_id", activeGroupId).gte("created_at", since).order("created_at", { ascending: false }).limit(20);
+  if (error) {
+    placardRemote = false;
+    return false;
+  }
+  placardRemote = true;
+  const before = new Map(placardSessions.map((session) => [session.id, session]));
+  placardGroupId = activeGroupId;
+  placardSessions = (data || []).map(FooterPlacard.sessionFromRow);
+  // FIM: o servidor gravou o resultado no jogo; trazer o jogo e os golos de novo.
+  for (const session of placardSessions) {
+    const old = before.get(session.id);
+    if (session.gameId && session.status === "finished" && old && old.status !== "finished") await refreshGameFromServer(session.gameId);
+  }
+  schedulePlacardPolling();
+  return true;
+}
+
+async function refreshGameFromServer(gameId) {
+  const { data, error } = await supabaseClient.from("games").select("*").eq("id", gameId).maybeSingle();
+  if (error || !data) return;
+  const fresh = gameFromRow(data);
+  const index = state.games.findIndex((game) => game.id === gameId);
+  if (index >= 0) state.games[index] = fresh;
+  else state.games.unshift(fresh);
+  delete gameGoals[gameId];
+  saveState();
+}
+
+function schedulePlacardPolling() {
+  clearTimeout(placardTimer);
+  if (!FooterPlacard.needsPolling(placardSessions)) return;
+  placardTimer = setTimeout(async () => {
+    if (document.visibilityState === "visible") {
+      await loadPlacardSessions();
+      renderPlacardViews();
+    } else {
+      schedulePlacardPolling();
+    }
+  }, 20000);
+}
+
+function renderPlacardViews() {
+  const game = getCurrentGame();
+  const slot = document.querySelector("#placard-live");
+  if (slot) {
+    slot.innerHTML = game ? renderPlacardBanner(game) : "";
+    bindPlacardActions(slot);
+  }
+  if (document.querySelector("#club-placard") && currentViewName === "club") renderClubPlacardSection();
+}
+
+function renderPlacardBanner(game) {
+  if (placardGroupId !== activeGroupId || !placardSessions.length) return "";
+  return FooterPlacard.renderGameBanner(game, placardSessions, {
+    isAdmin, games: state.games, escape: escapeHtml, formatDate,
+  });
+}
+
+async function confirmPlacardSession(sessionId, gameId) {
+  const { error } = await supabaseClient.rpc("placard_confirm_session", { p_session_id: sessionId, p_game_id: gameId });
+  if (error) {
+    alert(`Nao consegui ligar o placard ao jogo: ${error.message}`);
+    return;
+  }
+  delete gameGoals[gameId];
+  await loadPlacardSessions();
+  const session = placardSessions.find((item) => item.id === sessionId);
+  if (session?.status === "finished") await refreshGameFromServer(gameId);
+  render();
+  renderPlacardViews();
+}
+
+function bindPlacardActions(root) {
+  root?.querySelectorAll("[data-placard-confirm]").forEach((button) => button.addEventListener("click", () =>
+    confirmPlacardSession(button.dataset.placardConfirm, button.dataset.game)));
+  root?.querySelectorAll("[data-placard-pick]").forEach((select) => select.addEventListener("change", () => {
+    if (!select.value) return;
+    const game = state.games.find((item) => item.id === select.value);
+    if (game && confirm(`Ligar o placard ao jogo de ${formatDate(game.date)}?`)) confirmPlacardSession(select.dataset.placardPick, select.value);
+    else select.value = "";
+  }));
+}
+
+async function loadClubPlacard(group) {
+  if (!supabaseClient || !isGroupAdminRole(group.role)) return;
+  const [, devicesResult] = await Promise.all([
+    loadPlacardSessions(),
+    placardRemote === false ? Promise.resolve({ data: [] }) : supabaseClient.from("scoreboard_devices")
+      .select("id, name, active, created_at, last_seen_at").eq("group_id", group.id).order("created_at"),
+  ]);
+  if (group.id !== activeGroupId) return;
+  placardDevices = (devicesResult?.data || []).map(FooterPlacard.deviceFromRow);
+  // So mostra o bloco a quem ja tem placard ou a migracao aplicada.
+  renderClubPlacardSection();
+}
+
+function renderClubPlacardSection() {
+  const section = document.querySelector("#club-placard");
+  if (!section) return;
+  if (placardRemote === null) return;
+  section.innerHTML = FooterPlacard.renderClubSection({
+    devices: placardDevices, sessions: placardSessions, games: state.games, newKey: placardNewKey,
+    escape: escapeHtml, formatDate, remote: placardRemote,
+  });
+  bindPlacardActions(section);
+  section.querySelector("[data-placard-copy]")?.addEventListener("click", () => navigator.clipboard?.writeText(placardNewKey));
+  section.querySelectorAll("[data-placard-active]").forEach((button) => button.addEventListener("click", async () => {
+    const turnOn = button.dataset.active === "1";
+    if (!turnOn && !confirm("Desligar este placard? Deixa de conseguir enviar eventos ate o voltares a ligar.")) return;
+    const { error } = await supabaseClient.rpc("placard_set_device_active", { p_device_id: button.dataset.placardActive, p_active: turnOn });
+    if (error) {
+      alert(`Nao consegui mudar o placard: ${error.message}`);
+      return;
+    }
+    const group = getActiveGroup();
+    if (group) loadClubPlacard(group);
+  }));
+  section.querySelector("[data-placard-new]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = String(new FormData(event.target).get("name") || "").trim();
+    if (!name) return;
+    const { data, error } = await supabaseClient.rpc("placard_create_device", { p_group_id: activeGroupId, p_name: name });
+    if (error) {
+      alert(`Nao consegui criar a chave: ${error.message}`);
+      return;
+    }
+    placardNewKey = data || "";
+    const group = getActiveGroup();
+    if (group) loadClubPlacard(group);
+  });
+}
+
 // ---- Golos (2026-11-11): marcador e assistencia de cada golo; supabase/game-goals-migration.sql ----
 // Uma linha por golo, conforme o resultado. O admin do clube liga o registo; ligado, qualquer membro regista um
 // golo ainda vazio e quem discordar sugere outro marcador (o admin aceita ou recusa). Sem as tabelas, so o admin
@@ -11078,6 +11229,12 @@ async function saveGameGoals(gameId) {
   if (!game) return;
   // Golos acima do resultado atual (o resultado baixou) saem.
   const limit = { A: Number(game.scoreA) || 0, B: Number(game.scoreB) || 0 };
+  // Jogo com o placard ao vivo: o resultado do jogo ainda nao foi gravado, mas os golos do placard ja la estao.
+  const placardLive = typeof FooterPlacard !== "undefined" ? FooterPlacard.sessionForGame(placardSessions, gameId) : null;
+  if (placardLive && placardLive.status === "live") {
+    limit.A = Math.max(limit.A, placardLive.scoreA);
+    limit.B = Math.max(limit.B, placardLive.scoreB);
+  }
   gameGoals[gameId] = (gameGoals[gameId] || []).filter((goal) => goal.position <= limit[goal.side]);
   const dirty = gameGoalsDirty[gameId] || new Set();
   gameGoalsDirty[gameId] = new Set();

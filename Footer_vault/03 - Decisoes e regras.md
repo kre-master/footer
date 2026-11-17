@@ -336,3 +336,11 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Forma: presenca num jogo nos 7 dias antes da jornada da +2 a todos os atributos.
 - A liga nao da XP de conta e nao escreve em jogos, estatisticas ou recompensas reais (nota 12).
 - Mais tarde: ligas por calibre, subidas e descidas e janelas de transferencia (propostas pelo sistema, o jogador aceita ou recusa).
+
+## Placard ligado a Footer (decidido 2026-11-17)
+
+- O placard regista os eventos do jogo dos Futeboleiros (so este clube, para ja). Ha Wi-Fi no campo; o Pi envia logo e guarda o que nao conseguir enviar.
+- Cada INICIO abre uma sessao; a Footer sugere o jogo aberto do clube mais perto da hora e o admin aceita ou escolhe outro. So depois os eventos entram no jogo.
+- GOLO cria o golo com o tempo do placard e sem marcador; ANULAR tira o ultimo golo do placard desse lado; FIM grava o resultado e o admin corrige se preciso.
+- O tempo do jogo (`game_s`) e o relogio do placard desde o INICIO.
+- Tudo sujeito a mudancas enquanto a eletronica esta a ser montada.

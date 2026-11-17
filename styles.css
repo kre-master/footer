@@ -8997,3 +8997,21 @@ body.boot-refreshing::before {
 .gd-highlights .tracking-highlight strong { font-size: 1.6rem; }
 .gd-highlights .tracking-highlight strong small { font-size: .7rem; }
 .gd-highlights .tracking-highlight em { font-size: 11px; font-weight: 500; color: var(--muted); }
+
+/* Placard (2026-11-17): resultado ao vivo e ligacao das sessoes aos jogos. */
+.placard-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface-strong); }
+.placard-banner strong { font-family: var(--font-display); font-size: 1.35rem; letter-spacing: .02em; }
+.placard-banner > span:not(.placard-dot) { color: var(--muted); font-variant-numeric: tabular-nums; }
+.placard-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.placard-banner.live .placard-dot { background: var(--red); animation: placard-pulse 1.4s ease-in-out infinite; }
+.placard-banner.pending { display: block; }
+.placard-session { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 6px 0; }
+.placard-session + .placard-session { border-top: 1px solid var(--line); }
+.placard-session-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.placard-session-actions select { max-width: 100%; }
+.placard-key { display: grid; gap: 6px; margin: 10px 0; padding: 12px; border: 1px dashed var(--amber); border-radius: 12px; }
+.placard-key code { overflow-wrap: anywhere; font-size: .95rem; user-select: all; }
+.placard-new { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.placard-new input { flex: 1 1 180px; min-width: 0; }
+@keyframes placard-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .placard-banner.live .placard-dot { animation: none; } }

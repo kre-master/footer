@@ -133,6 +133,12 @@ Depois de alterar:
 - 2026-11-02 (v3): fundo fixo com janela e tampa de correr so na metade B (ideia do utilizador); frente volta a 20 mm; manual de montagem v3.
 - 2026-11-08: mantem-se o conversor 15 -> 5 V (uma porta de 5 V do powerbank so da 15 W e a tensao cai). Esquema eletrico desenhado: https://claude.ai/artifact/GEFQvvsZoThzi9zn8m2WWY (fonte `esquema-eletrico.html`, gerada por `esquema.py`). Fixado no desenho: 4 ligadores Wago (2 por lado), condensador de 1000 uF e resistencia de 100 ohm na placa principal; mapa do cabo plano em `ligacoes-raspberry.csv`.
 
+- 2026-11-17: integracao com a Footer e o Footer Tracker planeada (https://claude.ai/artifact/JSbXVBzgS3nU7UjqVcffvt). Fase 1 feita no Git, por aplicar no Supabase: `supabase/scoreboard-migration.sql` (placards com chave por clube, sessoes, `game_scoreboard_events`, RPC `placard_ingest` chamada pelo Pi com a anon key), simulador `npm run placard:simular` e cenarios em `tests/sql/scoreboard-scenarios.sql`.
+- [x] Fase 2a (Footer, 2026-11-17): bloco Placard em Clube (criar chave, ligar/desligar, ligar sessoes a jogos), faixa ao vivo no jogo (pergunta de novo a cada 20 s), FIM recarrega o jogo; o servidor impede uma copia antiga da app de apagar o resultado do placard (`games_placard_guard`). Codigo em `placard.js` + `app.js`.
+- [ ] Fase 2b: destaques do placard como momentos no video.
+- [ ] Fase 3 (Pi, no MAESTRO): programa dos botoes com fila local, igual ao simulador.
+- [ ] Fase 4: segundo do INICIO por video (`game_videos.video_start_s`), apito detetado pelo Footer Tracker.
+
 ## Nova organizacao e onboarding (decidido 2026-11-05)
 
 Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3pdinXZh2KWs7YmAcuT). Regras em [[03 - Decisoes e regras]].
