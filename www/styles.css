@@ -8933,7 +8933,7 @@ body.boot-refreshing::before {
 .gd-hero { gap: 10px; padding: 12px 14px; border-radius: 20px;
   background: radial-gradient(120% 120% at 50% 0%, rgba(59,140,255,.14), transparent 70%), var(--surface-opaque); }
 .gd-when { font-size: 10px; }
-.gd-score { align-items: center; gap: 10px; }
+.gd-score { align-items: center; gap: 8px; }
 .gd-team { gap: 6px; }
 .gd-team-a { justify-items: start; text-align: left; }
 .gd-team-b { justify-items: end; text-align: right; }
@@ -8946,8 +8946,11 @@ body.boot-refreshing::before {
 .gd-faces.all { flex-wrap: wrap; row-gap: 4px; }
 .gd-faces .gd-face.extra { display: none; }
 .gd-faces.all .gd-face.extra { display: inline-grid; }
-.gd-face .avatar { width: 26px; height: 26px; font-size: 9px; }
-.gd-face-more { margin-left: -7px; width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; display: inline-grid; place-items: center;
+/* 5 fotos + "+N" por equipa num telemovel: fotos de 24 px mais sobrepostas; em ecras largos voltam aos 26 px. */
+.gd-faces { padding-left: 10px; }
+.gd-faces .gd-face { margin-left: -10px; }
+.gd-face .avatar { width: 24px; height: 24px; font-size: 9px; }
+.gd-face-more { margin-left: -10px; width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0; display: inline-grid; place-items: center;
   background: var(--surface-strong); color: var(--muted); font-size: 10px; font-weight: 800; box-shadow: 0 0 0 2px var(--surface-opaque); cursor: pointer; }
 .gd-outcome-line { margin: 0; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px 10px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .gd-outcome-line .gd-outcome { padding: 2px 10px; font-size: 10px; }
@@ -8985,8 +8988,15 @@ body.boot-refreshing::before {
 .tp-cursor { stroke: var(--ink); stroke-width: .25; stroke-dasharray: .8 .8; opacity: .55; pointer-events: none; }
 .tp-cursor[hidden] { display: none; }
 
+@media (min-width: 480px) {
+  .gd-faces { padding-left: 7px; }
+  .gd-faces .gd-face, .gd-face-more { margin-left: -7px; }
+  .gd-face .avatar, .gd-face-more { width: 26px; height: 26px; }
+}
 @media (max-width: 360px) {
   .gd-face .avatar, .gd-face-more { width: 22px; height: 22px; }
+  .gd-faces { padding-left: 9px; }
+  .gd-faces .gd-face, .gd-face-more { margin-left: -9px; }
   .gd-digits b { font-size: 28px; }
 }
 .gd-menu-list[hidden] { display: none; }

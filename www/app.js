@@ -15671,8 +15671,8 @@ function renderGameDetailHero(game) {
     : "";
   ensureGameShape(game);
   // Equipas numa fila de mini fotos sobrepostas (foto ou iniciais); tocar abre o perfil. Suplentes mais esbatidos.
-  // Cabem 4 por equipa num ecra de 360 px; o resto fica num "+N" que abre a fila completa.
-  const FACES_SHOWN = 4;
+  // Mostram-se 5 por equipa (um 5x5 completo cabe sem "+N"); a partir de 6 fica 5 + "+N", que abre a fila completa.
+  const FACES_SHOWN = 5;
   const faces = (key) => {
     const starters = hydrate(game[`team${key}`] || []);
     const bench = hydrate(game[`bench${key}`] || []);
