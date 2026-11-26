@@ -3626,16 +3626,24 @@ function bindNavigation() {
   on(document.querySelector("#back-to-events"), "click", () => showView("events"));
   on(document.querySelector("#account-menu-btn"), "click", (event) => {
     event.stopPropagation();
+    toggleThemePanel(false);
     toggleAccountMenu();
+  });
+  on(document.querySelector("#theme-btn"), "click", (event) => {
+    event.stopPropagation();
+    toggleAccountMenu(false);
+    toggleThemePanel();
   });
   document.addEventListener("click", (event) => {
     if (!event.target.closest("#account-menu")) toggleAccountMenu(false);
     if (!event.target.closest("#notify-menu")) toggleNotifyPanel(false);
+    if (!event.target.closest("#theme-menu")) toggleThemePanel(false);
   });
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     toggleAccountMenu(false);
     toggleNotifyPanel(false);
+    toggleThemePanel(false);
   });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-moment-share]");
@@ -4248,7 +4256,7 @@ function render() {
   renderAccountPanel();
   syncThemeFromAccount();
   renderAccountVisibility();
-  renderAppearancePanel();
+  renderThemePanel();
   renderClaimsList();
   renderAccountsList();
   renderPaymentsPanel();
@@ -4315,23 +4323,26 @@ function syncThemeFromAccount() {
   if (THEMES[saved] && saved !== getStoredTheme()) applyTheme(saved);
 }
 
-function renderAppearancePanel() {
-  const holder = document.querySelector("#account-appearance");
+// Botão do sol no topo, ao lado da conta: abre a escolha de aspeto.
+function renderThemePanel() {
+  const holder = document.querySelector("#theme-panel");
   if (!holder) return;
   const current = getStoredTheme();
   holder.innerHTML = `
-    <div class="account-card">
-      <h3>Aspeto da app</h3>
-      ${Object.entries(THEMES).map(([key, item]) => `
-        <label class="club-check"><input type="radio" name="app-theme" value="${key}" ${key === current ? "checked" : ""}>
-          <span><strong>${item.label}</strong>: ${item.hint}</span></label>`).join("")}
-      <p data-theme-status>${currentSession?.user ? "Fica guardado na tua conta e vale em todos os aparelhos." : "Fica guardado neste aparelho. Entra para o levares contigo."}</p>
-    </div>`;
-  holder.querySelectorAll('input[name="app-theme"]').forEach((input) => input.addEventListener("change", async () => {
-    applyTheme(input.value);
+    ${Object.entries(THEMES).map(([key, item]) => `
+      <button class="theme-option${key === current ? " is-current" : ""}" type="button" role="menuitemradio" aria-checked="${key === current}" data-theme-choice="${key}">
+        <span class="theme-swatch theme-swatch-${key}" aria-hidden="true"></span>
+        <span><strong>${item.label}</strong><small>${item.hint}</small></span>
+      </button>`).join("")}
+    <p class="theme-note" data-theme-status>${currentSession?.user ? "Fica guardado na tua conta e vale em todos os aparelhos." : "Fica guardado neste aparelho. Entra para o levares contigo."}</p>`;
+  holder.querySelectorAll("[data-theme-choice]").forEach((button) => button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const choice = button.dataset.themeChoice;
+    applyTheme(choice);
+    renderThemePanel();
     const status = holder.querySelector("[data-theme-status]");
     if (!currentSession?.user || !supabaseClient) return;
-    const { data, error } = await supabaseClient.auth.updateUser({ data: { theme: input.value } });
+    const { data, error } = await supabaseClient.auth.updateUser({ data: { theme: choice } });
     if (error) {
       if (status) status.textContent = `Mudou aqui, mas não consegui guardar na conta: ${error.message}`;
       return;
@@ -4339,6 +4350,16 @@ function renderAppearancePanel() {
     if (data?.user) currentSession.user = data.user;
     if (status) status.textContent = "Guardado na tua conta.";
   }));
+}
+
+function toggleThemePanel(force) {
+  const panel = document.querySelector("#theme-panel");
+  const button = document.querySelector("#theme-btn");
+  if (!panel || !button) return;
+  const open = typeof force === "boolean" ? force : panel.classList.contains("hidden");
+  if (open) renderThemePanel();
+  panel.classList.toggle("hidden", !open);
+  button.setAttribute("aria-expanded", String(open));
 }
 
 function renderAccountVisibility() {

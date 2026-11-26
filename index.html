@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Big+Shoulders+Display:wght@700;800;900&family=Lilita+One&family=Nunito:wght@400;600;700;800;900&display=swap">
-    <link rel="stylesheet" href="styles.css?v=20261114-fable1">
-    <link rel="stylesheet" id="theme-caderneta-link" href="theme-caderneta.css?v=20261114-fable1">
+    <link rel="stylesheet" href="styles.css?v=20261126-tema1">
+    <link rel="stylesheet" id="theme-caderneta-link" href="theme-caderneta.css?v=20261126-tema1">
     <script>
       // Aplica o aspecto guardado antes do primeiro desenho, para nao piscar.
       try {
@@ -36,6 +36,13 @@
             <h1>Footer</h1>
             <div id="notify-panel" class="notify-panel hidden" role="dialog" aria-label="Novidades"></div>
           </div>
+          <div class="topbar-actions">
+          <div class="theme-menu" id="theme-menu">
+            <button id="theme-btn" class="theme-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="theme-panel" aria-label="Aspeto da app" title="Aspeto da app">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+            </button>
+            <div class="theme-panel hidden" id="theme-panel" role="menu" aria-label="Aspeto da app"></div>
+          </div>
           <div class="account-menu" id="account-menu">
             <button id="account-menu-btn" class="account-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-dropdown">
               <span class="account-avatar" id="account-avatar" aria-hidden="true">?</span>
@@ -54,6 +61,7 @@
               <button id="account-signup" class="menu-item" type="button" role="menuitem">Criar conta</button>
               <button id="admin-logout" class="menu-item menu-danger hidden" type="button" role="menuitem">Sair</button>
             </div>
+          </div>
           </div>
         </div>
         <nav class="tabs" aria-label="Seccoes">
@@ -303,7 +311,6 @@
             </div>
             <div id="account-panel" class="account-panel"></div>
             <div id="account-visibility" class="account-panel"></div>
-            <div id="account-appearance" class="account-panel"></div>
             <div id="traits-panel" class="traits-panel"></div>
             <div id="deleted-groups-panel" class="traits-panel"></div>
           </section>
@@ -680,6 +687,6 @@
     <script src="fantasy-league.js?v=20261114-jogo3niveis"></script>
     <script src="balneario.js?v=20261114-jogo3niveis"></script>
     <script src="xp-results.js?v=20261113-xp1"></script>
-    <script src="app.js?v=20261114-fable1"></script>
+    <script src="app.js?v=20261126-tema1"></script>
   </body>
 </html>
