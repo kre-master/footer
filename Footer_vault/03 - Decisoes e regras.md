@@ -301,6 +301,9 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - O tema oficial passa a ser "Caderneta" (substitui o Holofote): papel claro com pontinhos, paineis e cartoes como cromos (contorno a tinta de 2 px e sombra solida), vermelho de destaque, amarelo de autocolante para o que esta seleccionado, letra Lilita One nos titulos e Nunito no texto.
 - Esta num ficheiro a parte, `theme-caderneta.css`, carregado depois de `styles.css`; tirar o `<link>` do index.html volta ao Holofote. Campo, cartas, leitor de video, galeria e revisao do mes em ecra cheio mantem as cores proprias.
 
+- Seletor de aspeto (2026-11-12): em Conta > "Aspeto da app" cada utilizador escolhe Caderneta (por defeito) ou Holofote. Fica na conta (`user_metadata.theme` do Supabase Auth, sem migracao SQL) e em `localStorage` (`footer-theme`) para nao piscar ao abrir. Implementa-se ligando/desligando o `<link id="theme-caderneta-link">`.
+- Aspeto no topo (2026-11-26): a escolha saiu de Conta e passou para um botao com um sol ao lado da conta, no topo; abre um pequeno menu com Caderneta e Holofote. Mesma gravacao (conta + aparelho).
+
 ## Dono da app: eliminar jogadores e contas (2026-11-06)
 
 - So o dono da app (private.platform_admins), no Painel do dono, com confirmacao que diz o que vai acontecer.
@@ -336,3 +339,12 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 - Forma: presenca num jogo nos 7 dias antes da jornada da +2 a todos os atributos.
 - A liga nao da XP de conta e nao escreve em jogos, estatisticas ou recompensas reais (nota 12).
 - Mais tarde: ligas por calibre, subidas e descidas e janelas de transferencia (propostas pelo sistema, o jogador aceita ou recusa).
+
+## Fontes de metricas e acesso (decidido 2026-11-11)
+
+- Jogos e resultados sao gratuitos para todos os clientes. Golos e assistencias tambem sao gratuitos, quando registados. Dispositivos pessoais sao gratuitos para quem os usar. Video e tracking destinam-se ao Premium e aos Futeboleiros com gravacao adequada.
+- A folha de avaliacao do utilizador seleciona 186 metricas e exclui 76. Fonte, comentarios, inventario e propostas organizados em [[13 - Metricas, recompensas e producao]].
+- O utilizador quer premiar quem responde as convocatorias, incluindo Talvez e Nao vou.
+- O relatorio coletivo de video fica reservado ao admin do clube, conforme o comentario em G3-088.
+- O desenho tem de suportar fontes opcionais nunca usadas, iniciadas mais tarde, interrompidas e retomadas, por clube e jogador.
+- As associacoes de itens, os patamares de raridade e as regras de progressao na nota 13 sao propostas para revisao. O modelo de XP e os eventuais bonus virtuais continuam por decidir.

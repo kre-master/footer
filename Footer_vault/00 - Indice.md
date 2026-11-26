@@ -14,6 +14,7 @@ Este vault e a memoria organizada do projecto Footer. Deve ser lido antes de tra
 - [[10 - Mapa de futuro e estrategia]] - fases, estrategia, rentabilidade, idiomas e registo de decisoes; fonte do PDF (gerado a pedido, nao fica no Git).
 - [[11 - Leitor de video proprio]] - leitor de video novo (fora do YouTube): o que faz, Bunny Stream, custos, decisoes e proximos passos.
 - [[12 - Cartas evolutivas e equipamento RPG]] - conceito modular, familias visuais, glow variavel e producao local de recursos com ComfyUI na RTX 5080.
+- [[13 - Metricas, recompensas e producao]] - selecao de metricas de 11 de novembro, propostas de conquistas e raridades, dados opcionais e plano de producao dos recursos.
 
 ## Regra de uso
 

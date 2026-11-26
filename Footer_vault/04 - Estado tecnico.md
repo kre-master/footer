@@ -594,3 +594,12 @@ Quando forem adicionadas novas tabelas ou politicas, rever `supabase/schema.sql`
 - Cliente: `fantasy-league.js` (separador Jogos > Liga fantasia). So le e chama `fantasy_save_profile`, `fantasy_join_test_league`, `fantasy_leave_league`, `fantasy_my_points`.
 - Numeros do motor em `fantasy_settings` (afinar sem nova migracao). Calibracao em Python em `/mnt/project-files/liga-fantasia/` (fora do repo).
 - Testes: `npm run test:fantasy` e `tests/sql/fantasy-league-scenarios.sql` (47 cenarios) contra Postgres 16 local: stub anti-fraude, migracao anti-fraude e migracao da liga (ambas sem as linhas `cron.*`), depois os cenarios.
+
+## Planeamento de recompensas de 2026-11-11
+
+- Organizacao em [[13 - Metricas, recompensas e producao]] e numa nova folha Google Sheets com sete tabelas nativas. Conteudo, decisoes, comentarios, opcoes das listas e cobertura das tabelas verificados por leitura da API.
+- Captura e mapa estruturado em `/home/joao/maestro/output/footer-recompensas-2026-11-11/plano-recompensas.json`. Registo da verificacao em `verificacao.json` na mesma pasta.
+- Confirmada a existencia dos ficheiros referenciados dos 81 recursos do catalogo e consultados os indicadores de alpha do manifesto. Inspecionadas amostras de carta, camisola e chuteira do piloto. A revisao de cada correspondencia e a preparacao modular constam do plano de producao.
+
+- Seletor de aspeto (2026-11-12, cache-buster `20261112-theme1`): `applyTheme`, `syncThemeFromAccount`, `renderAppearancePanel` em `app.js`; script no `<head>` do `index.html` aplica o tema guardado antes do primeiro desenho; `#account-appearance` na vista Conta. Nao testado no navegador. Canvas PNG do jogo continua sempre escuro.
+- Aspeto no topo (2026-11-26, cache-buster `20261126-tema1`): `#theme-btn` + `#theme-panel` dentro de `.topbar-actions` no `index.html`; `renderThemePanel`/`toggleThemePanel` em `app.js` substituem `renderAppearancePanel`; `#account-appearance` removido. Testado no Chromium (desktop e 390px, os dois aspetos, fecha ao clicar fora).

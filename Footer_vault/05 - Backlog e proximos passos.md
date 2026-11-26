@@ -132,6 +132,10 @@ Depois de alterar:
 - 2026-11-02: decidido sem ventoinha para ja; o placard regista temperaturas (chip do Pi e ar da mala) e envia max/media por jogo; ventoinha so se o Pi passar dos 70 C.
 - 2026-11-02 (v3): fundo fixo com janela e tampa de correr so na metade B (ideia do utilizador); frente volta a 20 mm; manual de montagem v3.
 - 2026-11-08: mantem-se o conversor 15 -> 5 V (uma porta de 5 V do powerbank so da 15 W e a tensao cai). Esquema eletrico desenhado: https://claude.ai/artifact/GEFQvvsZoThzi9zn8m2WWY (fonte `esquema-eletrico.html`, gerada por `esquema.py`). Fixado no desenho: 4 ligadores Wago (2 por lado), condensador de 1000 uF e resistencia de 100 ohm na placa principal; mapa do cabo plano em `ligacoes-raspberry.csv`.
+- 2026-11-14: placa perfurada desenhada ao estilo Eagle: https://claude.ai/artifact/PDtFgFLfuHzdcZb9ZWHhir (fonte `placa-perfurada.html`, gerada por `placa.py`, que traca e verifica as ligacoes). O Pi encaixa na placa (barra femea 2x20, sem fios Dupont); botoes com pull-up interno do Pi; protecao dos botoes A na plaquinha do lado A; pinos novos DESTAQUE GPIO13, GOLO B GPIO17, ANULAR B GPIO27, INICIO GPIO22. Esquema eletrico republicado (v2). Novos na lista de compras: barra femea 2x20, barra macho 1x40, fio de cobre estanhado.
+- 2026-11-16: montagem de teste na breadboard de 830 furos do utilizador (fase 1 do plano): https://claude.ai/artifact/5s54323RXb8wPMYEMMLwHr (fonte `teste-breadboard.html`, gerada por `breadboard.py`, verificada sem curtos). Para o teste: cobbler 40 pinos (ou ~20 Dupont macho-femea), fios de breadboard e pincas crocodilo. Em aberto: o Pi do amigo ja tem os pinos soldados?
+- 2026-11-16 (correcao): a barra de pinos do Pi fica virada para cima (para baixo, o cabo do cobbler troca as filas e queima o Pi). A ligacao do Pi a placa perfurada decide-se depois do teste; paginas corrigidas.
+- 2026-11-16: placa de tiras (stripboard) para o XT, com o minimo de fios: https://claude.ai/artifact/MytfxpguEoS5Y7UTTpbNSo (fonte `placa-tiras.html`, gerada por `tiras.py`). Ordem do cabo plano revista (1 dados, 3 DESTAQUE, 5 ANULAR A, 7 GOLO A). Placa de ilhas marcada 'nao montar ainda' (fichas do cabo plano ao espelho). Indice das placas por tipo: https://claude.ai/artifact/2ufRxjio1Hs32fKXBJqww7.
 
 ## Nova organizacao e onboarding (decidido 2026-11-05)
 
@@ -166,3 +170,14 @@ Desenho: pagina privada "Planta da App Footer" (https://claude.ai/artifact/9bk3p
 - [ ] Testar a Fase 3 no telemovel com a conta real: abrir, tocar logo num separador, fechar e abrir em modo aviao, sair da conta e entrar com outra.
 - [ ] Rever (nao apagar sem ver): RPC `request_group` e `cancel_join_group_request` sem uso; tabela `player_form_snapshots` vazia; regra de edicao de marcadores usa `public.is_admin()` antigo; `saveState` sem protecao contra `localStorage` cheio; bot `vigia.mjs` faz login ~718 vezes por dia.
 - [ ] Avisos de seguranca do Supabase: proteger contra palavras-passe expostas (Auth) e rever as 4 funcoes abertas a anonimos (`email_for_login`, `has_any_profile`, `is_admin`, `preview_group_invite`).
+
+## Recompensas e recursos de 2026-11-11
+
+- [x] Organizar a selecao do utilizador, o inventario existente, as propostas de conquistas e o plano de producao. Ver [[13 - Metricas, recompensas e producao]].
+- [ ] Rever os 23 percursos e simular os patamares de raridade no historico existente.
+- [ ] Fechar o modelo de evolucao dos itens, XP, eventuais consumiveis e portabilidade entre clubes.
+- [ ] Implementar completude por metrica, contribuições com identidade estavel, reavaliacao de revisoes e inventario.
+- [ ] Comecar a integracao pelos percursos de jogos, presencas e respostas, seguida dos golos com registo parcial e tardio.
+- [ ] Preparar as camadas e os ornamentos indicados na folha Producao 5080, reutilizando bases do catalogo e os pilotos locais em tecido e papel.
+- [ ] Validar individualmente as metricas de tracking antes da atribuicao de recompensas. xG e xA permanecem na fase de avaliacao tecnica.
+- [ ] Definir titularidade da subscricao e acesso a video e analises historicas apos o fim do Premium.

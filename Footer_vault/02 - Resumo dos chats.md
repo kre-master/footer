@@ -210,6 +210,16 @@ Validacoes:
 
 - Pedido: desenho do circuito de todos os componentes. Feito numa pagina privada com a energia, os sinais do Raspberry Pi e os pormenores (botoes, chip das luzes, cabo plano, 40 pinos). Antes disso, na mesma conversa: tampa de correr v3, temperaturas registadas em vez de ventoinha, e o conversor 15 -> 5 V mantem-se. Ver [[05 - Backlog e proximos passos]] (Placard fisico).
 
+## 2026-11-16 - Placard fisico: teste na breadboard
+
+- Mesmo dia: o XT pediu a versao em placa de tiras (stripboard) com o minimo de fios; feita e verificada (4 fios isolados + 1 curto + 2 barras). Ao rever, apareceu um erro de espelho nas fichas do cabo plano e no chip: corrigido nas tiras e no esquema (nova ordem dos fios); a placa de ilhas ficou marcada para corrigir. O utilizador pediu tudo separado por tipo de placa: pagina-indice com as tres.
+
+- O utilizador mostrou a sua breadboard de 830 furos e pediu para rever o esquema eletrico com ela. Feita a montagem de teste (fase 1) na posicao da fotografia, com 4 regras de seguranca e passo a passo. Ver [[05 - Backlog e proximos passos]] (Placard fisico).
+
+## 2026-11-14 - Placard fisico: placa perfurada
+
+- Pedido: otimizar as ligacoes na placa perfurada e um desenho tecnico tipo Eagle. Feito com um programa que coloca as pecas, traca as pistas e verifica curtos e choques; pagina privada com vista de cima, vista de baixo (espelhada) e a plaquinha do lado A. O utilizador queixou-se da demora (25 min sem nada feito): o calculo de cabeca foi substituido pelo programa. Ver [[05 - Backlog e proximos passos]] (Placard fisico).
+
 ## 2026-11-07 - Conceito de cartas/equipamento e geracao local
 
 - Clarificado com o utilizador: a colecao metalica e apenas uma das familias possiveis; cartas e equipamentos podem ter outros materiais e estilos. Glow opcional, com variacao independente do material, raridade e nivel.
@@ -222,3 +232,12 @@ Validacoes:
 - Claude (2026-11-07): o utilizador entregou a passagem v2 (igual a nota 12) para registar este fluxo como forma de produzir as imagens da gamificacao. Acesso confirmado pelo Claude (`footer-comfy status` = ready, RTX 5080). Plano em 7 etapas passado para o backlog e regras para as decisoes. Sem geracao de imagens nem codigo nesta passagem.
 - Claude (2026-11-10): emails de conta deixaram de funcionar (SendGrid acabou com o plano gratis em 05/2025). Explicadas as opcoes: Gmail com palavra-passe de app (gratis, ja) ou dominio + Resend (definitivo). Feitas correcoes na app: codigos de 6 digitos no email para criar conta e recuperar password, ecra de nova password ao abrir o link, aviso de link expirado, botao "Entrar com Google" (por ligar), "Sair" so neste aparelho. Guia em `docs/emails-e-login.md`. Sem commit.
 - Claude (2026-11-10/11): historico sem ratings nas listas de jogadores nem radar "Equipas em comparação"; estatisticas do video passam a mostrar a Equipa A a esquerda depois de trocar equipas (os numeros ja seguiam os jogadores). Pedido seguinte: registo de golos (marcador + assistencia, AG, momento do video), com interruptor do admin por clube, registo por qualquer jogador e sugestoes de correcao decididas pelo admin.
+
+## 2026-11-11 - Organizacao de metricas, recompensas e recursos
+
+- Lida a avaliacao preenchida pelo utilizador no Google Sheets, com 186 Sim, 76 Nao e nove comentarios. Confirmado acesso gratuito para resultados, golos quando registados e dispositivos pessoais. Video para Premium e Futeboleiros com gravacao adequada.
+- Preparada uma folha nova com sete separadores, 23 propostas de conquistas, seis raridades do catalogo, mapa integral das 262 decisoes, 16 casos de dados opcionais, inventario de 81 recursos e 15 tarefas de producao local na RTX 5080.
+- Registadas as regras pretendidas para resposta a convocatorias e relatorios coletivos do admin. Inicios tardios, pausas, retomadas, dados parciais, correcoes e duplicados tratados na proposta tecnica.
+- Documento em [[13 - Metricas, recompensas e producao]]. Folha de trabalho em https://docs.google.com/spreadsheets/d/1xMK0hfpC3mFXU6_GuJO81e6no7FbmLl34-lzVbbNiAQ/edit e captura estruturada em `/home/joao/maestro/output/footer-recompensas-2026-11-11/plano-recompensas.json`.
+- Propostas de patamares, correspondencias e uso cosmetico assinaladas para revisao. A implementacao do motor, a economia de XP e a producao dos novos recursos correspondem a etapas seguintes.
+- A pedido do utilizador, preparada passagem completa para o Claude em `/home/joao/maestro/output/Footer_Handoff_Claude_Metricas_Recompensas_2026-11-11.md`, com as 262 decisoes, nove comentarios, 23 conquistas propostas, inventario de 81 recursos, casos de dados opcionais, operacao da RTX 5080 e proximos passos.
