@@ -12,8 +12,9 @@ function setup() {
   const modals = [];
   const context = createContext({
     console, Intl, crypto: webcrypto,
-    window: { FIVE5_CONFIG: {}, FooterMonthly: monthly, addEventListener() {} },
-    document: {
+    URLSearchParams,
+    window: { FIVE5_CONFIG: {}, location: { search: "" }, FooterMonthly: monthly, addEventListener() {} },
+    document: { addEventListener() {},
       querySelector() { return null; }, querySelectorAll() { return []; },
       createElement() { return { querySelectorAll() { return []; } }; },
       body: { appendChild(modal) { modals.push(modal); } },

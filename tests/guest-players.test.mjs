@@ -20,8 +20,9 @@ function setup({ rows = [], remote = false, admin = true, failure = null, readGa
   const dbRows = rows.map((r) => ({ ...r }));
   const button = { disabled: false };
   const context = createContext({ console, crypto: webcrypto, Intl,
-    window: { FIVE5_CONFIG: {}, crypto: webcrypto, addEventListener() {} },
-    document: { querySelector() { return null; }, querySelectorAll() { return []; } },
+    URLSearchParams,
+    window: { FIVE5_CONFIG: {}, location: { search: "" }, crypto: webcrypto, addEventListener() {} },
+    document: { addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; } },
     localStorage: { getItem: (k) => stored.get(k) || null, setItem: (k, v) => stored.set(k, v) },
     alert: (message) => alerts.push(message),
     fakeSupabase: { from(table) {
@@ -67,7 +68,7 @@ test("new guest becomes a persisted player without an account", async () => {
   const app = setup({ remote: true });
   const player = await app.run('createOrReuseGuestPlayer("  Amigo  Novo ", "6.5")');
   assert.equal(player.name, "Amigo Novo");
-  assert.equal(player.overall, 65);
+  assert.equal(player.overall, 60);
   assert.equal(player.isGuest, false);
   assert.equal(player.linkedUserId, null);
   assert.match(player.id, /^p-/);
@@ -112,13 +113,13 @@ test("ambiguous names cannot silently merge different players", async () => {
   assert.equal(app.json("state.players.length"), 0);
 });
 
-test("blank, non-finite and out-of-range scores cannot create a new player", async () => {
-  const app = setup();
-  for (const score of ["", " ", null, "NaN", "Infinity", "-1", "10.1"]) {
-    await assert.rejects(app.run(`createOrReuseGuestPlayer("Novo", ${JSON.stringify(score)})`), /nota entre 0 e 10/);
+// Notas escondidas em todos os clubes (2026-11-11): um jogador novo entra sempre com a base 60.
+test("with ratings hidden every new player starts at the base, whatever score is typed", async () => {
+  for (const score of ["", " ", null, "NaN", "-1", "6.5", "100"]) {
+    const app = setup();
+    assert.equal((await app.run(`createOrReuseGuestPlayer("Novo", ${JSON.stringify(score)})`)).overall, 60);
+    assert.equal(app.json("state.players.length"), 1);
   }
-  assert.equal(app.json("state.players.length"), 0);
-  assert.equal((await app.run('createOrReuseGuestPlayer("Novo", "0")')).overall, 0);
 });
 
 test("read and insert failures leave no local-only official player", async () => {

@@ -16,8 +16,9 @@ function setup({ admin = true, remote = false, response = "maybe", eventStatus =
   ];
   const context = createContext({
     console, Intl, crypto: webcrypto,
-    window: { FIVE5_CONFIG: {}, crypto: webcrypto, addEventListener() {} },
-    document: { querySelector() { return null; }, querySelectorAll() { return []; } },
+    URLSearchParams,
+    window: { FIVE5_CONFIG: {}, location: { search: "" }, crypto: webcrypto, addEventListener() {} },
+    document: { addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; } },
     localStorage: { getItem() { return null; }, setItem() {} },
     alert: (message) => alerts.push(message), buttons,
     fakeSupabase: { from(table) {
