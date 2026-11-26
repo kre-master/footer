@@ -191,6 +191,12 @@ input:focus, select:focus, textarea:focus { outline-color: var(--accent); border
   box-shadow: var(--shadow);
   backdrop-filter: none;
 }
+.theme-btn { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: 2px 2px 0 var(--cad-ink); }
+.theme-btn:hover, .theme-btn[aria-expanded="true"] { border-color: var(--cad-ink); background: var(--cad-yellow-soft); }
+.theme-panel { color: var(--ink); background: var(--cad-paper); border: 2px solid var(--cad-ink); box-shadow: var(--shadow); }
+.theme-option:hover { background: var(--cad-yellow-soft); }
+.theme-option.is-current { border-color: var(--cad-ink); }
+.theme-swatch { border-color: var(--cad-ink); }
 .menu-item { color: var(--ink); }
 .menu-item:hover { background: var(--cad-yellow-soft); }
 .auth-card {

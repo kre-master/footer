@@ -146,6 +146,8 @@ let supabaseClient = null;
 let remoteEnabled = false;
 let isAdmin = false;
 let currentSession = null;
+let themeAccountSelection = null;
+let themeSaveRequest = Promise.resolve();
 let currentProfile = null;
 let knownProfiles = [];
 // Grupos da conta (fase 3): o grupo ativo decide que dados se veem e quem e admin.
@@ -3626,16 +3628,28 @@ function bindNavigation() {
   on(document.querySelector("#back-to-events"), "click", () => showView("events"));
   on(document.querySelector("#account-menu-btn"), "click", (event) => {
     event.stopPropagation();
+    toggleThemePanel(false);
     toggleAccountMenu();
   });
+  on(document.querySelector("#theme-btn"), "click", (event) => {
+    event.stopPropagation();
+    toggleAccountMenu(false);
+    toggleThemePanel();
+  });
+  on(document.querySelector("#theme-menu"), "focusout", (event) => {
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) toggleThemePanel(false);
+  });
+  on(document.querySelector("#theme-panel"), "keydown", handleThemePanelKeys);
   document.addEventListener("click", (event) => {
     if (!event.target.closest("#account-menu")) toggleAccountMenu(false);
     if (!event.target.closest("#notify-menu")) toggleNotifyPanel(false);
+    if (!event.target.closest("#theme-menu")) toggleThemePanel(false);
   });
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     toggleAccountMenu(false);
     toggleNotifyPanel(false);
+    toggleThemePanel(false, true);
   });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-moment-share]");
@@ -4248,7 +4262,7 @@ function render() {
   renderAccountPanel();
   syncThemeFromAccount();
   renderAccountVisibility();
-  renderAppearancePanel();
+  renderThemePanel();
   renderClaimsList();
   renderAccountsList();
   renderPaymentsPanel();
@@ -4284,63 +4298,108 @@ function getMyPendingClaim() {
   return playerClaims.find((claim) => claim.user_id === currentSession.user.id && claim.status === "pending") || null;
 }
 
-// Visibilidade na pesquisa: por defeito a conta esta escondida; so aparece em Procurar se a pessoa escolher.
-const THEME_STORAGE_KEY = "footer-theme";
-const THEMES = {
-  caderneta: { label: "Caderneta", hint: "Claro, cartões como cromos, vermelho de destaque.", color: "#eef1f6" },
-  holofote: { label: "Holofote", hint: "Escuro, estádio à noite, azul da chama do logo.", color: "#0a1222" },
-};
-
-function getStoredTheme() {
-  try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    return THEMES[saved] ? saved : "caderneta";
-  } catch (error) {
-    return "caderneta";
-  }
+function saveThemeOnDevice(theme) {
+  applyTheme(theme);
+  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch { /* sem armazenamento local */ }
 }
 
-// O ficheiro theme-caderneta.css vai por cima do styles.css (Holofote): desligá-lo repõe o Holofote.
-function applyTheme(theme) {
-  const name = THEMES[theme] ? theme : "caderneta";
-  const link = document.querySelector("#theme-caderneta-link");
-  if (link) link.disabled = name !== "caderneta";
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEMES[name].color);
-  try { localStorage.setItem(THEME_STORAGE_KEY, name); } catch (error) { /* sem armazenamento local */ }
-}
-
-// A escolha da conta (user_metadata.theme) manda sobre a do aparelho.
 function syncThemeFromAccount() {
-  const saved = currentSession?.user?.user_metadata?.theme;
-  if (THEMES[saved] && saved !== getStoredTheme()) applyTheme(saved);
+  const user = currentSession?.user;
+  if (themeAccountSelection?.userId !== user?.id) themeAccountSelection = null;
+  if (themeAccountSelection && !themeAccountSelection.saved) return;
+
+  const saved = user?.user_metadata?.theme;
+  if (saved && Object.hasOwn(THEMES, saved) && saved !== getActiveTheme()) saveThemeOnDevice(saved);
 }
 
-function renderAppearancePanel() {
-  const holder = document.querySelector("#account-appearance");
+function selectTheme(choice) {
+  saveThemeOnDevice(choice);
+  const userId = currentSession?.user?.id;
+  if (userId && supabaseClient) {
+    const selection = { userId, saved: false, status: "A guardar na tua conta…" };
+    themeAccountSelection = selection;
+
+    // Guarda por ordem e ignora escolhas já substituídas enquanto esperam pela rede.
+    themeSaveRequest = themeSaveRequest.then(async () => {
+      if (themeAccountSelection !== selection || currentSession?.user?.id !== userId) return;
+      try {
+        const { data, error } = await supabaseClient.auth.updateUser({ data: { theme: choice } });
+        if (error) throw error;
+        if (data?.user && currentSession?.user?.id === userId) currentSession.user = data.user;
+        selection.saved = true;
+        selection.status = "Guardado na tua conta.";
+      } catch {
+        selection.status = "Aplicado neste aparelho. Não foi possível guardar na conta.";
+      }
+      if (themeAccountSelection === selection && currentSession?.user?.id === userId) renderThemePanel();
+    });
+  }
+  renderThemePanel();
+}
+
+// Botão do sol no topo, ao lado da conta: abre a escolha de aspeto.
+function renderThemePanel() {
+  const holder = document.querySelector("#theme-panel");
   if (!holder) return;
-  const current = getStoredTheme();
-  holder.innerHTML = `
-    <div class="account-card">
-      <h3>Aspeto da app</h3>
+
+  if (!holder.firstElementChild) {
+    holder.innerHTML = `
       ${Object.entries(THEMES).map(([key, item]) => `
-        <label class="club-check"><input type="radio" name="app-theme" value="${key}" ${key === current ? "checked" : ""}>
-          <span><strong>${item.label}</strong>: ${item.hint}</span></label>`).join("")}
-      <p data-theme-status>${currentSession?.user ? "Fica guardado na tua conta e vale em todos os aparelhos." : "Fica guardado neste aparelho. Entra para o levares contigo."}</p>
-    </div>`;
-  holder.querySelectorAll('input[name="app-theme"]').forEach((input) => input.addEventListener("change", async () => {
-    applyTheme(input.value);
-    const status = holder.querySelector("[data-theme-status]");
-    if (!currentSession?.user || !supabaseClient) return;
-    const { data, error } = await supabaseClient.auth.updateUser({ data: { theme: input.value } });
-    if (error) {
-      if (status) status.textContent = `Mudou aqui, mas não consegui guardar na conta: ${error.message}`;
-      return;
-    }
-    if (data?.user) currentSession.user = data.user;
-    if (status) status.textContent = "Guardado na tua conta.";
-  }));
+        <button class="theme-option" type="button" role="menuitemradio" tabindex="-1" data-theme-choice="${key}">
+          <span class="theme-swatch theme-swatch-${key}" aria-hidden="true"></span>
+          <span><strong>${item.label}</strong><small>${item.hint}</small></span>
+        </button>`).join("")}
+      <p class="theme-note" data-theme-status role="status"></p>`;
+    holder.querySelectorAll("[data-theme-choice]").forEach((button) => {
+      button.addEventListener("click", () => selectTheme(button.dataset.themeChoice));
+    });
+  }
+
+  const current = getActiveTheme();
+  for (const button of holder.querySelectorAll("[data-theme-choice]")) {
+    const selected = button.dataset.themeChoice === current;
+    button.classList.toggle("is-current", selected);
+    button.setAttribute("aria-checked", String(selected));
+  }
+
+  const userId = currentSession?.user?.id;
+  const status = holder.querySelector("[data-theme-status]");
+  const message = userId
+    ? (themeAccountSelection?.userId === userId ? themeAccountSelection.status : "Fica guardado na tua conta e vale em todos os aparelhos.")
+    : "Fica guardado neste aparelho. Entra para o levares contigo.";
+  if (status.textContent !== message) status.textContent = message;
 }
 
+function handleThemePanelKeys(event) {
+  const options = [...event.currentTarget.querySelectorAll("[data-theme-choice]")];
+  const index = options.indexOf(document.activeElement);
+  let next;
+  switch (event.key) {
+    case "ArrowDown": next = (index + 1) % options.length; break;
+    case "ArrowUp": next = (index - 1 + options.length) % options.length; break;
+    case "Home": next = 0; break;
+    case "End": next = options.length - 1; break;
+    default: return;
+  }
+  event.preventDefault();
+  options[next]?.focus();
+}
+
+function toggleThemePanel(force, restoreFocus = false) {
+  const panel = document.querySelector("#theme-panel");
+  const button = document.querySelector("#theme-btn");
+  if (!panel || !button) return;
+  const wasOpen = !panel.classList.contains("hidden");
+  const open = force ?? !wasOpen;
+  if (open === wasOpen) return;
+  if (open) renderThemePanel();
+  panel.classList.toggle("hidden", !open);
+  button.setAttribute("aria-expanded", String(open));
+  if (open) panel.querySelector('[aria-checked="true"]')?.focus();
+  else if (restoreFocus) button.focus();
+}
+
+// Visibilidade na pesquisa: por defeito a conta esta escondida; so aparece em Procurar se a pessoa escolher.
 function renderAccountVisibility() {
   const holder = document.querySelector("#account-visibility");
   if (!holder) return;

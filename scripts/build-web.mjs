@@ -5,6 +5,8 @@ const files = [
   "index.html",
   "styles.css",
   "theme-caderneta.css",
+  "themes.css",
+  "themes.js",
   "stats-calculations.js",
   "app.js",
   "postgame-feedback.js",

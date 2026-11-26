@@ -3515,13 +3515,10 @@ th.stat-col {
 }
 
 .topbar-actions {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.theme-menu {
-  position: relative;
 }
 
 .theme-btn {
@@ -3557,7 +3554,11 @@ th.stat-col {
   z-index: 60;
   display: grid;
   gap: 4px;
-  width: min(280px, calc(100vw - 32px));
+  width: min(310px, calc(100vw - 32px));
+  max-height: calc(100vh - 96px);
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 6px;
@@ -3573,9 +3574,10 @@ th.stat-col {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 48px;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   color: var(--ink);
   background: transparent;
   text-align: left;

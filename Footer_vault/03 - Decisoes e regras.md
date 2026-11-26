@@ -303,6 +303,7 @@ O browser integrado/Codex browser pode falhar com sandbox no Windows. Preferir t
 
 - Seletor de aspeto (2026-11-12): em Conta > "Aspeto da app" cada utilizador escolhe Caderneta (por defeito) ou Holofote. Fica na conta (`user_metadata.theme` do Supabase Auth, sem migracao SQL) e em `localStorage` (`footer-theme`) para nao piscar ao abrir. Implementa-se ligando/desligando o `<link id="theme-caderneta-link">`.
 - Aspeto no topo (2026-11-26): a escolha saiu de Conta e passou para um botao com um sol ao lado da conta, no topo; abre um pequeno menu com Caderneta e Holofote. Mesma gravacao (conta + aparelho).
+- O seletor inclui Caderneta, Holofote, Natal, Relvado e Arcade. Caderneta e o tema por defeito. Natal pode ser escolhido em qualquer altura do ano.
 
 ## Dono da app: eliminar jogadores e contas (2026-11-06)
 
