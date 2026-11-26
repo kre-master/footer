@@ -14348,6 +14348,13 @@ function renderMomentsList(game) {
   </ul>`;
 }
 
+// Momentos perto de um tempo (o mesmo criterio do leitor novo: 10 s para cada lado).
+function findNearbyBookmarks(items, seconds) {
+  const lab = window.FooterVideoLab;
+  if (lab?.findNearbyMoments) return lab.findNearbyMoments(items, seconds);
+  return items.filter((item) => Math.abs(item.t - seconds) <= 10).sort((a, b) => Math.abs(a.t - seconds) - Math.abs(b.t - seconds));
+}
+
 function canMarkMoments() {
   return !remoteEnabled || Boolean(currentSession?.user);
 }
@@ -14365,6 +14372,7 @@ function renderMomentForm(extraClass = "") {
       </div>
       <input type="text" name="note" maxlength="140" placeholder="Ex.: Golaco do Cunha" required autocomplete="off">
       <p class="tracking-error" data-moment-error hidden></p>
+      <div class="moment-dup" data-moment-dup hidden></div>
       <div class="moment-form-actions">
         <button type="button" class="ghost-btn" data-moment-cancel>Cancelar</button>
         <button type="submit" class="primary-btn">Guardar momento</button>
@@ -14570,6 +14578,7 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
   let youtubeId = null;
   let editingId = null;
   const submitButton = form.querySelector("button[type=submit]");
+  const dupBox = form.querySelector("[data-moment-dup]");
 
   const readMoment = () => window.FooterTracking.parseClock(form.moment.value);
   const updateWindow = () => {
@@ -14596,7 +14605,38 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
     if (resumeAfter) sendVideoCommand(getFrame(), "playVideo");
   };
 
-  on(form.moment, "input", updateWindow);
+  // Ja ha um momento (de qualquer jogador) perto deste tempo, no mesmo video: pergunta se nao e o mesmo.
+  // "E o mesmo" fecha sem guardar; "E outro" deixa guardar na mesma.
+  let dupDismissed = false;
+  const updateDuplicate = () => {
+    const moment = readMoment();
+    const part = youtubeId || getGameVideoParts(game.id)[0]?.youtubeId;
+    const items = getGameBookmarks(game.id)
+      .filter((item) => !part || item.youtubeId === part)
+      .map((item) => ({ ...item, t: item.momentS }));
+    const nearby = editingId || dupDismissed || moment == null ? [] : findNearbyBookmarks(items, moment);
+    dupBox.hidden = !nearby.length;
+    if (!nearby.length) return;
+    const first = nearby[0];
+    const more = nearby.length > 1 ? ` (e mais ${nearby.length - 1})` : "";
+    dupBox.innerHTML = `
+      <p>⚠️ Já existe um momento a <strong>${escapeHtml(formatVideoClock(first.momentS))}</strong>: «${escapeHtml(first.note)}» · ${escapeHtml(first.authorName || "Jogador")}${more}. Não será o mesmo?</p>
+      <div class="moment-dup-actions">
+        <button type="button" class="ghost-btn" data-moment-dup-same>É o mesmo</button>
+        <button type="button" class="ghost-btn" data-moment-dup-new>É outro</button>
+      </div>`;
+    on(dupBox.querySelector("[data-moment-dup-same]"), "click", close);
+    on(dupBox.querySelector("[data-moment-dup-new]"), "click", () => {
+      dupDismissed = true;
+      dupBox.hidden = true;
+      form.note.focus();
+    });
+  };
+
+  on(form.moment, "input", () => {
+    updateWindow();
+    updateDuplicate();
+  });
   form.querySelectorAll("[data-moment-adjust]").forEach((button) => on(button, "click", () => {
     const [edge, delta] = button.dataset.momentAdjust.split(":");
     const change = Number(delta);
@@ -14641,8 +14681,10 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
       form.moment.value = now == null ? "" : formatVideoClock(now);
       form.note.value = "";
       showError(now == null ? "Nao consegui ler o tempo do video. Escreve o momento (mm:ss)." : "");
+      dupDismissed = false;
       form.classList.remove("hidden");
       updateWindow();
+      updateDuplicate();
       (now == null ? form.moment : form.note).focus();
     },
     // Abre o formulario com um momento ja guardado, para corrigir o texto, o tempo ou o pedaco.
@@ -14653,6 +14695,7 @@ function wireMomentForm(form, game, { getFrame, onSaved, resumeAfter = false }) 
       form.moment.value = formatVideoClock(item.momentS);
       form.note.value = item.note;
       showError("");
+      dupBox.hidden = true;
       form.classList.remove("hidden");
       updateWindow();
       form.note.focus();

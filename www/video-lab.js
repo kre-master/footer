@@ -15,6 +15,8 @@
   const MOMENTS_KEY = "footer-video-lab-moments";
   const MOMENT_BEFORE_S = 8;
   const MOMENT_AFTER_S = 5;
+  // Dois momentos a menos de 10 s um do outro sao provavelmente a mesma jogada (o pedaco ja apanha 8 s antes e 5 s depois).
+  const DUPLICATE_WINDOW_S = 10;
   const ZOOMS = [1, 2, 3, 5];
   const MAX_ZOOM = 5;
   const FRAME_S = 1 / 30;
@@ -173,6 +175,7 @@
               <span class="lab-moment-window" data-lab-moment-window></span>
             </div>
             <p class="lab-moment-error" data-lab-moment-error hidden></p>
+            <div class="lab-moment-dup" data-lab-moment-dup hidden></div>
           </form>
           <div class="lab-controls">
             <div class="lab-row lab-row-seek">
@@ -226,6 +229,7 @@
     const adjustRow = container.querySelector("[data-lab-moment-adjust]");
     const momentWindow = container.querySelector("[data-lab-moment-window]");
     const momentError = container.querySelector("[data-lab-moment-error]");
+    const momentDup = container.querySelector("[data-lab-moment-dup]");
     let currentSrc = src;
     let currentGame = null;
     let momentAt = 0;
@@ -614,8 +618,28 @@
       adjustRow.hidden = !item;
       updateWindow();
       showMomentError("");
+      showMomentDuplicate(item ? [] : findNearbyMoments(listMoments(), momentAt));
       momentForm.hidden = false;
       momentForm.note.focus();
+    }
+    // Ja ha um momento (de qualquer jogador) perto deste tempo: pergunta se nao e o mesmo antes de duplicar.
+    function showMomentDuplicate(nearby) {
+      momentDup.hidden = !nearby.length;
+      if (!nearby.length) return;
+      const first = nearby[0];
+      const author = first.author ? ` · ${escapeAttr(first.author)}` : "";
+      const more = nearby.length > 1 ? ` (e mais ${nearby.length - 1})` : "";
+      momentDup.innerHTML = `
+        <p>⚠️ Já existe um momento a <strong>${formatClock(first.t)}</strong>: «${escapeAttr(first.note)}»${author}${more}. Não será o mesmo?</p>
+        <div class="lab-moment-dup-actions">
+          <button type="button" data-lab-dup-same>É o mesmo</button>
+          <button type="button" data-lab-dup-new>É outro</button>
+        </div>`;
+      on(momentDup.querySelector("[data-lab-dup-same]"), "click", closeMoment);
+      on(momentDup.querySelector("[data-lab-dup-new]"), "click", () => {
+        momentDup.hidden = true;
+        momentForm.note.focus();
+      });
     }
     const closeMoment = () => {
       momentForm.hidden = true;
@@ -809,9 +833,17 @@
     };
   }
 
+  // Momentos a menos de windowS segundos de t, do mais perto para o mais longe. Itens: { id, t, ... }.
+  function findNearbyMoments(items, t, { windowS = DUPLICATE_WINDOW_S, excludeId = null } = {}) {
+    if (!Array.isArray(items) || !Number.isFinite(t)) return [];
+    return items
+      .filter((item) => item && item.id !== excludeId && Number.isFinite(item.t) && Math.abs(item.t - t) <= windowS)
+      .sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t));
+  }
+
   function on(element, type, handler, options) {
     if (element) element.addEventListener(type, handler, options);
   }
 
-  return { mount, formatClock, clampPan, zoomAround, isHlsSrc, SAMPLE_SRC, PRESETS };
+  return { mount, formatClock, clampPan, zoomAround, isHlsSrc, findNearbyMoments, DUPLICATE_WINDOW_S, SAMPLE_SRC, PRESETS };
 });

@@ -25,7 +25,8 @@
     "test:antifraud": "node --test tests/anti-fraud-schema.test.mjs",
     "test:fantasy": "node --test tests/fantasy-league.test.mjs",
     "test:balneario": "node --test tests/balneario.test.mjs",
-    "test:xp": "node --test tests/xp-results.test.mjs"
+    "test:xp": "node --test tests/xp-results.test.mjs",
+    "test:moments": "node --test tests/moment-duplicates.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.5",
